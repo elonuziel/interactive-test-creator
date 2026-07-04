@@ -8,8 +8,12 @@ if hasattr(sys.stdout, 'reconfigure'):
 def main():
     parser = argparse.ArgumentParser(description="QA check for the final questions.json file.")
     parser.add_argument("json_file", help="Path to the questions.json file")
+    parser.add_argument("--expected-options", type=int, default=None,
+                        help="Expected number of options per question (default: 4). "
+                             "Questions with a different count will show a WARNING rather than an ERROR.")
     
     args = parser.parse_args()
+    expected_opts = args.expected_options if args.expected_options is not None else 4
 
     try:
         with open(args.json_file, 'r', encoding='utf-8') as f:
@@ -19,16 +23,18 @@ def main():
         return
 
     print(f"Total questions: {len(qs)}\n")
-    problems = []
+    errors = []
+    warnings = []
 
     for i, q in enumerate(qs):
         issues = []
+        warns = []
         if not q.get('question'):
             issues.append("EMPTY question text")
             
         options = q.get('options', [])
-        if len(options) != 4:
-            issues.append(f"Wrong option count: {len(options)}")
+        if len(options) != expected_opts:
+            warns.append(f"Option count: {len(options)} (expected {expected_opts})")
             
         for j, opt in enumerate(options):
             if not opt:
@@ -38,16 +44,39 @@ def main():
         ci = q.get('correctIndex', 0)
         if ci >= len(options):
             issues.append(f"correctIndex {ci} out of range (only {len(options)} options)")
+        elif ci < 0:
+            issues.append(f"correctIndex {ci} is negative")
+
+        # Detect duplicate option text within a question
+        seen_texts = {}
+        for j, opt in enumerate(options):
+            if opt and opt in seen_texts:
+                warns.append(f"Duplicate option text: option {seen_texts[opt]} and option {j} both say \"{opt}\"")
+            elif opt:
+                seen_texts[opt] = j
             
         if issues:
-            problems.append((i + 1, issues))
+            errors.append((i + 1, issues))
+        if warns:
+            warnings.append((i + 1, warns))
 
-    if not problems:
-        print("All questions look good!")
-    else:
-        print(f"{len(problems)} questions have issues:\n")
-        for qnum, issues in problems:
+    if errors:
+        print(f"{len(errors)} question(s) have ERRORS:\n")
+        for qnum, issues in errors:
             print(f"  Q{qnum}: {', '.join(issues)}")
+    else:
+        print("No errors found.")
+
+    if warnings:
+        print(f"\n{len(warnings)} question(s) have WARNINGS:\n")
+        for qnum, warns in warnings:
+            print(f"  Q{qnum}: {', '.join(warns)}")
+        print("\n  Warnings are expected for exams with combination answers or non-standard option counts.")
+    else:
+        print("No warnings.")
+
+    if not errors and not warnings:
+        print("All questions look good!")
 
 if __name__ == "__main__":
     main()

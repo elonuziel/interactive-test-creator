@@ -13,8 +13,28 @@ Ensure the required libraries are installed:
 pip install pymupdf pandas openpyxl
 ```
 
+## `questions.json` Schema Reference
+Each question object in the JSON array follows this structure:
+```json
+[
+  {
+    "question": "הטקסט המלא של השאלה בעברית...",
+    "options": ["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+    "correctIndex": 2,
+    "image": "images/q5_graph.png"
+  }
+]
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `question` | string | **Yes** | Full question text in Hebrew |
+| `options` | string[] | **Yes** | Answer options (usually 4, but may be more for combination-answer exams) |
+| `correctIndex` | number | **Yes** | 0-based index of the correct option within `options` (Option 1 = 0, Option 2 = 1, etc.) |
+| `image` | string | No | Relative path from the test folder to an image file (e.g., `"images/q1_graph.png"`). Omit if no image. |
+
 ## Practical Findings From This Repo
-- For the digital Hebrew PDFs in this repository, PyMuPDF already returned the text in correct logical Hebrew order. A blanket word-reversal pass scrambled the questions and split option letters across lines.
+- For the digital Hebrew PDFs in this repository, PyMuPDF already returned the text in correct logical Hebrew order. A blanket word-reversal pass scrambled the questions and split option letters across lines. **Do NOT use `--reverse` unless you've verified the raw output is in visual (reversed) order.**
 - The provided 2019 Botany PDFs are exam code `000` master copies. In these files, the intended answer is usually option `א`, but some questions use a combination answer like `תשובות ב ו-ד נכונות` as a regular option and that option should be preserved as the correct one when applicable.
 
 ---
@@ -31,15 +51,26 @@ It will output whether the PDF is a **Digital PDF** (extractable text) or a **Sc
 ## Step 2: Extract Questions (Digital PDF Path)
 If the PDF is Digital, you can automate text extraction.
 
-Before post-processing the extracted text, inspect a sample page. Do not assume Hebrew needs to be reversed line-by-line; if the raw output is already logical, reversing it will degrade the result.
+**⚠️ Important:** Before extracting the entire document, always inspect a sample page first. The Hebrew word order in the raw output varies by PDF — some need reversal, some don't. Reversing a PDF that's already in logical order will scramble it.
 
-**2A. Extract Raw Text**
-Use PyMuPDF to extract the text and automatically fix the Hebrew word-order reversal issue:
+**2A. Inspect the First Page**
+Extract just the first page to check Hebrew word order:
 ```bash
+python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" --first-page-only -o "raw_text_page1.md"
+```
+Read the output. If the Hebrew text reads correctly left-to-right as logical Hebrew, proceed without `--reverse`. If words appear backwards (visual order — e.g., "הבא היום" instead of "היום הבא"), add `--reverse` in the next step.
+
+**2B. Extract Full Text**
+Extract all pages. Only add `--reverse` if your inspection in Step 2A showed the text was in visual (reversed) order:
+```bash
+# For most PDFs in this repo (already logical Hebrew — NO reversal):
 python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" -o "raw_text.md"
+
+# If the raw text is in visual order (reversed Hebrew words):
+python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" -o "raw_text.md" --reverse
 ```
 
-**2B. Parse to JSON**
+**2C. Parse to JSON**
 Parse the raw text markdown into a structured JSON:
 ```bash
 python python_scripts/5_parse_questions_md.py "raw_text.md" -o "questions.json"
@@ -55,17 +86,7 @@ If the PDF is scanned (or has heavily complex diagrams that break digital extrac
 python python_scripts/3_render_pdf_pages.py "path/to/exam.pdf" -o "pages_output"
 ```
 **2B. Manual / LLM Transcription**
-You must read the generated images, extract the questions and options manually (using your vision capabilities), and format them into the `questions.json` structure:
-```json
-[
-  {
-    "question": "כותרת השאלה...",
-    "options": ["תשובה 1", "תשובה 2", "תשובה 3", "תשובה 4"],
-    "correctIndex": 0,
-    "image": "images/q1_graph.png" 
-  }
-]
-```
+You must read the generated images, extract the questions and options manually (using your vision capabilities), and format them into the `questions.json` structure (see [Schema Reference](#questionsjson-schema-reference) above).
 
 ---
 
@@ -86,7 +107,7 @@ If the file is an Excel export from Tomamix, it often has the following quirks:
 1. **Header Row Location:** The column headers (like `שאלון` and `שאלה 1`) are usually **not on the first row** (often row 5 or 6).
 2. **Cell Format:** Cells look like `3 (2) [15] {4}`. The correct answer is the integer inside the parentheses `()`.
 
-`4_extract_csv_answers.py` now handles both CSV and Excel inputs directly. It scans for the header row instead of assuming `header=0`, and it maps cancelled questions (e.g. cells containing `והת` or `מבוטלת`) to `null`. Save the output as `answers.json` structured like `{"1": 3, "2": null, "3": 1...}`.
+`4_extract_csv_answers.py` handles both CSV and Excel inputs directly. It scans for the header row instead of assuming `header=0`, and it maps cancelled questions (e.g. cells containing `והת` or `מבוטלת`) to `null`. Save the output as `answers.json` structured like `{"1": 3, "2": null, "3": 1...}`.
 
 ---
 
@@ -100,16 +121,74 @@ python python_scripts/6_merge_json_answers.py "questions.json" "answers.json" -o
 ---
 
 ## Step 5: QA & Finalization
-Run the QA script to catch dropped options or out-of-bounds indices:
+Run the QA script to catch dropped options, empty questions, or out-of-bounds indices:
 ```bash
 python python_scripts/7_check_json.py "final_questions.json"
 ```
 
+> **Note on option counts:** The QA script flags questions that don't have exactly 4 options. Some exams (such as 000 master copies with combination answers) intentionally have more than 4 options. If the extra options are legitimate combination answers (e.g., `כל התשובות נכונות`), the warning is expected and safe to ignore. Focus on actual errors like empty text, out-of-range `correctIndex`, or truly missing options.
+
 If everything passes:
-1. Create a directory for the exam: `mkdir -p tests/test_name`
+1. Create a directory for the exam:
+   ```bash
+   # On Linux/macOS:
+   mkdir -p tests/test_name
+   # On Windows (cmd):
+   mkdir tests\test_name
+   ```
 2. Move `final_questions.json` into the directory and rename it to `questions.json`.
 3. Move any extracted images into `tests/test_name/images/`.
 4. The test is now playable at `http://localhost:8000/web/index.html?test=tests/test_name`!
+
+---
+
+## Extracting Images from PDFs
+
+To extract embedded images from a digital PDF, use PyMuPDF directly:
+```python
+import fitz
+doc = fitz.open("exam.pdf")
+for page_num in range(len(doc)):
+    for img_index, img in enumerate(doc.get_page_images(page_num)):
+        xref = img[0]
+        pix = fitz.Pixmap(doc, xref)
+        if pix.n < 5:  # GRAY or RGB
+            pix.save(f"images/page{page_num+1}_img{img_index+1}.png")
+        else:  # CMYK — convert to RGB first
+            pix = fitz.Pixmap(fitz.csRGB, pix)
+            pix.save(f"images/page{page_num+1}_img{img_index+1}.png")
+```
+
+Associate extracted images with their questions by setting the `"image"` field in `questions.json` (see [Schema Reference](#questionsjson-schema-reference)).
+
+---
+
+## Troubleshooting
+
+### "Question X parsed as empty"
+The question detection regex expects `שאלה מספר` or `מספר שאלה` at the start of a line. If the exam uses a different format (e.g., `.5 שאלה`), manually add the question text to the JSON or adjust the regex in `5_parse_questions_md.py`.
+
+### "Options merged into one line / option letters split across lines"
+This usually happens when `--reverse` was incorrectly applied to a PDF already in logical Hebrew order. Re-extract without `--reverse`.
+If the issue persists, the PDF may have unusual line-breaking. Check the raw markdown output and consider manually editing the option boundaries.
+
+### "No answers found for form X"
+The form number doesn't match any row in the answer key file. Double-check:
+- The form number spelling (e.g., `"76"` vs `"076"`)
+- That the answer key file contains the expected header row with `שאלון` and `שאלה`
+- That the form number appears in the first 3 columns of a data row
+
+### "correctIndex out of range"
+The answer key assigned an option number (e.g., 5) that exceeds the number of options parsed from the PDF (e.g., only 4 options). This can happen when:
+- The answer key uses a different option numbering than expected
+- A combination answer was collapsed when it should have been preserved
+Check the specific question in both `questions.json` and `answers.json` and manually correct.
+
+### Images not displaying in the web app
+Verify:
+- Image paths in `questions.json` are relative to the test folder (e.g., `"images/q1.png"`, not `"tests/my_test/images/q1.png"`)
+- The image files actually exist at `tests/test_name/images/`
+- File extensions match (`.png` vs `.jpg`)
 
 ---
 
@@ -132,3 +211,6 @@ For scanned PDFs without OCR text layers:
 For exam code `000` master copies, the correct answer is usually encoded directly in question options (e.g., `כל התשובות נכונות` or `תשובות א ו-ג נכונות` as an option), not in a separate answer key. The correct answer is always **Option 1 (`correctIndex: 0`)** unless explicitly stated otherwise in the question options.
 
 Preserve combination answers when found – do not collapse them automatically.
+
+### `parse_2018_moed_a.py`
+This script at the repo root is a one-off transcription helper used specifically for the 2018 Moed A scanned exam. It contains manually transcribed question text hardcoded for that exam. It is **not** a general-purpose tool — for new scanned exams, follow the [Scanned PDF Path](#step-2-alternative-extract-questions-scanned-pdf-path) workflow instead.

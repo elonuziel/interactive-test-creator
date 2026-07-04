@@ -21,8 +21,9 @@ Determines if a PDF is a Digital PDF (has extractable text) or a Scanned PDF (im
 Use these scripts to extract text and parse it:
 
 **A. `2_extract_text_fitz.py`**
-Extracts the text using PyMuPDF and fixes the Hebrew word-order reversal issue automatically.
+Extracts the text using PyMuPDF. Hebrew word-order reversal is **opt-in** via `--reverse` — always inspect a sample page first with `--first-page-only` to check if reversal is needed.
 **Usage:** `python 2_extract_text_fitz.py "exam.pdf" -o "raw_text.md"`
+**Options:** `--reverse` (opt-in Hebrew word reversal), `--first-page-only` (extract only page 1 for inspection)
 
 **B. `5_parse_questions_md.py`**
 Parses the generated Markdown file into a structured `questions.json` file.
@@ -52,5 +53,6 @@ Merges the extracted answers from the CSV with the raw questions JSON (which mig
 ### 5. Quality Assurance
 
 **`7_check_json.py`**
-Checks the final JSON file for dropped options, empty questions, or out-of-bounds `correctIndex` values. Run this before deploying!
+Checks the final JSON file for dropped options, empty questions, duplicate option text, or out-of-bounds `correctIndex` values. Run this before deploying!
 **Usage:** `python 7_check_json.py "final_questions.json"`
+**Options:** `--expected-options N` (default: 4; mismatched counts produce a warning instead of an error)
