@@ -60,6 +60,31 @@ def normalize_whitespace(text):
     """Replace non‑breaking spaces, collapse whitespace, strip. (L288–295)"""
     return re.sub(r'\s+', ' ', text.replace('\u00A0', ' ')).strip()
 
+def clean_question_text(text):
+    """
+    Fix LTR‑grouping artifacts that appear in smart‑extracted Hebrew text:
+    - Stray leading dots (e.g. '.(text' → '(text')
+    - Trailing hyphens from line‑breaks (e.g. 'text-' → 'text')
+    - Dot‑then‑letter merges (e.g. '.א' → 'א.')
+    - Misplaced ? and :( at start of question → move to end
+    """
+    text = normalize_whitespace(text)
+    # Strip leading stray dots that aren't part of an answer marker
+    text = re.sub(r'^\.(?!\s*[אבגד1-4]\s)', '', text)
+    # Strip trailing hyphens (line‑break artifacts)
+    text = re.sub(r'-\s*$', '', text)
+    # Fix dot‑letter sequences: '.א ' → 'א. ' (LTR artifact)
+    text = re.sub(r'\.([אבגד1-4])\s', r'\1. ', text)
+
+    # Move misplaced ? from start to end: "?text" → "text?"
+    if text.startswith('?'):
+        text = text[1:] + '?'
+
+    # Move misplaced :( from start to end: ":(text" → "text:"
+    if text.startswith(':('):
+        text = text[2:] + ':'
+
+    return normalize_whitespace(text)
 
 def reverse_words(line):
     """Return the line with word order reversed (for RTL edge‑case matching)."""
@@ -126,12 +151,14 @@ def try_match_patterns(line):
     return None, None
 
 
-def try_split_midline_answer(line):
+def try_split_midline_answer(line, has_question_text=False):
     """
     If the line has an answer marker mid‑line, return (preceding_text, letter, answer_text).
     Otherwise return None.
-    Used when we're in question‑text mode (state=1) and an option א is stuck
-    to the end of the question body because of LTR text grouping.
+
+    When has_question_text is True and the fragment before the answer marker
+    looks like content (not a question ending), the fragment is merged into
+    the answer text rather than being treated as question continuation.
     """
     m = ANS_MIDLINE_RE.search(line)
     if not m:
@@ -139,9 +166,25 @@ def try_split_midline_answer(line):
     letter = m.group(1)
     start = m.start(1)      # position of the letter in the line
     before = line[:start].strip()
+    # Clean LTR artifacts from the question fragment
+    before = re.sub(r'^\.', '', before)          # stray leading dot
+    before = re.sub(r'-\s*$', '', before)        # trailing line‑break hyphen
+    before = before.strip()
     after = line[start:].strip()
     # Strip the letter+separator from the answer text
     answer_text = re.sub(r'^[אבגד1-4]\s*[\.\)]\s*', '', after).strip()
+
+    # Heuristic: if we already have question text and the fragment looks like
+    # answer content (not ending with : or ?), it's likely a multi‑line option
+    if has_question_text and before:
+        if not re.search(r'[?:]\s*$', before):
+            # Restore trailing hyphen (it's a word‑join hyphen like דו-חמצני, not a line‑break artifact)
+            if re.search(r'-\s*$', line[:start]):
+                before = before + "-"
+            # Merge fragment into the answer; answer_text comes first (RTL verb→object order)
+            answer_text = (answer_text + " " + before).strip()
+            before = ""
+
     return before, letter, answer_text
 
 
@@ -215,7 +258,7 @@ def main():
                 current_q['answers'].append({'text': [text] if text else []})
             elif state == 1:
                 # Try mid‑line split: option א stuck to question body
-                split = try_split_midline_answer(line)
+                split = try_split_midline_answer(line, has_question_text=bool(current_q['text']))
                 if split:
                     before, letter, answer_text = split
                     if before:
@@ -234,7 +277,7 @@ def main():
     # ── Format output (Steps 2.4 + 2.5) ────────────────────────────────────
     formatted = []
     for q in questions:
-        question_text = normalize_whitespace(" ".join(q['text']))
+        question_text = clean_question_text(" ".join(q['text']))
         options = [
             normalize_whitespace(" ".join(a['text']))
             for a in q['answers']
