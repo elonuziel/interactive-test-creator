@@ -35,17 +35,23 @@
             <div class="welcome-card">
                 <h1>בחירת מבחן</h1>
                 <p>אנא בחר מבחן מרשימת המבחנים הזמינים, או הזן נתיב למבחן חדש.</p>
-                <div style="margin: 20px 0;">
-                    <a href="?test=tests/2019%20a" class="secondary-btn" style="display: block; margin-bottom: 10px; text-decoration: none;">בוטניקה - 2019 מועד א'</a>
-                    <a href="?test=tests/2019%20b" class="secondary-btn" style="display: block; margin-bottom: 10px; text-decoration: none;">בוטניקה - 2019 מועד ב'</a>
-                    <a href="?test=tests/2018%20a" class="secondary-btn" style="display: block; margin-bottom: 10px; text-decoration: none;">בוטניקה - 2018 מועד א'</a>
-                    <a href="?test=tests/2018%20b" class="secondary-btn" style="display: block; margin-bottom: 10px; text-decoration: none;">בוטניקה - 2018 מועד ב'</a>
+                <div id="test-list" style="margin: 20px 0;">
+                    <p style="color: var(--text-secondary);">טוען רשימת מבחנים...</p>
                 </div>
                 <div style="margin-top: 30px;">
                     <p style="font-size: 0.9em; color: var(--text-secondary);">או הקלד נתיב למבחן:</p>
                     <input type="text" id="custom-test-path" placeholder="לדוגמה: tests/my_test" style="padding: 10px; border-radius: 5px; border: 1px solid var(--primary-color); background: var(--bg-color); color: var(--text-color); width: 60%;">
-                    <button onclick="window.location.search = '?test=' + document.getElementById('custom-test-path').value" class="primary-btn">טען מבחן</button>
+                    <button id="load-custom-test-btn" class="primary-btn">טען מבחן</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Error Screen -->
+        <div id="error-screen" class="screen">
+            <div class="welcome-card">
+                <h1>שגיאה בטעינת המבחן</h1>
+                <p id="error-message-text" style="color: var(--error-color); margin-bottom: 1.5rem;">אירעה שגיאה בעת טעינת המבחן.</p>
+                <button id="back-to-menu-btn" class="primary-btn lg-btn">חזור לתפריט</button>
             </div>
         </div>
 

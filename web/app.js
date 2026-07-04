@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const setupScreen   = document.getElementById('setup-screen');
     const quizScreen    = document.getElementById('quiz-screen');
     const resultsScreen = document.getElementById('results-screen');
+    const menuScreen    = document.getElementById('menu-screen');
 
     const startBtn      = document.getElementById('start-btn');
     const resumeBtn     = document.getElementById('resume-btn');
@@ -85,11 +86,49 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const testPath = urlParams.get('test');
 
+    const errorScreen      = document.getElementById('error-screen');
+    const errorMessageText = document.getElementById('error-message-text');
+    const backToMenuBtn    = document.getElementById('back-to-menu-btn');
+    const testListContainer = document.getElementById('test-list');
+    const loadCustomTestBtn = document.getElementById('load-custom-test-btn');
+
+    // ── Back to menu button ──────────────────────────────────────────────────
+    if (backToMenuBtn) {
+        backToMenuBtn.addEventListener('click', () => {
+            clearProgress();
+            switchScreen(errorScreen, menuScreen);
+            window.location.search = '';
+        });
+    }
+
+    // ── Custom test path button ──────────────────────────────────────────────
+    if (loadCustomTestBtn) {
+        loadCustomTestBtn.addEventListener('click', () => {
+            const customPath = document.getElementById('custom-test-path').value.trim();
+            if (customPath) {
+                window.location.search = '?test=' + encodeURIComponent(customPath);
+            }
+        });
+    }
+
+    // ── Error Screen ─────────────────────────────────────────────────────────
+    function showError(message) {
+        if (errorMessageText) {
+            errorMessageText.textContent = message;
+        }
+        // Hide all other screens
+        [setupScreen, quizScreen, resultsScreen, menuScreen].forEach(s => {
+            if (s) s.classList.remove('active');
+        });
+        if (errorScreen) errorScreen.classList.add('active');
+    }
+
     if (!testPath) {
         // No test selected: show exam selection menu
         setupScreen.classList.remove('active');
-        const menuScreen = document.getElementById('menu-screen');
         if(menuScreen) menuScreen.classList.add('active');
+        // Load dynamic test list
+        loadTestList();
         return; // Stop execution, don't fetch questions
     }
 
@@ -126,9 +165,36 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(err => {
             console.error('Error loading questions:', err);
-            questionText.innerHTML = `<span style="color:red">שגיאה בטעינת המבחן. אנא ודא שהנתיב נכון.</span>`;
-            switchScreen(setupScreen, quizScreen);
+            showError('שגיאה בטעינת המבחן. אנא ודא שהנתיב נכון וקיים קובץ questions.json בתיקיית המבחן.');
         });
+
+    // ── Dynamic Test List ────────────────────────────────────────────────────
+    function loadTestList() {
+        if (!testListContainer) return;
+        fetch('../tests/manifest.json')
+            .then(r => {
+                if (!r.ok) throw new Error('No manifest found');
+                return r.json();
+            })
+            .then(tests => {
+                testListContainer.innerHTML = '';
+                tests.forEach(test => {
+                    const link = document.createElement('a');
+                    link.href = '?test=' + encodeURIComponent(test.path);
+                    link.className = 'secondary-btn';
+                    link.style.cssText = 'display: block; margin-bottom: 10px; text-decoration: none;';
+                    link.textContent = test.name;
+                    testListContainer.appendChild(link);
+                });
+            })
+            .catch(() => {
+                // Fallback: show static message with custom input only
+                testListContainer.innerHTML = '<p style="color: var(--text-secondary);">אין מבחנים זמינים כרגע. ניתן להזין נתיב ידנית למטה.</p>';
+            });
+    }
+
+    // ── Also load test list on menu screen when not using ?test= parameter ──
+    // (loadTestList is called above when !testPath; also expose for manual use)
 
     // ── Image Zoom ────────────────────────────────────────────────────────────
     questionImage.addEventListener('click', () => {

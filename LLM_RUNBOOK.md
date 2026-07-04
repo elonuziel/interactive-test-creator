@@ -172,6 +172,12 @@ The question detection regex expects `שאלה מספר` or `מספר שאלה` 
 This usually happens when `--reverse` was incorrectly applied to a PDF already in logical Hebrew order. Re-extract without `--reverse`.
 If the issue persists, the PDF may have unusual line-breaking. Check the raw markdown output and consider manually editing the option boundaries.
 
+### "CSV header not recognized / first column has garbled characters"
+
+This typically happens with Hebrew CSV files exported from Windows tools (Excel, Tomamix), which often include a UTF-8 Byte Order Mark (BOM) at the beginning of the file. The BOM gets prepended to the first column header, breaking column matching.
+
+**Fix:** The `4_extract_csv_answers.py` script already handles this by scanning for header rows rather than relying on exact column names. If issues persist, try re-exporting the CSV without BOM, or open the file in Notepad++ and check the encoding (Encoding → UTF-8 without BOM).
+
 ### "No answers found for form X"
 The form number doesn't match any row in the answer key file. Double-check:
 - The form number spelling (e.g., `"76"` vs `"076"`)
