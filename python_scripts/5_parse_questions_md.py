@@ -312,6 +312,14 @@ def main():
                 if imgs:
                     obj['image'] = f"images/{imgs[0]}"
 
+        # ── Page image for cropper fallback ────────────────────────────────
+        if args.image_dir:
+            page = q.get('source_page')
+            if page:
+                page_png = os.path.join(args.image_dir, f"page{page}.png")
+                if os.path.isfile(page_png):
+                    obj['pageImage'] = f"images/page{page}.png"
+
         # ── Debug: include source page ─────────────────────────────────────
         if args.include_source_page and q.get('source_page') is not None:
             obj['sourcePage'] = q['source_page']

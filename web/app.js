@@ -153,8 +153,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (img && !img.startsWith('http')) {
                     img = `../${testPath}/${img}`;
                 }
+                let pageImg = q.pageImage;
+                if (pageImg && !pageImg.startsWith('http')) {
+                    pageImg = `../${testPath}/${pageImg}`;
+                }
 
-                return { ...q, options, image: img };
+                return { ...q, options, image: img, pageImage: pageImg };
             });
 
             // Check for saved progress
@@ -337,21 +341,24 @@ document.addEventListener('DOMContentLoaded', () => {
         questionText.innerHTML = q.question;
 
         // Image
-        if (q.image) {
-            // Check if user has already cropped this image
+        const hasQuestionImage = !!q.image;
+        const hasPageImage = !!q.pageImage;
+
+        if (hasQuestionImage) {
             if (croppedImages[q.image]) {
                 questionImage.src = croppedImages[q.image];
             } else {
                 questionImage.src = q.image;
             }
-            questionImage.dataset.fullSrc = q.image;
             questionImage.classList.remove('hidden');
+            // Cropper: use full page when available, fall back to question image
+            questionImage.dataset.fullSrc = hasPageImage ? q.pageImage : q.image;
             openCropperBtn.classList.remove('hidden');
         } else {
             questionImage.classList.add('hidden');
-            openCropperBtn.classList.add('hidden');
             questionImage.src = '';
             questionImage.dataset.fullSrc = '';
+            openCropperBtn.classList.add('hidden');
         }
 
         // Progress bar

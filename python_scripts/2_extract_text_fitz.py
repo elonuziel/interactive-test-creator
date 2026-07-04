@@ -147,11 +147,31 @@ def extract_embedded_images(doc, out_dir):
     return dict(page_images)
 
 
+# ── Full‑page rendering (for vector graphics + cropper fallback) ───────────
+def render_pages(doc, out_dir, dpi=150):
+    """
+    Render every page as a full PNG.  Useful for vector tables/diagrams
+    that get_image() misses, and as a crop source in the web app.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    rendered = []
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        pix = page.get_pixmap(dpi=dpi)
+        fname = f"page{page_num + 1}.png"
+        fpath = os.path.join(out_dir, fname)
+        pix.save(fpath)
+        rendered.append(fname)
+    return rendered
+
+
 def main():
     parser = argparse.ArgumentParser(description="Extract raw text from a Digital PDF with smart grouping.")
     parser.add_argument("pdf_file", help="Path to the PDF file")
     parser.add_argument("-o", "--output", help="Path to the output Markdown file", default=None)
     parser.add_argument("--extract-images", help="Directory to save embedded images", default=None)
+    parser.add_argument("--render-pages", action="store_true",
+                        help="Render every page as a full PNG (for vector graphics + cropper fallback)")
     parser.add_argument("--page-map", help="Output JSON mapping line index → page number", default=None)
     parser.add_argument("--reverse", action="store_true",
                         help="(deprecated) Reverse is auto‑detected now. Use --force-reverse to override.")
@@ -188,6 +208,12 @@ def main():
         print(f"Extracted {total} embedded images to '{args.extract_images}'")
     else:
         images_map = {}
+
+    # ── Render full pages (for cropper fallback + vector graphics) ─────────
+    if args.render_pages:
+        out_dir = args.extract_images or "."
+        rendered = render_pages(doc, out_dir)
+        print(f"Rendered {len(rendered)} full pages to '{out_dir}'")
 
     # ── Extract text with smart grouping (Steps 1.1, 1.4) ──────────────────
     pages_range = doc[:1] if args.first_page_only else doc
