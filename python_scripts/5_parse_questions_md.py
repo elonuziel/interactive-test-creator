@@ -60,6 +60,21 @@ def normalize_whitespace(text):
     """Replace non‑breaking spaces, collapse whitespace, strip. (L288–295)"""
     return re.sub(r'\s+', ' ', text.replace('\u00A0', ' ')).strip()
 
+def clean_option_text(text):
+    """
+    Same cleanup as clean_question_text but applied to individual answer options.
+    """
+    text = normalize_whitespace(text)
+    # Strip leading stray dots
+    text = re.sub(r'^\.(?!\s*[אבגד1-4]\s)', '', text)
+    # Strip trailing hyphens
+    text = re.sub(r'-\s*$', '', text)
+    # Split merged Hebrew+digit / digit+Hebrew
+    text = re.sub(r'([א-ת])(\d)', r'\1 \2', text)
+    text = re.sub(r'(\d)([א-ת])', r'\1 \2', text)
+    return normalize_whitespace(text)
+
+
 def clean_question_text(text):
     """
     Fix LTR‑grouping artifacts that appear in smart‑extracted Hebrew text:
@@ -287,7 +302,7 @@ def main():
     for q in questions:
         question_text = clean_question_text(" ".join(q['text']))
         options = [
-            normalize_whitespace(" ".join(a['text']))
+            clean_option_text(" ".join(a['text']))
             for a in q['answers']
         ]
         # Filter empty options
