@@ -47,7 +47,7 @@ NOISE_WORDS = ("קוד מבחן", "מבחן מס'", "מבחן מס")
 
 # Step 2.4: image keyword detection
 IMAGE_KEYWORDS = re.compile(
-    r'לפניכם|גרף|תרשים|תמונה|איור|מפה|ציור|דיאגרמה|צילום'
+    r'לפניכם|גרף|תרשים|תמונה|איור|מפה|ציור|דיאגרמה|צילום|טבלה|בטבלה|תרשים|scheme'
 )
 
 
@@ -300,8 +300,16 @@ def main():
             page = q.get('source_page')
             if page:
                 imgs = find_images_for_page(page, args.image_dir)
+                # Try page render as fallback (for vector graphics like tables)
+                if not imgs:
+                    fallback = os.path.join(args.image_dir, f"page{page}_table.png")
+                    if os.path.isfile(fallback):
+                        imgs = [f"page{page}_table.png"]
+                    else:
+                        fallback = os.path.join(args.image_dir, f"page{page}.png")
+                        if os.path.isfile(fallback):
+                            imgs = [f"page{page}.png"]
                 if imgs:
-                    # Use first image on the page as the associated image
                     obj['image'] = f"images/{imgs[0]}"
 
         # ── Debug: include source page ─────────────────────────────────────
