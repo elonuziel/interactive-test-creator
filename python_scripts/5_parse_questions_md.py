@@ -66,7 +66,9 @@ def clean_question_text(text):
     - Stray leading dots (e.g. '.(text' → '(text')
     - Trailing hyphens from line‑breaks (e.g. 'text-' → 'text')
     - Dot‑then‑letter merges (e.g. '.א' → 'א.')
-    - Misplaced ? and :( at start of question → move to end
+    - Misplaced ? and : at start of question → move to end
+    - Merged word+digit (e.g. 'הן6' → 'הן 6')
+    - Parenthesized content at line start → move to end
     """
     text = normalize_whitespace(text)
     # Strip leading stray dots that aren't part of an answer marker
@@ -75,14 +77,20 @@ def clean_question_text(text):
     text = re.sub(r'-\s*$', '', text)
     # Fix dot‑letter sequences: '.א ' → 'א. ' (LTR artifact)
     text = re.sub(r'\.([אבגד1-4])\s', r'\1. ', text)
+    # Split merged Hebrew‑letter + digit: 'הן6' → 'הן 6'
+    text = re.sub(r'([א-ת])(\d)', r'\1 \2', text)
+    # Split merged digit + Hebrew: '6מיליון' → '6 מיליון'
+    text = re.sub(r'(\d)([א-ת])', r'\1 \2', text)
 
     # Move misplaced ? from start to end: "?text" → "text?"
     if text.startswith('?'):
         text = text[1:] + '?'
 
-    # Move misplaced :( from start to end: ":(text" → "text:"
+    # Move misplaced :( or : from start to end: ":(text" → "text:" / ":text" → "text:"
     if text.startswith(':('):
         text = text[2:] + ':'
+    elif text.startswith(':'):
+        text = text[1:] + ':'
 
     return normalize_whitespace(text)
 
