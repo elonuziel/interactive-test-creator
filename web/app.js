@@ -171,14 +171,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Dynamic Test List ────────────────────────────────────────────────────
     function loadTestList() {
         if (!testListContainer) return;
-        fetch('../tests/manifest.json')
-            .then(r => {
-                if (!r.ok) throw new Error('No manifest found');
-                return r.json();
-            })
-            .then(tests => {
+
+        // Load manifests from both 'tests' and 'test' folders, merge results
+        const fetches = [
+            fetch('../tests/manifest.json').then(r => r.ok ? r.json() : []).catch(() => []),
+            fetch('../test/manifest.json').then(r => r.ok ? r.json() : []).catch(() => [])
+        ];
+
+        Promise.all(fetches)
+            .then(([testsList, testList]) => {
+                const allTests = [...testsList, ...testList];
+                if (!allTests.length) throw new Error('No manifest found');
+
                 testListContainer.innerHTML = '';
-                tests.forEach(test => {
+                allTests.forEach(test => {
                     const link = document.createElement('a');
                     link.href = '?test=' + encodeURIComponent(test.path);
                     link.className = 'secondary-btn';
@@ -188,7 +194,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             })
             .catch(() => {
-                // Fallback: show static message with custom input only
                 testListContainer.innerHTML = '<p style="color: var(--text-secondary);">אין מבחנים זמינים כרגע. ניתן להזין נתיב ידנית למטה.</p>';
             });
     }
