@@ -18,16 +18,62 @@ Determines if a PDF is a Digital PDF (has extractable text) or a Scanned PDF (im
 **Usage:** `python 1_detect_pdf_type.py "exam.pdf"`
 
 ### 2. Digital PDF Path (if Step 1 is Digital)
-Use these scripts to extract text and parse it:
+Use these scripts to extract text, images, and parse it:
 
 **A. `2_extract_text_fitz.py`**
-Extracts the text using PyMuPDF. Hebrew word-order reversal is **opt-in** via `--reverse` — always inspect a sample page first with `--first-page-only` to check if reversal is needed.
-**Usage:** `python 2_extract_text_fitz.py "exam.pdf" -o "raw_text.md"`
-**Options:** `--reverse` (opt-in Hebrew word reversal), `--first-page-only` (extract only page 1 for inspection)
+Extracts text using PyMuPDF with smart position‑based line grouping (handles mixed RTL/LTR layouts better than raw `get_text()`).
+Hebrew word‑order is **auto‑detected** — the script samples the first 3 pages and only reverses words if it detects visual (reversed) order.
+Also supports embedded image extraction and page‑to‑line mapping for image association.
+
+**Usage:**
+```bash
+# Extract text only (default — auto‑detects word order):
+python 2_extract_text_fitz.py "exam.pdf" -o "raw_text.md"
+
+# Extract text + embedded images + page‑map (for full pipeline):
+python 2_extract_text_fitz.py "exam.pdf" -o "raw_text.md" \
+    --extract-images "images" --page-map "page_map.json"
+
+# Inspect first page only (quick check):
+python 2_extract_text_fitz.py "exam.pdf" --first-page-only
+```
+
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `-o`, `--output FILE` | Output markdown file (default: `<pdf>_extracted.md`) |
+| `--extract-images DIR` | Extract embedded images from the PDF into `DIR` |
+| `--page-map FILE` | Write a JSON mapping `line_N → page_number` for image association |
+| `--first-page-only` | Extract only page 1 (quick inspection) |
+| `--force-reverse` | Force Hebrew word‑order reversal (overrides auto‑detection) |
+| `--reverse` | *(deprecated)* No‑op — word order is auto‑detected now |
 
 **B. `5_parse_questions_md.py`**
 Parses the generated Markdown file into a structured `questions.json` file.
-**Usage:** `python 5_parse_questions_md.py "raw_text.md" -o "questions.json"`
+Uses robust regex patterns that handle multiple question/answer formats including LTR‑grouped Hebrew text.
+Supports image association via keyword detection (`גרף`, `תרשים`, etc.) and page‑map from step 2.
+
+**Usage:**
+```bash
+# Parse text only:
+python 5_parse_questions_md.py "raw_text.md" -o "questions.json"
+
+# Parse with image association:
+python 5_parse_questions_md.py "raw_text.md" -o "questions.json" \
+    --image-dir "images" --page-map "page_map.json"
+
+# Include source page in output (for debugging):
+python 5_parse_questions_md.py "raw_text.md" -o "questions.json" \
+    --include-source-page
+```
+
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `-o`, `--output FILE` | Output JSON file (default: `questions.json`) |
+| `--image-dir DIR` | Directory with extracted images for keyword‑based association |
+| `--page-map FILE` | JSON file from `2_extract_text_fitz.py --page-map` |
+| `--include-source-page` | Add `sourcePage` field to each question for debugging |
 
 ### 3. Scanned PDF Path (if Step 1 is Scanned)
 Use these scripts to render the PDF to images and extract text manually (via Vision LLMs or manual transcription).

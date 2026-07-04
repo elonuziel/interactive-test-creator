@@ -34,7 +34,7 @@ Each question object in the JSON array follows this structure:
 | `image` | string | No | Relative path from the test folder to an image file (e.g., `"images/q1_graph.png"`). Omit if no image. |
 
 ## Practical Findings From This Repo
-- For the digital Hebrew PDFs in this repository, PyMuPDF already returned the text in correct logical Hebrew order. A blanket word-reversal pass scrambled the questions and split option letters across lines. **Do NOT use `--reverse` unless you've verified the raw output is in visual (reversed) order.**
+- Hebrew word order is now **auto‑detected** — the extraction script samples the first 3 pages and only reverses words if it detects visual (reversed) order. Manual `--reverse` is deprecated. Use `--force-reverse` to override.
 - The provided 2019 Botany PDFs are exam code `000` master copies. In these files, the intended answer is usually option `א`, but some questions use a combination answer like `תשובות ב ו-ד נכונות` as a regular option and that option should be preserved as the correct one when applicable.
 
 ---
@@ -51,30 +51,37 @@ It will output whether the PDF is a **Digital PDF** (extractable text) or a **Sc
 ## Step 2: Extract Questions (Digital PDF Path)
 If the PDF is Digital, you can automate text extraction.
 
-**⚠️ Important:** Before extracting the entire document, always inspect a sample page first. The Hebrew word order in the raw output varies by PDF — some need reversal, some don't. Reversing a PDF that's already in logical order will scramble it.
+The extraction script now uses **smart position‑based line grouping** (handles mixed RTL/LTR layouts better) and **auto‑detects Hebrew word order** by sampling the first 3 pages. Manual `--reverse` is no longer needed in most cases.
 
-**2A. Inspect the First Page**
-Extract just the first page to check Hebrew word order:
+**2A. Extract text, images, and page‑map (single command)**
 ```bash
-python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" --first-page-only -o "raw_text_page1.md"
+python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" \
+    -o "raw_text.md" \
+    --extract-images "images" \
+    --page-map "page_map.json"
 ```
-Read the output. If the Hebrew text reads correctly left-to-right as logical Hebrew, proceed without `--reverse`. If words appear backwards (visual order — e.g., "הבא היום" instead of "היום הבא"), add `--reverse` in the next step.
+This produces:
+- `raw_text.md` — extracted text with noise filtered and word order auto‑corrected
+- `images/` — any embedded images found in the PDF
+- `page_map.json` — maps output lines to source pages (for image association)
 
-**2B. Extract Full Text**
-Extract all pages. Only add `--reverse` if your inspection in Step 2A showed the text was in visual (reversed) order:
+**Options:**
+- `--first-page-only` — extract only page 1 (quick inspection)
+- `--force-reverse` — override auto‑detection and force word reversal
+- `--reverse` — *(deprecated)* no‑op; word order is auto‑detected
+
+If the script says "auto‑detected VISUAL" and the output looks wrong, re‑run with `--force-reverse`.
+
+**2B. Parse to JSON (with image association)**
 ```bash
-# For most PDFs in this repo (already logical Hebrew — NO reversal):
-python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" -o "raw_text.md"
-
-# If the raw text is in visual order (reversed Hebrew words):
-python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" -o "raw_text.md" --reverse
+python python_scripts/5_parse_questions_md.py "raw_text.md" \
+    -o "questions.json" \
+    --image-dir "images" \
+    --page-map "page_map.json"
 ```
+Questions that mention graphs/diagrams (keywords: `גרף`, `תרשים`, `תמונה`, etc.) will automatically get an `image` field pointing to the matching page's embedded image.
 
-**2C. Parse to JSON**
-Parse the raw text markdown into a structured JSON:
-```bash
-python python_scripts/5_parse_questions_md.py "raw_text.md" -o "questions.json"
-```
+For debugging, add `--include-source-page` to see which PDF page each question came from.
 
 ---
 

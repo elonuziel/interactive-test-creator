@@ -1,81 +1,283 @@
 import sys
 import json
 import re
+import os
 import argparse
+from glob import glob
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-Q_PATTERN   = re.compile(r'^(שאלה מספר|מספר שאלה)\s*:?\s*\d+:?')
-ANS_PATTERN = re.compile(r'^([א-ז])\.(.*)')
-NOISE_RE    = re.compile(r"^עמוד \d+ מתוך \d+$")
-NOISE_WORDS = ("קוד מבחן", "מבחן מס'")
+# ── Patterns (mirrors quiz_builder.js L216–L225) ───────────────────────────
+# Step 2.1: robust question detection
+Q_PATTERN = re.compile(
+    r'(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?'       # שאלה מספר :1  /  שאלה 1:
+    r'|(?:מספר\s+)?שאלה\s*:?\s*\d+\s*:?'       # מספר שאלה :1  (reversed on line)
+    r'|\d+\s*:?\s*מספר\s+שאלה'                 # 1 :מספר שאלה  (fully reversed)
+    r'|^\d+\s*[\.\)]\s'                         # 1.  /  1)
+    r'|^\d+\s*-\s)'                             # 1 -
+)
+
+# Step 2.2: dual answer patterns
+ANS_START_PATTERN = re.compile(
+    r'^([אבגד1-4])\s*[\.\)]\s*(.*)$'           # א. text  /  1) text
+)
+ANS_START_DOT_FIRST = re.compile(
+    r'^[\.\)]\s*([אבגד1-4])\s+(.*)$'            # .א text  (LTR-grouped Hebrew)
+)
+ANS_END_PATTERN = re.compile(
+    r'^(.*)\s+([אבגד1-4])\s*[\.\)]$'           # text א.  /  text א)
+)
+ANS_END_DOT_FIRST = re.compile(
+    r'^(.*)\s+[\.\)]\s*([אבגד1-4])$'           # text .א  (LTR-grouped Hebrew)
+)
+
+# Mid‑line answer: letter+period/paren anywhere in the line (not at start)
+ANS_MIDLINE_RE = re.compile(
+    r'(?:^|.+)'                                 # optional leading text
+    r'([אבגד1-4])\s*[\.\)]\s+'                  # א.  /  1)  with trailing space
+)
+
+# Step 2.3: noise filtering
+NOISE_RE = re.compile(
+    r'(?:^עמוד\s+\d+\s+מתוך\s+\d+$'            # עמוד 1 מתוך 5
+    r'|^\d+\s+מתוך\s*\d+\s+עמוד$)'             # 1 מתוך5 עמוד  (LTR-grouped)
+)
+NOISE_WORDS = ("קוד מבחן", "מבחן מס'", "מבחן מס")
+
+# Step 2.4: image keyword detection
+IMAGE_KEYWORDS = re.compile(
+    r'לפניכם|גרף|תרשים|תמונה|איור|מפה|ציור|דיאגרמה|צילום'
+)
+
 
 def is_noise(line):
+    """Return True if the line is a page-number marker or exam-header fluff."""
     return NOISE_RE.match(line) or any(w in line for w in NOISE_WORDS)
 
+
+def normalize_whitespace(text):
+    """Replace non‑breaking spaces, collapse whitespace, strip. (L288–295)"""
+    return re.sub(r'\s+', ' ', text.replace('\u00A0', ' ')).strip()
+
+
+def reverse_words(line):
+    """Return the line with word order reversed (for RTL edge‑case matching)."""
+    stripped = line.strip()
+    if not stripped:
+        return ""
+    words = stripped.split()
+    words.reverse()
+    return " ".join(words)
+
+
+def find_images_for_page(page_num, images_dir):
+    """Return sorted list of relative image paths for a given page number."""
+    if not images_dir or not os.path.isdir(images_dir):
+        return []
+    pattern = os.path.join(images_dir, f"page{page_num}_img*.png")
+    matches = glob(pattern)
+    matches.sort()
+    # Return relative paths from the images dir
+    return [os.path.basename(m) for m in matches]
+
+
+def try_match_patterns(line):
+    """
+    Try answer start/end/midline patterns against the line AND its word‑reversed form.
+    Returns (letter, text) or (None, None).
+    """
+    # Try start patterns (letter-first)
+    m = ANS_START_PATTERN.match(line)
+    if m:
+        return m.group(1), (m.group(2) or "").strip()
+
+    # Try start patterns (dot-first, from LTR grouping)
+    m = ANS_START_DOT_FIRST.match(line)
+    if m:
+        return m.group(1), (m.group(2) or "").strip()
+
+    # Try end patterns (letter-last)
+    m = ANS_END_PATTERN.match(line)
+    if m:
+        return m.group(2), (m.group(1) or "").strip()
+
+    # Try end patterns (dot-before-letter, from LTR grouping)
+    m = ANS_END_DOT_FIRST.match(line)
+    if m:
+        return m.group(2), (m.group(1) or "").strip()
+
+    # Try reversed line
+    rev = reverse_words(line)
+    if rev and rev != line:
+        m = ANS_START_PATTERN.match(rev)
+        if m:
+            return m.group(1), (m.group(2) or "").strip()
+        m = ANS_START_DOT_FIRST.match(rev)
+        if m:
+            return m.group(1), (m.group(2) or "").strip()
+        m = ANS_END_PATTERN.match(rev)
+        if m:
+            return m.group(2), (m.group(1) or "").strip()
+        m = ANS_END_DOT_FIRST.match(rev)
+        if m:
+            return m.group(2), (m.group(1) or "").strip()
+
+    return None, None
+
+
+def try_split_midline_answer(line):
+    """
+    If the line has an answer marker mid‑line, return (preceding_text, letter, answer_text).
+    Otherwise return None.
+    Used when we're in question‑text mode (state=1) and an option א is stuck
+    to the end of the question body because of LTR text grouping.
+    """
+    m = ANS_MIDLINE_RE.search(line)
+    if not m:
+        return None
+    letter = m.group(1)
+    start = m.start(1)      # position of the letter in the line
+    before = line[:start].strip()
+    after = line[start:].strip()
+    # Strip the letter+separator from the answer text
+    answer_text = re.sub(r'^[אבגד1-4]\s*[\.\)]\s*', '', after).strip()
+    return before, letter, answer_text
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Parse extracted Hebrew Markdown into structured JSON.")
+    parser = argparse.ArgumentParser(
+        description="Parse extracted Hebrew Markdown into structured JSON with smart detection."
+    )
     parser.add_argument("md_file", help="Path to the Markdown file")
     parser.add_argument("-o", "--output", help="Output JSON file", default="questions.json")
-    
+    parser.add_argument("--image-dir", help="Directory containing extracted images (from 2_extract_text_fitz)", default=None)
+    parser.add_argument("--page-map", help="JSON file mapping line index → page number (from 2_extract_text_fitz)", default=None)
+    parser.add_argument("--include-source-page", action="store_true",
+                        help="Include 'sourcePage' field in output JSON for debugging")
+
     args = parser.parse_args()
 
+    # ── Load page map ──────────────────────────────────────────────────────
+    page_map = {}
+    if args.page_map:
+        try:
+            with open(args.page_map, 'r', encoding='utf-8') as f:
+                page_map = json.load(f)
+        except Exception as e:
+            print(f"Warning: could not load page map: {e}")
+
+    # ── Read input ─────────────────────────────────────────────────────────
     try:
         with open(args.md_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
+            raw_lines = f.readlines()
     except Exception as e:
         print(f"Error reading file: {e}")
         return
 
+    # ── Parse loop (mirrors quiz_builder.js L220–L284) ─────────────────────
     questions = []
     current_q = None
-    state = 0   # 0=looking for Q, 1=in question text, 2=in answer options
+    state = 0          # 0=looking for Q, 1=in question text, 2=in answer options
+    line_index = 0     # track position for page‑map lookup
 
-    for raw_line in lines:
+    for raw_line in raw_lines:
         line = raw_line.strip()
+        line_index += 1
+
         if not line or is_noise(line):
             continue
 
-        if Q_PATTERN.match(line):
+        # ── Question detection ─────────────────────────────────────────────
+        if Q_PATTERN.match(line) or Q_PATTERN.match(reverse_words(line)):
             if current_q:
                 questions.append(current_q)
-            current_q = {'id': line.replace(':', ''), 'text': [], 'answers': [], 'current_ans_letter': None}
+            current_q = {
+                'text': [],
+                'answers': [],
+                'source_page': page_map.get(f"line_{line_index}", None),
+            }
             state = 1
             continue
 
+        if not current_q:
+            continue
+
+        # ── Answer detection ───────────────────────────────────────────────
         if state >= 1:
-            m = ANS_PATTERN.match(line)
-            if m:
+            letter, text = try_match_patterns(line)
+
+            if letter is not None:
                 state = 2
-                letter = m.group(1)
-                text   = m.group(2).strip()
-                # Edge case: 'א.' appears alone; its text was parsed as last line of question
-                if letter == 'א' and not text and current_q['text']:
+                # Edge case: 'א.' appears alone, its text was the last line of question
+                if letter in ('א', '1') and not text and current_q['text']:
                     text = current_q['text'].pop()
-                current_q['answers'].append({'letter': letter, 'text': [text] if text else []})
-                current_q['current_ans_letter'] = letter
-            else:
-                if state == 1:
+                current_q['answers'].append({'text': [text] if text else []})
+            elif state == 1:
+                # Try mid‑line split: option א stuck to question body
+                split = try_split_midline_answer(line)
+                if split:
+                    before, letter, answer_text = split
+                    if before:
+                        current_q['text'].append(before)
+                    state = 2
+                    current_q['answers'].append({'text': [answer_text] if answer_text else []})
+                else:
                     current_q['text'].append(line)
-                elif state == 2:
+            elif state == 2:
+                if current_q['answers']:
                     current_q['answers'][-1]['text'].append(line)
 
     if current_q:
         questions.append(current_q)
 
+    # ── Format output (Steps 2.4 + 2.5) ────────────────────────────────────
     formatted = []
     for q in questions:
-        formatted.append({
-            'question':     " ".join(q['text']).strip(),
-            'options':      [" ".join(a['text']).strip() for a in q['answers']],
-            'correctIndex': 0   # Placeholder, should be updated by answer key
-        })
+        question_text = normalize_whitespace(" ".join(q['text']))
+        options = [
+            normalize_whitespace(" ".join(a['text']))
+            for a in q['answers']
+        ]
+        # Filter empty options
+        options = [o for o in options if o]
 
+        # Skip questions with < 2 options (mirrors JS L295)
+        if not question_text or len(options) < 2:
+            continue
+
+        obj = {
+            'question':     question_text,
+            'options':      options,
+            'correctIndex': 0,      # placeholder, updated by answer key
+        }
+
+        # ── Image association (Step 2.4) ───────────────────────────────────
+        if IMAGE_KEYWORDS.search(question_text) and args.image_dir:
+            page = q.get('source_page')
+            if page:
+                imgs = find_images_for_page(page, args.image_dir)
+                if imgs:
+                    # Use first image on the page as the associated image
+                    obj['image'] = f"images/{imgs[0]}"
+
+        # ── Debug: include source page ─────────────────────────────────────
+        if args.include_source_page and q.get('source_page') is not None:
+            obj['sourcePage'] = q['source_page']
+
+        formatted.append(obj)
+
+    # ── Write output ───────────────────────────────────────────────────────
     with open(args.output, 'w', encoding='utf-8') as f:
         json.dump(formatted, f, ensure_ascii=False, indent=2)
 
-    print(f"Parsed {len(formatted)} questions -> {args.output}")
+    img_note = ""
+    if args.image_dir:
+        img_count = sum(1 for q in formatted if q.get('image'))
+        img_note = f" ({img_count} with images)"
+
+    print(f"Parsed {len(formatted)} questions{img_note} -> {args.output}")
+
 
 if __name__ == '__main__':
     main()
