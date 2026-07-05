@@ -394,15 +394,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
     }
 
-    function arrayBufferToBase64(buffer) {
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-            const chunk = bytes.subarray(i, i + chunkSize);
-            binary += String.fromCharCode(...chunk);
-        }
-        return btoa(binary);
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = String(reader.result || '');
+                const commaIdx = result.indexOf(',');
+                if (commaIdx < 0) {
+                    reject(new Error('לא ניתן היה לקודד את קובץ ה-PDF לבסיס64.'));
+                    return;
+                }
+                resolve(result.slice(commaIdx + 1));
+            };
+            reader.onerror = () => {
+                reject(new Error('קריאת קובץ ה-PDF נכשלה.'));
+            };
+            reader.readAsDataURL(file);
+        });
     }
 
     async function renderAllPdfPageImages(pdf) {
@@ -707,14 +715,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    async function extractTextViaGeminiNativePdf(pdfBuffer, pdf, apiKey) {
+    async function extractTextViaGeminiNativePdf(pdfFile, pdf, apiKey) {
         if (!apiKey) {
             throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
         }
 
         setStatus('מעלה את מסמך ה-PDF ישירות ל-Gemini (Native PDF)...');
-        
-        const base64Pdf = await arrayBufferToBase64(pdfBuffer);
+
+        const base64Pdf = await fileToBase64(pdfFile);
         const prompt = [
             'You are an OCR engine for scanned Hebrew exams.',
             'Extract visible text exactly as printed. Keep Hebrew text in its original reading order.',
@@ -1291,10 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let apiKey = '';
 
         const pdfBuffer = await pdf.arrayBuffer();
-        // PDF.js may transfer/detach the provided buffer internally, so keep a dedicated
-        // copy for Native PDF upload to Gemini.
         const pdfBufferForParse = pdfBuffer.slice(0);
-        const pdfBufferForNativeUpload = pdfBuffer.slice(0);
         let answerRows = null;
         if (csv) {
             const fileName = csv.name.toLowerCase();
@@ -1332,7 +1337,7 @@ document.addEventListener('DOMContentLoaded', () => {
             apiKey = await resolveGeminiApiKey(true);
             if (ocrEngine === 'gemini_native') {
                 setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...' : 'נבחר מצב LLM כפוי. שולח את ה-PDF ל-Gemini Native PDF...');
-                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfBufferForNativeUpload, extracted.pdf, apiKey);
+                const nativeExtraction = await extractTextViaGeminiNativePdf(pdf, extracted.pdf, apiKey);
                 examText = nativeExtraction.text;
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
