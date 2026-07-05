@@ -105,6 +105,75 @@
             resize: vertical;
         }
         .muted { opacity: .85; font-size: .92rem; }
+        .help-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 1.5px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--text-secondary);
+            font-size: .75rem;
+            font-weight: 700;
+            cursor: pointer;
+            vertical-align: middle;
+            line-height: 1;
+            padding: 0;
+            transition: background .15s, color .15s, border-color .15s;
+        }
+        .help-btn:hover {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+        .help-popup {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .help-popup.show { display: flex; }
+        .help-popup-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 460px;
+            width: 90%;
+            box-shadow: var(--shadow-sm);
+            direction: rtl;
+            text-align: right;
+        }
+        .help-popup-content h3 { margin: 0 0 12px; }
+        .help-popup-content p { margin: 8px 0; font-size: .92rem; line-height: 1.6; }
+        .help-popup-content code {
+            background: var(--input-bg);
+            padding: 2px 6px;
+            border-radius: 5px;
+            font-size: .85rem;
+            direction: ltr;
+            display: inline-block;
+        }
+        .help-popup-content .key-type {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        .help-popup-close {
+            margin-top: 16px;
+            padding: 8px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            cursor: pointer;
+            font: inherit;
+            font-size: .9rem;
+        }
         @media (max-width: 640px) {
             .question-card .row { grid-template-columns: 1fr; }
         }
@@ -145,7 +214,7 @@
                 </select>
             </div>
             <div class="field">
-                <label for="api-key">API Key (אופציונלי)</label>
+                <label for="api-key">API Key (אופציונלי) <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
                 <input id="api-key" type="password" placeholder="הזן API Key (למשל AIza...)">
             </div>
             <div class="field">
@@ -171,6 +240,41 @@
         </section>
     </div>
 </main>
+
+<div id="api-help-popup" class="help-popup">
+    <div class="help-popup-content">
+        <h3>🔑 איך משיגים API Key?</h3>
+        <p>המערכת תומכת בשני סוגי מפתחות:</p>
+        <p>
+            <span class="key-type">1. Gemini API Key</span> <code>AIza...</code><br>
+            חינמי, מתקבל מ־
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+            מתאים לשימוש אישי עם מכסה נדיבה.
+        </p>
+        <p>
+            <span class="key-type">2. Interactions API Key</span> <code>AQ...</code><br>
+            בתשלום דרך Google Cloud, מתקבל דרך
+            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>.
+            דורש הפעלת Generative Language API.
+        </p>
+        <p style="font-size:.82rem;color:var(--text-secondary);">
+            💡 את המפתח מדביקים בשדה API Key — המערכת מזהה את סוגו אוטומטית.
+        </p>
+        <button id="api-help-close" class="help-popup-close">הבנתי, תודה</button>
+    </div>
+</div>
+
+<script>
+document.getElementById('api-help-btn').addEventListener('click', () => {
+    document.getElementById('api-help-popup').classList.add('show');
+});
+document.getElementById('api-help-close').addEventListener('click', () => {
+    document.getElementById('api-help-popup').classList.remove('show');
+});
+document.getElementById('api-help-popup').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) document.getElementById('api-help-popup').classList.remove('show');
+});
+</script>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="generator.js"></script>
