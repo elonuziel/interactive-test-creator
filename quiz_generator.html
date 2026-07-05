@@ -42,17 +42,71 @@
             gap: 6px;
             margin-bottom: 12px;
         }
-        .field-note {
-            margin: 2px 0 0;
+        .field-note-inline {
+            font-weight: 400;
+            font-size: .78rem;
             color: var(--text-secondary);
-            font-size: .84rem;
-            line-height: 1.5;
         }
         .warning-note {
             color: var(--danger);
             font-size: .82rem;
             line-height: 1.45;
         }
+        .info-banner {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            background: rgba(59,130,246,.07);
+            border: 1px solid rgba(59,130,246,.22);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: .84rem;
+            line-height: 1.55;
+            color: var(--text-primary);
+            margin-bottom: 14px;
+        }
+        .section-divider {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 14px 0 8px;
+        }
+        .section-label {
+            font-size: .73rem;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin: 0 0 10px;
+        }
+        .auth-section {
+            background: rgba(59,130,246,.04);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 4px;
+        }
+        .auth-section .field:last-child { margin-bottom: 0; }
+        .offline-warning-box {
+            display: none;
+            background: rgba(239,68,68,.07);
+            border: 1px solid rgba(239,68,68,.22);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: .82rem;
+            line-height: 1.45;
+            color: var(--danger);
+            margin-top: 6px;
+        }
+        .offline-warning-box.show { display: block; }
+        .proof-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .proof-label { font-size: .87rem; font-weight: 500; }
+        .proof-note { font-size: .81rem; color: var(--text-secondary); flex: 1; }
         .field input, .field textarea, .field select {
             background: var(--input-bg);
             color: var(--text-primary);
@@ -68,7 +122,7 @@
             border: none;
             background: transparent;
             accent-color: var(--primary-color);
-            justify-self: start;
+            flex-shrink: 0;
         }
         .actions {
             display: flex;
@@ -243,7 +297,12 @@
     <div class="builder-grid">
         <section class="builder-card">
             <h2>קבצי מקור</h2>
-            <p class="field-note">PDF דיגיטלי יעובד מקומית בלי LLM כברירת מחדל. אם הקובץ סרוק, אפשר לעבור ל-Gemini או ל-OCR מקומי, אבל OCR מקומי כנראה יהיה פחות מדויק.</p>
+
+            <div class="info-banner">
+                <span>💡</span>
+                <span><strong>PDF רגיל (עם טקסט)</strong> יעובד ישירות על המחשב שלך — בחינם וללא הגבלה. <strong>PDF סרוק (תמונה)</strong> דורש חיבור ל-Gemini (מפתח API) או שימוש ב-OCR מקומי (פחות מדויק).</span>
+            </div>
+
             <div class="field">
                 <label for="pdf-file">קובץ PDF</label>
                 <div class="file-wrap">
@@ -252,61 +311,76 @@
                 </div>
             </div>
             <div class="field">
-                <label for="csv-file">קובץ CSV / XLSX תשובות (אופציונלי - יוגדר א' כברירת מחדל)</label>
+                <label for="csv-file">קובץ תשובות <span class="field-note-inline">CSV / XLS — אופציונלי (בהיעדר קובץ, ברירת המחדל של התשובה הנכונה תהיה א')</span></label>
                 <div class="file-wrap">
                     <input id="csv-file" type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
                     <button class="file-clear hidden" data-target="csv-file" type="button" title="הסר קובץ">✕ הסר</button>
                 </div>
             </div>
             <div class="field">
-                <label for="form-number">מספר שאלון (אופציונלי)</label>
+                <label for="form-number">מספר שאלון <span class="field-note-inline">אופציונלי</span></label>
                 <input id="form-number" type="text" inputmode="numeric" placeholder="לדוגמה: 76">
             </div>
+
+            <hr class="section-divider">
+            <p class="section-label">⚙️&nbsp; הגדרות עיבוד</p>
+
             <div class="field">
-                <label for="ocr-engine">מנוע OCR</label>
-                <select id="ocr-engine">
-                    <option value="gemini_chunked">Gemini AI - פיצול עמודים לאימג'ים (מומלץ)</option>
-                    <option value="gemini_native">Gemini AI - העלאת PDF ישירה (מהיר יותר)</option>
-                    <option value="offline_local">OCR מקומי בדפדפן (כנראה פחות טוב)</option>
-                </select>
-                <p class="warning-note">ה-OCR המקומי עובד בלי LLM ובלי API key, אבל בסריקות בעברית התוצאה כנראה תהיה פחות טובה מ-Gemini.</p>
-            </div>
-            <div class="field">
-                <label for="llm-policy">מדיניות שימוש ב-LLM</label>
+                <label for="llm-policy">שימוש ב-LLM</label>
                 <select id="llm-policy">
-                    <option value="auto">אוטומטי: מקומי לדיגיטלי, LLM רק לסרוק</option>
-                    <option value="force_llm">תמיד להשתמש ב-LLM</option>
-                    <option value="force_no_llm">ללא LLM: מקומי בלבד</option>
+                    <option value="auto">אוטומטי — מקומי לדיגיטלי, LLM לסרוק</option>
+                    <option value="force_llm">LLM תמיד (Gemini)</option>
+                    <option value="force_no_llm">ללא LLM — מקומי בלבד</option>
                 </select>
             </div>
             <div class="field">
-                <label for="api-key">Gemini API Key <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
-                <div class="password-wrap">
-                    <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
-                    <button class="eye-btn" type="button" data-target="api-key" aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
+                <label for="ocr-engine">מנוע OCR <span class="field-note-inline">לסרוקים</span></label>
+                <select id="ocr-engine">
+                    <option value="gemini_chunked">Gemini — פיצול לעמודים (מומלץ)</option>
+                    <option value="gemini_native">Gemini — העלאת PDF ישירה (מהיר)</option>
+                    <option value="offline_local">OCR מקומי — ללא API Key</option>
+                </select>
+                <div class="offline-warning-box">
+                    ⚠️&nbsp; OCR מקומי עובד ללא חיבור לשרת, אבל בעברית הדיוק נמוך בהרבה מ-Gemini.
                 </div>
             </div>
-            <div class="field">
-                <label for="passcode">קוד גישה למפתח מוצפן (אופציונלי)</label>
-                <div class="password-wrap">
-                    <input id="passcode" type="password" autocomplete="off" placeholder="הזן קוד סודי (Passcode)">
-                    <button class="eye-btn" type="button" data-target="passcode" aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
+
+            <div id="llm-auth-section" class="auth-section">
+                <p class="section-label">🔑&nbsp; אימות Gemini</p>
+                <div class="field">
+                    <label for="api-key">API Key <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
+                    <div class="password-wrap">
+                        <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
+                        <button class="eye-btn" type="button" data-target="api-key" aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="passcode">Passcode <span class="field-note-inline">למפתח מוצפן — אופציונלי</span></label>
+                    <div class="password-wrap">
+                        <input id="passcode" type="password" autocomplete="off" placeholder="קוד גישה סודי">
+                        <button class="eye-btn" type="button" data-target="passcode" aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
+                    </div>
                 </div>
             </div>
+
+            <hr class="section-divider">
+
             <div class="field">
-                <label for="html-file">טעינת מבחן קיים לעריכה (אופציונלי)</label>
+                <label for="html-file">מבחן קיים לעריכה <span class="field-note-inline">אופציונלי</span></label>
                 <div class="file-wrap">
                     <input id="html-file" type="file" accept=".html,text/html">
                     <button class="file-clear hidden" data-target="html-file" type="button" title="הסר קובץ">✕ הסר</button>
                 </div>
             </div>
+
             <div class="actions">
                 <button id="run-parse" class="primary-btn">הפעל ניתוח</button>
                 <button id="download-quiz" class="success-btn" disabled>הורד מבחן עצמאי</button>
                 <button id="take-quiz" class="secondary-btn" disabled>פתור מבחן כעת</button>
             </div>
-            <div class="field" style="margin-top:10px;">
-                <label for="proof-mode-toggle">מצב הגהה (הצגת עמוד מקור לכל שאלה)</label>
+            <div class="proof-row">
+                <label for="proof-mode-toggle" class="proof-label">מצב הגהה</label>
+                <span class="proof-note">הצגת עמוד מקור לכל שאלה</span>
                 <input id="proof-mode-toggle" type="checkbox" checked>
             </div>
             <div id="status" class="status muted">מוכן להתחלה. PDF דיגיטלי יעובד מקומית, ו-PDF סרוק יבקש OCR רק אם צריך.</div>
@@ -394,6 +468,22 @@ document.querySelectorAll('.eye-btn').forEach(btn => {
         btn.textContent = isPassword ? '🙈' : '👁️';
     });
 });
+
+// Dynamic visibility: offline warning + auth section
+(function () {
+    const ocrSel = document.getElementById('ocr-engine');
+    const policySel = document.getElementById('llm-policy');
+    const offlineWarn = document.querySelector('.offline-warning-box');
+    const authSection = document.getElementById('llm-auth-section');
+    function syncVisibility() {
+        if (offlineWarn) offlineWarn.classList.toggle('show', ocrSel.value === 'offline_local');
+        const hideAuth = policySel.value === 'force_no_llm' || ocrSel.value === 'offline_local';
+        if (authSection) authSection.classList.toggle('hidden', hideAuth);
+    }
+    ocrSel.addEventListener('change', syncVisibility);
+    policySel.addEventListener('change', syncVisibility);
+    syncVisibility();
+})();
 
 </script>
 
