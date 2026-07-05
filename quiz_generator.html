@@ -128,6 +128,27 @@
             color: #fff;
             border-color: var(--primary-color);
         }
+        .password-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .password-wrap input {
+            padding-left: 40px;
+        }
+        .eye-btn {
+            position: absolute;
+            left: 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 4px;
+            line-height: 1;
+            opacity: .55;
+            transition: opacity .15s;
+        }
+        .eye-btn:hover { opacity: 1; }
         .help-popup {
             display: none;
             position: fixed;
@@ -216,11 +237,17 @@
             </div>
             <div class="field">
                 <label for="api-key">API Key (אופציונלי) <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
-                <input id="api-key" type="password" placeholder="הזן API Key (למשל AIza...)">
+                <div class="password-wrap">
+                    <input id="api-key" type="password" placeholder="הזן API Key (למשל AIza...)">
+                    <button class="eye-btn" type="button" data-target="api-key" title="הצג/הסתר">👁️</button>
+                </div>
             </div>
             <div class="field">
                 <label for="passcode">קוד גישה למפתח מוצפן (אופציונלי)</label>
-                <input id="passcode" type="password" autocomplete="off" placeholder="הזן קוד סודי (Passcode)">
+                <div class="password-wrap">
+                    <input id="passcode" type="password" autocomplete="off" placeholder="הזן קוד סודי (Passcode)">
+                    <button class="eye-btn" type="button" data-target="passcode" title="הצג/הסתר">👁️</button>
+                </div>
             </div>
             <div class="actions">
                 <button id="run-parse" class="primary-btn">הפעל ניתוח</button>
@@ -274,6 +301,14 @@ document.getElementById('api-help-close').addEventListener('click', () => {
 });
 document.getElementById('api-help-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('api-help-popup').classList.remove('show');
+});
+document.querySelectorAll('.eye-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        btn.textContent = isPassword ? '🙈' : '👁️';
+    });
 });
 </script>
 
