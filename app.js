@@ -128,12 +128,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Only act when quiz screen is active
         if (!quizScreen.classList.contains('active')) return;
 
-        // Option selection: 1–4
-        if (['1', '2', '3', '4'].includes(e.key)) {
-            const idx = parseInt(e.key) - 1;
+        // Option selection: dynamic keys based on number of options (1-9)
+        const keyNum = parseInt(e.key);
+        if (keyNum >= 1 && keyNum <= 9) {
             const opts = optionsContainer.querySelectorAll('.option');
-            if (opts[idx] && !opts[idx].classList.contains('disabled')) {
-                opts[idx].click();
+            if (opts[keyNum - 1] && !opts[keyNum - 1].classList.contains('disabled')) {
+                opts[keyNum - 1].click();
             }
             return;
         }

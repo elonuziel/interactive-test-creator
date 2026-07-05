@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'Do NOT translate, summarize, reorder, paraphrase, or explain.',
             'Keep Hebrew text in its original reading order.',
             'Preserve line breaks and option markers exactly.',
-            'Preserve question and option structure (e.g., "שאלה מספר", "א.", "ב.", "ג.", "ד.").',
+            'Preserve question and option structure (e.g., "שאלה מספר", "א.", "ב.", "ג.", "ד.", "ה.", "ו." etc.).',
             'If text is unclear, keep best-effort literal OCR and do not invent content.',
             'Return plain text only.',
             '',
@@ -940,8 +940,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Matches: 'שאלה מספר 1:', 'שאלה מספר :1', 'שאלה 1:', AND standalone lines like '1.' '1)' only at line start
         const qPattern = /(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?|\d+\s*:?\s*מספר\s+שאלה|^\d+\s*[\.\)]\s|^\d+\s*-\s)/;
         // Matches: 'א. text', 'א . text' (space between letter and dot from PDF.js visual layout)
-        const ansPatternStart = /^([אבגד1-4])\s*[\.]\s*(.*)$|^([אבגד1-4])[\)]\s*(.*)$/;
-        const ansPatternEnd = /^(.*)\s+([אבגד1-4])\s*[\.\)]$/;
+        const ansPatternStart = /^([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^([אבגדהוזחטי1-9])[\)]\s*(.*)$/;
+        const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$/;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
 
         const rawQuestions = [];
