@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         // Matches: 'שאלה מספר 1:', 'שאלה מספר :1', 'שאלה 1:', AND standalone lines like '1.' '1)' only at line start
-        const qPattern = /(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?|\d+\s*:?\s*מספר\s+שאלה|^\d+\s*[\.\)]\s|^\d+\s*-\s)/;
+        const qPattern = /(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?|\d+\s*:?\s*מספר\s+שאלה|^\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/;
         // Matches: 'א. text', 'א . text' (space between letter and dot from PDF.js visual layout)
         // Also: '.א text' or '. א text' (dot-before-letter, another Hebrew PDF extraction artifact)
         const ansPatternStart = /^([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^([אבגדהוזחטי1-9])[\)]\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/;
@@ -916,7 +916,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const questionRow = document.createElement('div');
             questionRow.className = 'row';
-            questionRow.innerHTML = `<label>שאלה ${index + 1}</label>`;
+            questionRow.style.gridTemplateColumns = '80px 1fr 28px';
+
+            const qLabel = document.createElement('label');
+            qLabel.textContent = `שאלה ${index + 1}`;
+            questionRow.appendChild(qLabel);
 
             // Image thumbnail
             if (question.image) {
@@ -945,6 +949,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.questions[index].question = questionTextarea.value;
             });
             questionRow.appendChild(questionTextarea);
+
+            const deleteQBtn = document.createElement('button');
+            deleteQBtn.type = 'button';
+            deleteQBtn.textContent = '✕';
+            deleteQBtn.title = 'מחק שאלה';
+            deleteQBtn.style.cssText = 'width:28px;height:28px;border-radius:50%;border:1px solid var(--border-color);background:var(--input-bg);color:var(--danger);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;';
+            deleteQBtn.addEventListener('click', () => {
+                state.questions.splice(index, 1);
+                renderPreview();
+            });
+            questionRow.appendChild(deleteQBtn);
+
             card.appendChild(questionRow);
 
             if (state.proofMode && question.sourcePage && state.proofPageImages.length) {
@@ -1020,6 +1036,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             elements.preview.appendChild(card);
         });
+
+        const addQBtn = document.createElement('button');
+        addQBtn.type = 'button';
+        addQBtn.textContent = '+ הוסף שאלה';
+        addQBtn.style.cssText = 'margin-top:12px;padding:10px 16px;border-radius:10px;border:2px dashed var(--border-color);background:var(--card-bg);color:var(--text-secondary);cursor:pointer;font:inherit;font-size:.95rem;width:100%;';
+        addQBtn.addEventListener('click', () => {
+            state.questions.push({
+                question: '',
+                options: ['', '', '', ''],
+                correctIndex: 0
+            });
+            renderPreview();
+        });
+        elements.preview.appendChild(addQBtn);
     }
 
     async function getTemplateSources() {
