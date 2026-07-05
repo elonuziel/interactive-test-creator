@@ -1291,6 +1291,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let apiKey = '';
 
         const pdfBuffer = await pdf.arrayBuffer();
+        // PDF.js may transfer/detach the provided buffer internally, so keep a dedicated
+        // copy for Native PDF upload to Gemini.
+        const pdfBufferForParse = pdfBuffer.slice(0);
+        const pdfBufferForNativeUpload = pdfBuffer.slice(0);
         let answerRows = null;
         if (csv) {
             const fileName = csv.name.toLowerCase();
@@ -1307,7 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setStatus('מחלץ טקסט מה-PDF...');
-        const extracted = await extractPdfText(pdfBuffer);
+        const extracted = await extractPdfText(pdfBufferForParse);
 
         let examText = extracted.text;
         let sourcePages = extracted.rawPages;
@@ -1328,7 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             apiKey = await resolveGeminiApiKey(true);
             if (ocrEngine === 'gemini_native') {
                 setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...' : 'נבחר מצב LLM כפוי. שולח את ה-PDF ל-Gemini Native PDF...');
-                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfBuffer, extracted.pdf, apiKey);
+                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfBufferForNativeUpload, extracted.pdf, apiKey);
                 examText = nativeExtraction.text;
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
