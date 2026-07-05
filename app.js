@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
     let isImmediateFeedback = false;
     let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered'
+    let isReviewMode = false; // true when reviewing from results screen
     let theme = localStorage.getItem('theme') || 'light';
 
     const STORAGE_KEY = 'quiz_answers_v1';
@@ -143,10 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!prevBtn.disabled) prevBtn.click();
         }
         if (e.key === 'ArrowLeft') {
-            if (!nextBtn.classList.contains('hidden')) nextBtn.click();
-            else if (!submitBtn.classList.contains('hidden')) submitBtn.click();
+            if (!submitBtn.classList.contains('hidden')) submitBtn.click();
+            else if (!nextBtn.classList.contains('hidden')) nextBtn.click();
         }
-    });
 
     // ── Screen Switching ──────────────────────────────────────────────────────
     function switchScreen(from, to) {
@@ -159,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearProgress();
         userAnswers = new Array(questions.length).fill(null);
         currentQuestionIndex = 0;
+        isReviewMode = false;
         switchScreen(setupScreen, quizScreen);
         renderQuestion();
     });
@@ -173,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     restartBtn.addEventListener('click', () => {
         clearProgress();
+        isReviewMode = false;
         reviewFilter = 'all';
         filterBtns.forEach(b => {
             b.classList.toggle('active', b.dataset.filter === 'all');
@@ -196,6 +198,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     submitBtn.addEventListener('click', () => {
+        if (isReviewMode) {
+            isReviewMode = false;
+            switchScreen(quizScreen, resultsScreen);
+            renderResults();
+            return;
+        }
         clearProgress();
         switchScreen(quizScreen, resultsScreen);
         renderResults();
@@ -266,8 +274,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Navigation buttons
         prevBtn.disabled = currentQuestionIndex === 0;
         const isLast = currentQuestionIndex === questions.length - 1;
-        nextBtn.classList.toggle('hidden', isLast);
+        nextBtn.classList.toggle('hidden', false); // never hide next
         submitBtn.classList.toggle('hidden', !isLast);
+        if (isReviewMode) {
+            submitBtn.textContent = 'חזרה לתוצאות';
+            submitBtn.classList.remove('hidden');
+        } else {
+            submitBtn.textContent = 'הגש מבחן';
+        }
 
         // Options
         optionsContainer.innerHTML = '';
@@ -392,6 +406,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             div.innerHTML = html;
+            div.style.cursor = 'pointer';
+            div.title = 'לחץ למעבר לשאלה';
+            div.addEventListener('click', () => {
+                isReviewMode = true;
+                currentQuestionIndex = i;
+                switchScreen(resultsScreen, quizScreen);
+                renderQuestion();
+            });
             reviewContainer.appendChild(div);
         });
 
