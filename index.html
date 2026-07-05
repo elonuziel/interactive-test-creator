@@ -6,9 +6,6 @@
     <meta name="description" content="מבחן אינטראקטיבי בעברית – מענה על שאלות, משוב מיידי, ניווט מקלדת, ושמירת התקדמות אוטומטית.">
     <title>מבחן אינטראקטיבי</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Cropper.js -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
@@ -17,6 +14,7 @@
     <header class="navbar">
         <div class="logo">מבחן אינטראקטיבי</div>
         <div class="controls">
+            <a href="quiz_generator.html" class="nav-link" title="צור מבחן חדש">יוצר מבחן ←</a>
             <label class="toggle">
                 <span class="toggle-label">משוב מיידי</span>
                 <div class="toggle-wrapper">
@@ -35,7 +33,7 @@
         <div id="setup-screen" class="screen active">
             <div class="welcome-card">
                 <h1>מוכנים להתחיל?</h1>
-                <p>השאלות נטענו בהצלחה. סדר התשובות מעורבב בכל שאלה.</p>
+                <p>טוען שאלות...</p>
                 <div id="resume-notice" class="resume-notice hidden">
                     <span>נמצא מפגש קודם שלא הושלם.</span>
                     <button id="resume-btn" class="secondary-btn">המשך מהיכן שהפסקת</button>

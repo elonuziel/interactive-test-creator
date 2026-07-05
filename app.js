@@ -85,8 +85,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Fetch Questions ───────────────────────────────────────────────────────
     fetch('questions.json')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(data => {
+            if (!Array.isArray(data) || data.length === 0) {
+                throw new Error('questions.json is empty or malformed');
+            }
             questions = data.map(q => {
                 const options = q.options.map((text, id) => ({ id, text }));
                 // Fisher-Yates shuffle
@@ -97,13 +103,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 return { ...q, options };
             });
 
+            // Update welcome text now that questions are confirmed loaded
+            const welcomeDesc = document.querySelector('.welcome-card > p');
+            if (welcomeDesc) welcomeDesc.textContent = `נטענו ${questions.length} שאלות בהצלחה. סדר התשובות מעורבב בכל שאלה.`;
+
             // Check for saved progress
             const saved = loadProgress();
             if (saved && saved.answers && saved.answers.length === questions.length) {
                 resumeNotice.classList.remove('hidden');
             }
         })
-        .catch(err => console.error('Error loading questions.json:', err));
+        .catch(err => {
+            console.error('Error loading questions.json:', err);
+            const welcomeCard = document.querySelector('.welcome-card');
+            if (welcomeCard) {
+                const errDiv = document.createElement('div');
+                errDiv.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:.75rem;background:var(--error-bg);color:var(--error-color);border:1px solid var(--error-color);font-size:.9rem;';
+                errDiv.innerHTML = '⚠️ לא נמצא קובץ שאלות. פתח מבחן שהורד מ<a href="quiz_generator.html" style="color:inherit;text-decoration:underline;">יוצר המבחן</a> ישירות, או השתמש בכפתור "פתור מבחן כעת".';
+                welcomeCard.appendChild(errDiv);
+            }
+            startBtn.disabled = true;
+            startBtn.style.opacity = '0.4';
+        });
 
     // ── Image Zoom ────────────────────────────────────────────────────────────
     questionImage.addEventListener('click', () => {
@@ -393,8 +414,27 @@ document.addEventListener('DOMContentLoaded', () => {
             `ענית נכונה על ${correctCount} מתוך ${total} שאלות.`;
 
         const circle = document.querySelector('.score-circle');
-        circle.style.background =
-            `conic-gradient(var(--primary-color) ${percentage}%, var(--option-bg) 0%)`;
+        const scoreEl = document.getElementById('final-score');
+
+        // Animate score circle and counter from 0 → percentage
+        circle.style.background = `conic-gradient(var(--primary-color) 0%, var(--option-bg) 0%)`;
+        scoreEl.textContent = '0%';
+
+        let start = null;
+        const duration = 900;
+        function animateScore(ts) {
+            if (!start) start = ts;
+            const elapsed = ts - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = Math.round(eased * percentage);
+            scoreEl.textContent = `${current}%`;
+            circle.style.background =
+                `conic-gradient(var(--primary-color) ${current}%, var(--option-bg) 0%)`;
+            if (progress < 1) requestAnimationFrame(animateScore);
+        }
+        requestAnimationFrame(animateScore);
 
         renderReviewList();
     }
@@ -448,9 +488,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Cropper Logic ─────────────────────────────────────────────────────────
-    openCropperBtn.addEventListener('click', () => {
+    let cropperLibLoaded = false;
+
+    function loadCropperLib() {
+        if (cropperLibLoaded) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css';
+            document.head.appendChild(link);
+
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js';
+            script.onload = () => { cropperLibLoaded = true; resolve(); };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    openCropperBtn.addEventListener('click', async () => {
         const fullSrc = questionImage.dataset.fullSrc;
         if (!fullSrc) return;
+
+        await loadCropperLib();
 
         cropperImage.src = fullSrc;
         cropperModal.classList.remove('hidden');
@@ -473,6 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         };
     });
+
 
     function closeCropper() {
         cropperModal.classList.add('hidden');

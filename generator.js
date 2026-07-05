@@ -548,71 +548,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    async function extractTextViaGeminiNativePdf(pdfBuffer, apiKey) {
-        if (!apiKey) {
-            throw new Error('נדרש API key של Gemini או Passcode תקין עבור Gemini Native PDF.');
-        }
-
-        const candidates = await discoverGeminiModelCandidates(apiKey);
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model));
-        const candidate = sortedCandidates[0]; // Take best model (likely pro)
-        const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-        const prompt = [
-            'Extract OCR text from this PDF exam exactly as written.',
-            'Do NOT translate, summarize, or rewrite.',
-            'Preserve question and answer order.',
-            'Return plain text only.',
-            'Insert the exact line ---PAGE_BOUNDARY--- between every physical page.'
-        ].join('\n');
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: prompt },
-                        { inlineData: { mimeType: 'application/pdf', data: arrayBufferToBase64(pdfBuffer) } }
-                    ]
-                }],
-                generationConfig: {
-                    temperature: 0,
-                    topP: 0.1,
-                    maxOutputTokens: 8192
-                }
-            })
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            const info = getGeminiErrorInfo(response.status, errorText);
-            throw new Error(`Gemini Native PDF נכשל: ${info.userMessage}`);
-        }
-
-        const payload = await response.json();
-        const text = (payload.candidates?.[0]?.content?.parts || []).map((part) => part.text || '').join('\n').trim();
-        if (!text) {
-            throw new Error('Gemini Native PDF החזיר טקסט ריק.');
-        }
-
-        const pages = text.split(/---PAGE_BOUNDARY---/i).map((line) => maybeFixHebrewWordOrder(line.trim()));
-        return {
-            pages,
-            text: pages.join('\n')
-        };
-    }
-
-    // --- New OCR Engines & Verification ---
-
-    async function arrayBufferToBase64(buffer) {
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        return window.btoa(binary);
-    }
 
     async function extractTextViaGeminiNativePdf(pdfBuffer, pdf, apiKey) {
         if (!apiKey) {
@@ -689,64 +624,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    async function verifyTestWithGemini(parsedQuestions, apiKey) {
-        setStatus('מבצע הגהה ותיקון של המבחן עם Gemini...');
-        const prompt = [
-            'You are an expert exam proofreader.',
-            'I am providing you with a JSON array of parsed exam questions extracted via OCR.',
-            'Your task is to verify and fix the JSON:',
-            '1. Fix any OCR typos in the Hebrew text.',
-            '2. Ensure options are logically separated and not truncated.',
-            '3. Maintain the exact JSON schema provided.',
-            '4. Return ONLY the raw JSON array, without any markdown formatting or code blocks.',
-            '',
-            'JSON:',
-            JSON.stringify(parsedQuestions, null, 2)
-        ].join('\n');
-
-        const candidates = await discoverGeminiModelCandidates(apiKey);
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model));
-        const candidate = sortedCandidates[0]; // Pro model preferred
-        const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.1, // slightly higher temp for minor typo fixing
-                    topP: 0.8
-                }
-            })
-        });
-
-        if (!response.ok) {
-            console.warn('Gemini verification failed, using original parsed questions.');
-            return parsedQuestions;
-        }
-
-        const payload = await response.json();
-        const responseParts = payload.candidates?.[0]?.content?.parts || [];
-        let text = responseParts.map((part) => part.text || '').join('\n').trim();
-        
-        // Remove markdown formatting if Gemini included it despite instructions
-        text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-
-        try {
-            const verified = JSON.parse(text);
-            if (Array.isArray(verified) && verified.length > 0 && verified[0].question) {
-                return verified;
-            }
-        } catch (e) {
-            console.error('Failed to parse Gemini verification JSON:', e);
-        }
-
-        // Fallback to original if parsing failed
-        return parsedQuestions;
-    }
-
-    // --- End OCR Engines & Verification ---
 
     async function verifyTestWithGemini(parsedQuestions, apiKey) {
         setStatus('מבצע הגהה ותיקון של המבחן עם Gemini...');
@@ -1231,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (extracted.isScanned) {
             if (ocrEngine === 'gemini_native') {
                 setStatus('זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...');
-                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfBuffer, apiKey);
+                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfBuffer, extracted.pdf, apiKey);
                 examText = nativeExtraction.text;
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
