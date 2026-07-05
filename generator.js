@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formNumber: document.getElementById('form-number'),
         ocrEngine: document.getElementById('ocr-engine'),
         apiKey: document.getElementById('api-key'),
+        visionKey: document.getElementById('vision-key'),
         passcode: document.getElementById('passcode'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
@@ -1288,17 +1289,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus('קורא קובצי מקור...');
 
-        const typedApiKey = elements.apiKey.value.trim();
+        const isVision = ocrEngine === 'google_vision';
+        const typedApiKey = isVision
+            ? (elements.visionKey?.value || '').trim()
+            : elements.apiKey.value.trim();
         let apiKey = typedApiKey;
         const passcode = elements.passcode.value.trim();
-        if (!apiKey && passcode && ocrEngine !== 'google_vision') {
+        if (!apiKey && passcode && !isVision) {
             apiKey = await decryptEmbeddedApiKey(passcode);
             if (!apiKey) {
                 throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
             }
         }
-        if (ocrEngine === 'google_vision' && !typedApiKey) {
-            throw new Error('Google Vision דורש Google Cloud API key ישיר בשדה ה-API Key. Passcode לא נתמך עבור Vision.');
+        if (isVision && !apiKey) {
+            throw new Error('Google Vision דורש Google Cloud API key בשדה Vision API Key.');
         }
 
         const pdfBuffer = await pdf.arrayBuffer();
