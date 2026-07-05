@@ -393,7 +393,8 @@ document.addEventListener('DOMContentLoaded', () => {
             status === 404 ||
             normalized.includes('not found') ||
             normalized.includes('not supported for generatecontent') ||
-            normalized.includes('is not supported for generatecontent')
+            normalized.includes('is not supported for generatecontent') ||
+            normalized.includes('only supports interactions api')
         ) {
             return {
                 code: 'model_not_found',
