@@ -7,12 +7,26 @@
   const useOfflineOcrToggle = document.getElementById('use-offline-ocr-toggle');
   const parseModeNote = document.getElementById('parse-mode-note');
 
-  const qPattern = /(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?|(?:מספר\s+)?שאלה\s*:?\s*\d+\s*:?)|^\d+[\.)]\s/;
+  // Question headers:
+  // 1) "שאלה מספר 1:" / "שאלה 1:"
+  // 2) "מספר שאלה 1:"
+  // 3) "1. ..." / "1) ..."
+  const questionHeaderPatterns = [
+    String.raw`שאלה\s+(?:מספר\s+)?:?\d+\s*:?`,
+    String.raw`(?:מספר\s+)?שאלה\s*:?\s*\d+\s*:?`,
+    String.raw`^\d+[\.)]\s*`
+  ];
+  const qPattern = new RegExp(questionHeaderPatterns.join('|'));
   const answerPattern = /^([אבגד1-4])\s*[\.)]\s*(.*)$/;
   const noisePattern = /(?:^עמוד\s+\d+\s+מתוך\s+\d+$|^\d+\s+מתוך\s*\d+\s+עמוד$)/;
-  const endExamPattern = /-?\s*סוף\s+המבחן\s*-?/g;
+  const endExamPattern = /-*\s*סוף\s+המבחן\s*-*/g;
+  const endExamLinePattern = /^\s*-*\s*סוף\s+המבחן\s*-*\s*$/i;
 
   let questions = [];
+
+  function isMissing(value) {
+    return value === undefined || value === '';
+  }
 
   function sanitizeText(text) {
     return (text || '').replace(endExamPattern, '').replace(/\s+/g, ' ').trim();
@@ -20,7 +34,7 @@
 
   function isNoise(line) {
     const clean = line.trim();
-    return !clean || noisePattern.test(clean) || /^\s*-*\s*סוף\s+המבחן\s*-*\s*$/i.test(clean);
+    return !clean || noisePattern.test(clean) || endExamLinePattern.test(clean);
   }
 
   function updateParseModeNote() {
@@ -137,19 +151,29 @@
 
   previewContainer.addEventListener('input', (event) => {
     const { type, q, opt } = event.target.dataset;
+    if (type !== 'question' && type !== 'option') return;
+    if ((type === 'question' || type === 'option') && isMissing(q)) return;
+
+    const qIndex = Number(q);
+    if (!Number.isInteger(qIndex) || !questions[qIndex]) return;
+
     if (type === 'question') {
-      questions[Number(q)].question = sanitizeText(event.target.value);
+      questions[qIndex].question = sanitizeText(event.target.value);
     }
     if (type === 'option') {
-      questions[Number(q)].options[Number(opt)] = sanitizeText(event.target.value);
+      if (isMissing(opt)) return;
+      const optIndex = Number(opt);
+      if (!Number.isInteger(optIndex) || !questions[qIndex].options[optIndex]) return;
+      questions[qIndex].options[optIndex] = sanitizeText(event.target.value);
     }
   });
 
   previewContainer.addEventListener('change', (event) => {
     const { type, q } = event.target.dataset;
-    if (type === 'correct') {
-      questions[Number(q)].correctIndex = Number(event.target.value);
-    }
+    if (type !== 'correct' || isMissing(q)) return;
+    const qIndex = Number(q);
+    if (!Number.isInteger(qIndex) || !questions[qIndex]) return;
+    questions[qIndex].correctIndex = Number(event.target.value);
   });
 
   useLlmToggle.addEventListener('change', updateParseModeNote);

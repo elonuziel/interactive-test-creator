@@ -44,7 +44,8 @@ NOISE_RE = re.compile(
     r'|^\d+\s+מתוך\s*\d+\s+עמוד$)'             # 1 מתוך5 עמוד  (LTR-grouped)
 )
 NOISE_WORDS = ("קוד מבחן", "מבחן מס'", "מבחן מס")
-END_EXAM_MARKER_RE = re.compile(r'^\s*-*\s*סוף\s+המבחן\s*-*\s*$', re.IGNORECASE)
+END_EXAM_MARKER_LINE_RE = re.compile(r'^\s*-*\s*סוף\s+המבחן\s*-*\s*$', re.IGNORECASE)
+END_EXAM_MARKER_RE = re.compile(r'-*\s*סוף\s+המבחן\s*-*', re.IGNORECASE)
 
 # Step 2.4: image keyword detection
 IMAGE_KEYWORDS = re.compile(
@@ -57,7 +58,7 @@ def is_noise(line):
     return (
         NOISE_RE.match(line)
         or any(w in line for w in NOISE_WORDS)
-        or END_EXAM_MARKER_RE.match(line)
+        or END_EXAM_MARKER_LINE_RE.match(line)
     )
 
 
@@ -70,7 +71,7 @@ def strip_end_exam_marker(text):
     Remove end-of-exam markers that may leak into the last parsed question.
     Supports variants like 'סוף המבחן' and '--- סוף המבחן ---'.
     """
-    text = re.sub(r'-*\s*סוף\s+המבחן\s*-*', '', text, flags=re.IGNORECASE)
+    text = re.sub(END_EXAM_MARKER_RE, '', text)
     return normalize_whitespace(text)
 
 def clean_option_text(text):
