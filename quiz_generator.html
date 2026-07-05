@@ -300,7 +300,13 @@
 
             <div class="info-banner">
                 <span>💡</span>
-                <span><strong>PDF רגיל (עם טקסט)</strong> יעובד ישירות על המחשב שלך — בחינם וללא הגבלה. <strong>PDF סרוק (תמונה)</strong> דורש חיבור ל-Gemini (מפתח API) או שימוש ב-OCR מקומי (פחות מדויק).</span>
+                <div style="flex: 1;">
+                    <strong style="display: block; margin-bottom: 4px; font-size: .9rem;">איך הקובץ שלך יעובד?</strong>
+                    <ul style="margin: 0; padding-right: 18px; list-style-type: disc; display: grid; gap: 4px;">
+                        <li><strong>PDF דיגיטלי (עם טקסט להעתקה):</strong> יעובד <strong>מקומי על המחשב שלך</strong> — בחינם, ללא הגבלה וללא צורך בחיבור לאינטרנט או ב-API Key.</li>
+                        <li><strong>PDF סרוק (צילום/תמונה):</strong> דורש פענוח תמונה (OCR) — באמצעות <strong>Gemini (דיוק מושלם, דורש API Key)</strong> או באמצעות <strong>OCR חינמי מקומי</strong> (מתבצע בדפדפן, דיוק נמוך יותר).</li>
+                    </ul>
+                </div>
             </div>
 
             <div class="field">
@@ -338,10 +344,10 @@
                 <select id="ocr-engine">
                     <option value="gemini_chunked">Gemini — פיצול לעמודים (מומלץ)</option>
                     <option value="gemini_native">Gemini — העלאת PDF ישירה (מהיר)</option>
-                    <option value="offline_local">OCR מקומי — ללא API Key</option>
+                    <option value="offline_local">OCR מקומי חינמי — ללא API Key</option>
                 </select>
                 <div class="offline-warning-box">
-                    ⚠️&nbsp; OCR מקומי עובד ללא חיבור לשרת, אבל בעברית הדיוק נמוך בהרבה מ-Gemini.
+                    ⚠️&nbsp; OCR חינמי זה מתבצע בדפדפן, אך דורש חיבור לאינטרנט חד-פעמי להורדת מודל השפה. בעברית הדיוק נמוך בהרבה מ-Gemini.
                 </div>
             </div>
 
@@ -469,17 +475,62 @@ document.querySelectorAll('.eye-btn').forEach(btn => {
     });
 });
 
-// Dynamic visibility: offline warning + auth section
+// Dynamic visibility: offline warning + auth section + invalid combinations blocker
 (function () {
     const ocrSel = document.getElementById('ocr-engine');
     const policySel = document.getElementById('llm-policy');
     const offlineWarn = document.querySelector('.offline-warning-box');
     const authSection = document.getElementById('llm-auth-section');
+
     function syncVisibility() {
+        if (!ocrSel || !policySel) return;
+
+        const ocrOfflineOption = ocrSel.querySelector('option[value="offline_local"]');
+        const ocrGeminiChunkedOption = ocrSel.querySelector('option[value="gemini_chunked"]');
+        const ocrGeminiNativeOption = ocrSel.querySelector('option[value="gemini_native"]');
+
+        const policyForceLlmOption = policySel.querySelector('option[value="force_llm"]');
+        const policyForceNoLlmOption = policySel.querySelector('option[value="force_no_llm"]');
+
+        // Reset disabled states first
+        if (ocrOfflineOption) ocrOfflineOption.disabled = false;
+        if (ocrGeminiChunkedOption) ocrGeminiChunkedOption.disabled = false;
+        if (ocrGeminiNativeOption) ocrGeminiNativeOption.disabled = false;
+
+        if (policyForceLlmOption) policyForceLlmOption.disabled = false;
+        if (policyForceNoLlmOption) policyForceNoLlmOption.disabled = false;
+
+        // 1. Check constraints from LLM Policy side
+        if (policySel.value === 'force_llm') {
+            if (ocrOfflineOption) ocrOfflineOption.disabled = true;
+            if (ocrSel.value === 'offline_local') {
+                ocrSel.value = 'gemini_chunked';
+            }
+        } else if (policySel.value === 'force_no_llm') {
+            if (ocrGeminiChunkedOption) ocrGeminiChunkedOption.disabled = true;
+            if (ocrGeminiNativeOption) ocrGeminiNativeOption.disabled = true;
+            ocrSel.value = 'offline_local';
+        }
+
+        // 2. Check constraints from OCR Engine side
+        if (ocrSel.value === 'offline_local') {
+            if (policyForceLlmOption) policyForceLlmOption.disabled = true;
+            if (policySel.value === 'force_llm') {
+                policySel.value = 'auto';
+            }
+        } else if (ocrSel.value === 'gemini_chunked' || ocrSel.value === 'gemini_native') {
+            if (policyForceNoLlmOption) policyForceNoLlmOption.disabled = true;
+            if (policySel.value === 'force_no_llm') {
+                policySel.value = 'auto';
+            }
+        }
+
+        // 3. Update visibility of warning & authentication sections
         if (offlineWarn) offlineWarn.classList.toggle('show', ocrSel.value === 'offline_local');
         const hideAuth = policySel.value === 'force_no_llm' || ocrSel.value === 'offline_local';
         if (authSection) authSection.classList.toggle('hidden', hideAuth);
     }
+
     ocrSel.addEventListener('change', syncVisibility);
     policySel.addEventListener('change', syncVisibility);
     syncVisibility();

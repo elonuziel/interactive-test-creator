@@ -383,17 +383,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function extractTextViaOfflineOcr(pdf) {
         if (!window.Tesseract?.createWorker) {
-            throw new Error('OCR מקומי לא נטען בדפדפן. רענן את העמוד ונסה שוב, או בחר Gemini.');
+            throw new Error('רכיב OCR חינמי לא נטען בדפדפן. רענן את העמוד ונסה שוב, או בחר Gemini.');
         }
 
-        setStatus('מכין OCR מקומי. האיכות כנראה תהיה נמוכה יותר מ-Gemini...');
+        setStatus('מכין OCR חינמי בדפדפן. האיכות כנראה תהיה נמוכה יותר מ-Gemini...');
         const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf);
         const pages = [];
         const worker = await window.Tesseract.createWorker('heb');
 
         try {
             for (let i = 0; i < imageDatas.length; i++) {
-                setStatus(`OCR מקומי מעבד עמוד ${i + 1}/${imageDatas.length}... האיכות כנראה תהיה נמוכה יותר מ-Gemini.`);
+                setStatus(`OCR חינמי מעבד עמוד ${i + 1}/${imageDatas.length}... האיכות כנראה תהיה נמוכה יותר מ-Gemini.`);
                 const { data } = await worker.recognize(`data:image/png;base64,${imageDatas[i]}`);
                 pages.push(maybeFixHebrewWordOrder((data && data.text) || ''));
             }
@@ -1279,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (useOfflineOcr) {
-            setStatus('זוהה PDF סרוק. מפעיל OCR מקומי בלבד; האיכות כנראה תהיה נמוכה יותר מ-Gemini.');
+            setStatus('זוהה PDF סרוק. מפעיל OCR חינמי בדפדפן; האיכות כנראה תהיה נמוכה יותר מ-Gemini.');
             const offlineExtraction = await extractTextViaOfflineOcr(extracted.pdf);
             examText = offlineExtraction.text;
             sourcePages = offlineExtraction.pages;
