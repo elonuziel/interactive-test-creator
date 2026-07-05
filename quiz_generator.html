@@ -96,7 +96,7 @@
         }
         .question-card .option-row {
             display: grid;
-            grid-template-columns: 24px 1fr;
+            grid-template-columns: 24px 1fr 26px;
             gap: 8px;
             align-items: center;
         }
@@ -248,6 +248,10 @@
                     <input id="passcode" type="password" autocomplete="off" placeholder="הזן קוד סודי (Passcode)">
                     <button class="eye-btn" type="button" data-target="passcode" title="הצג/הסתר">👁️</button>
                 </div>
+            </div>
+            <div class="field">
+                <label for="html-file">טעינת מבחן קיים לעריכה (אופציונלי)</label>
+                <input id="html-file" type="file" accept=".html,text/html">
             </div>
             <div class="actions">
                 <button id="run-parse" class="primary-btn">הפעל ניתוח</button>

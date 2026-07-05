@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ocrEngine: document.getElementById('ocr-engine'),
         apiKey: document.getElementById('api-key'),
         passcode: document.getElementById('passcode'),
+        htmlFile: document.getElementById('html-file'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
         takeQuiz: document.getElementById('take-quiz'),
@@ -1111,9 +1112,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.questions[index].options[optIndex] = optionInput.value;
                 });
 
-                optionRow.append(radio, optionInput);
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.textContent = '✕';
+                delBtn.title = 'הסר תשובה';
+                delBtn.style.cssText = 'width:26px;height:26px;border-radius:50%;border:1px solid var(--border-color);background:var(--input-bg);color:var(--danger);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;';
+                delBtn.addEventListener('click', () => {
+                    state.questions[index].options.splice(optIndex, 1);
+                    if (state.questions[index].correctIndex >= state.questions[index].options.length) {
+                        state.questions[index].correctIndex = Math.max(0, state.questions[index].options.length - 1);
+                    }
+                    renderPreview();
+                });
+
+                optionRow.append(radio, optionInput, delBtn);
                 card.appendChild(optionRow);
             });
+
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.textContent = '+ הוסף תשובה';
+            addBtn.style.cssText = 'margin-top:4px;padding:6px 14px;border-radius:8px;border:1px dashed var(--border-color);background:var(--input-bg);color:var(--text-secondary);cursor:pointer;font:inherit;font-size:.85rem;width:100%;';
+            addBtn.addEventListener('click', () => {
+                state.questions[index].options.push('');
+                renderPreview();
+            });
+            card.appendChild(addBtn);
 
             elements.preview.appendChild(card);
         });
@@ -1308,6 +1332,28 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatus('המבחן נפתח בלשונית חדשה.');
         } catch (error) {
             setStatus(error.message || 'לא ניתן היה לפתוח את המבחן.', true);
+        }
+    });
+
+    elements.htmlFile.addEventListener('change', async () => {
+        const file = elements.htmlFile.files?.[0];
+        if (!file) return;
+        try {
+            setStatus('טוען מבחן קיים...');
+            const html = await file.text();
+            const match = html.match(/window\.__INLINE_QUESTIONS__\s*=\s*(\[[\s\S]*?\])\s*;/);
+            if (!match) throw new Error('לא נמצאו שאלות מוטמעות בקובץ.');
+            const questions = JSON.parse(match[1]);
+            if (!Array.isArray(questions) || !questions.length || !questions[0].question) {
+                throw new Error('מבנה השאלות בקובץ אינו תקין.');
+            }
+            state.questions = questions;
+            state.proofPageImages = [];
+            renderPreview();
+            disableOutputActions(false);
+            setStatus(`נטענו ${questions.length} שאלות מקובץ HTML קיים.`);
+        } catch (error) {
+            setStatus(error.message || 'נכשלה טעינת קובץ HTML.', true);
         }
     });
 });
