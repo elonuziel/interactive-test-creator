@@ -150,6 +150,20 @@
         }
         .eye-btn:hover { opacity: 1; }
         .hidden { display: none; }
+        .file-wrap { display: flex; align-items: center; gap: 8px; }
+        .file-wrap input[type="file"] { flex: 1; }
+        .file-clear {
+            white-space: nowrap;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--danger);
+            background: transparent;
+            color: var(--danger);
+            cursor: pointer;
+            font: inherit;
+            font-size: .82rem;
+        }
+        .file-clear:hover { background: var(--danger); color: #fff; }
         .help-popup {
             display: none;
             position: fixed;
@@ -218,11 +232,17 @@
             <h2>קבצי מקור</h2>
             <div class="field">
                 <label for="pdf-file">קובץ PDF</label>
-                <input id="pdf-file" type="file" accept="application/pdf">
+                <div class="file-wrap">
+                    <input id="pdf-file" type="file" accept="application/pdf">
+                    <button class="file-clear hidden" data-target="pdf-file" type="button" title="הסר קובץ">✕ הסר</button>
+                </div>
             </div>
             <div class="field">
                 <label for="csv-file">קובץ CSV / XLSX תשובות (אופציונלי - יוגדר א' כברירת מחדל)</label>
-                <input id="csv-file" type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                <div class="file-wrap">
+                    <input id="csv-file" type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                    <button class="file-clear hidden" data-target="csv-file" type="button" title="הסר קובץ">✕ הסר</button>
+                </div>
             </div>
             <div class="field">
                 <label for="form-number">מספר שאלון (אופציונלי)</label>
@@ -251,7 +271,10 @@
             </div>
             <div class="field">
                 <label for="html-file">טעינת מבחן קיים לעריכה (אופציונלי)</label>
-                <input id="html-file" type="file" accept=".html,text/html">
+                <div class="file-wrap">
+                    <input id="html-file" type="file" accept=".html,text/html">
+                    <button class="file-clear hidden" data-target="html-file" type="button" title="הסר קובץ">✕ הסר</button>
+                </div>
             </div>
             <div class="actions">
                 <button id="run-parse" class="primary-btn">הפעל ניתוח</button>
@@ -305,6 +328,16 @@ document.getElementById('api-help-close').addEventListener('click', () => {
 });
 document.getElementById('api-help-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('api-help-popup').classList.remove('show');
+});
+document.querySelectorAll('.file-clear').forEach(btn => {
+    const input = document.getElementById(btn.dataset.target);
+    input.addEventListener('change', () => {
+        btn.classList.toggle('hidden', !input.files?.length);
+    });
+    btn.addEventListener('click', () => {
+        input.value = '';
+        btn.classList.add('hidden');
+    });
 });
 document.querySelectorAll('.eye-btn').forEach(btn => {
     btn.addEventListener('click', () => {
