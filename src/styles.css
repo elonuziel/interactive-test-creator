@@ -1,0 +1,270 @@
+:root {
+  color-scheme: light;
+  --bg: #07111f;
+  --bg-alt: #0b1730;
+  --panel: rgba(10, 20, 40, 0.72);
+  --panel-strong: #0f1d36;
+  --text: #f4f7fb;
+  --muted: #b6c2d3;
+  --accent: #7dd3fc;
+  --accent-strong: #38bdf8;
+  --border: rgba(148, 163, 184, 0.2);
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Rubik', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.25), transparent 28%),
+    radial-gradient(circle at right 20%, rgba(99, 102, 241, 0.18), transparent 24%),
+    linear-gradient(180deg, #06101f 0%, #09142a 45%, #07111f 100%);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+  overflow: hidden;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+.orb-a {
+  width: 280px;
+  height: 280px;
+  top: -60px;
+  right: -40px;
+  background: radial-gradient(circle, rgba(125, 211, 252, 0.3), rgba(125, 211, 252, 0));
+}
+
+.orb-b {
+  width: 220px;
+  height: 220px;
+  left: -70px;
+  top: 180px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0));
+}
+
+.topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.eyebrow,
+.hero-kicker,
+.panel-title {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+.topbar h1 {
+  margin-bottom: 0;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1;
+}
+
+.ghost-link,
+.primary-btn,
+.secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-weight: 700;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.ghost-link {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ghost-link:hover,
+.primary-btn:hover,
+.secondary-btn:hover,
+.link-card:hover {
+  transform: translateY(-1px);
+}
+
+.hero-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.hero-card,
+.stack-card,
+.notes-card,
+.link-card {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.hero-card,
+.stack-card,
+.notes-card {
+  border-radius: 28px;
+}
+
+.hero-card {
+  padding: 32px;
+}
+
+.hero-card h2 {
+  margin-bottom: 14px;
+  font-size: clamp(1.7rem, 3vw, 2.8rem);
+  line-height: 1.1;
+}
+
+.hero-copy {
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.8;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #04101f;
+}
+
+.secondary-btn {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stack-card {
+  padding: 22px;
+}
+
+.feature-list {
+  display: grid;
+  gap: 14px;
+}
+
+.feature-item {
+  padding: 16px 16px 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.feature-item h3 {
+  margin-bottom: 6px;
+  font-size: 1rem;
+}
+
+.feature-item p,
+.notes-card li,
+.link-card span {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.link-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.link-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px 18px 20px;
+  border-radius: 22px;
+}
+
+.link-card strong {
+  font-size: 1.02rem;
+}
+
+.notes-card {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  padding: 22px 24px;
+}
+
+.notes-card ul {
+  margin: 0;
+  padding-right: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .hero-grid,
+  .link-grid,
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    align-items: start;
+  }
+
+  .link-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card,
+  .stack-card,
+  .notes-card {
+    padding: 20px;
+  }
+}

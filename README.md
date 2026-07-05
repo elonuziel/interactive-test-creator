@@ -1,65 +1,73 @@
 # Interactive Hebrew Quiz Generator
 
-> **Try it live:** [elonuziel.github.io/html-test-creator/quiz_generator.html](https://elonuziel.github.io/html-test-creator/quiz_generator.html)
+> **React entry:** [index.html](index.html) | **Legacy builder:** [quiz_generator.html](quiz_generator.html) | **Legacy quiz taker:** [quiz_taker.html](quiz_taker.html)
 
-Turn scanned Hebrew exam PDFs into interactive, self-grading quizzes — in your browser. Upload a PDF, let Gemini OCR extract the questions, attach an answer key, and export a standalone HTML quiz.
+Turn scanned Hebrew exam PDFs into interactive, self-grading quizzes. The repo now has a React-first root entry so it can be uploaded to Google AI Studio Build Mode, while the existing static builder and quiz player remain available as legacy pages.
 
-## 🎯 Quiz Generator
+## React / AI Studio entry
 
-**`quiz_generator.html`** + **`generator.js`** — the builder UI.
+**`index.html`** + **`src/main.jsx`** + **`src/App.jsx`** + **`src/styles.css`** — the React shell for AI Studio.
 
-### Workflow
-1. Upload a **PDF** (digital or scanned)
-2. (Optional) Upload an **answer key** — CSV, XLS, or XLSX — with a form number
-3. Enter a **Gemini API key** (free from [Google AI Studio](https://aistudio.google.com/apikey))
-4. Click **הפעל ניתוח** — Gemini extracts and parses all questions
-5. Edit questions, answers, and correct choices in the preview
-6. Click **הורד מבחן עצמאי** to download, or **פתור מבחן כעת** to take it immediately
+### What this root app does
+- Presents the repo as a React-based build target for AI Studio.
+- Links to the existing builder and quiz player pages.
+- Keeps the migration path open for moving Gemini calls to AI Studio server-side code later.
 
-### Generator Features
-- **OCR engines** — Gemini chunked (default, best for Hebrew) or Gemini native PDF
-- **Answer key formats** — CSV, XLS, XLSX with automatic form-number matching
-- **Proof mode** — view the original PDF page alongside each question
-- **Add/remove answers** — adjust option counts per question in the editor
-- **Image detection** — charts, graphs, tables auto-attach page images for cropping
-- **Re-edit existing quizzes** — upload a previously downloaded quiz HTML to continue editing
-- **File clear buttons** — remove uploaded files without refreshing
+## Legacy pages kept in place
 
-### API Keys
+**`quiz_generator.html`** + **`generator.js`** — the original builder UI.
+
+**`quiz_taker.html`** + **`app.js`** + **`style.css`** — the standalone quiz player.
+
+### Generator features
+- OCR engines — Gemini chunked or Gemini native PDF
+- Answer key formats — CSV, XLS, XLSX with automatic form-number matching
+- Proof mode — view the original PDF page alongside each question
+- Add/remove answers — adjust option counts per question in the editor
+- Image detection — charts, graphs, tables auto-attach page images for cropping
+- Re-edit existing quizzes — upload a previously downloaded quiz HTML to continue editing
+- File clear buttons — remove uploaded files without refreshing
+
+## AI Studio notes
+
+- Google AI Studio Build mode generates web apps with React by default and a Node.js server runtime for secrets.
+- The next migration step is to move Gemini calls to server-side code so the API key stays out of the browser.
+- This repo is now structured so AI Studio can import the React shell while preserving the current HTML workflow.
+
+## API Keys
+
 | Type | Prefix | How to get |
 |---|---|---|
 | Gemini (free) | `AIza...` | [Google AI Studio](https://aistudio.google.com/apikey) |
 | Gemini (Cloud) | `AQ...` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
 
-Free tier tip: the generator sends all pages in one request to stay within rate limits.
-
-## 📝 Quiz Taker
-
-**`index.html`** + **`app.js`** + **`style.css`** — the standalone quiz player.
-
-### Features
-- **RTL Hebrew** — full right-to-left support
-- **Keyboard navigation** — `1`–`9` to select, `←` `→` to navigate, `Esc` to close zoom
-- **Immediate feedback** — optional toggle to check answers as you go
-- **Progress tracking** — progress bar + question jump bar
-- **Auto-save & resume** — localStorage persistence
-- **Review mode** — after submitting, click any question to jump back and review, or use the **חזרה לשאלות** button
-- **Image zoom & crop** — zoom into attached images, crop to focus on specific areas
-- **Dark/light theme** — toggle in the header
-- **Answer shuffle** — options randomized per session
-
-## 🗂️ Project Structure
+## Project Structure
 
 ```
-quiz_generator.html   — Builder UI
-generator.js          — PDF extraction, OCR, parsing, export logic
-index.html            — Quiz taker shell
-app.js                — Quiz player logic (navigation, scoring, review)
-style.css             — Shared styles (RTL, dark mode, responsive)
-vendor/pdfjs/         — PDF.js for in-browser PDF rendering
-tests/                — Sample exam PDFs and answer keys
+index.html          — React root entry
+src/                — React shell for AI Studio
+quiz_generator.html — Builder UI
+generator.js        — PDF extraction, OCR, parsing, export logic
+quiz_taker.html     — Quiz player shell
+app.js              — Quiz player logic
+style.css           — Shared styles for legacy pages
+vendor/pdfjs/       — PDF.js for in-browser PDF rendering
+tests/              — Sample exam PDFs and answer keys
 ```
 
-## 📄 License
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## License
 
 MIT — see [LICENSE](LICENSE).
