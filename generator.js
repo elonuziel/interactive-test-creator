@@ -889,7 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pushCurrent();
 
-        const imageKeywords = /לפניכם|גרף|תרשים|תמונה|איור|מפה|ציור|דיאגרמה|צילום/;
+        const imageKeywords = /לפניכם|גרף|תרשים|תמונה|טבלה|לוח|איור|מפה|ציור|דיאגרמה|צילום|סכמה|טבלאות|תרשים/;
 
         const formatted = rawQuestions
             .map((q) => {
@@ -898,12 +898,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pageIdx = filteredLinePageMap[q.lineIdx] ?? 0;
                 const obj = { question, options, correctIndex: 0, sourcePage: pageIdx + 1 };
 
-                // Attach image only for strong visual-reference cues to avoid wrong page assignments.
-                if (pageImages && pageImages.length && imageKeywords.test(question)) {
-                    // Use exact page only. This prevents attaching charts from nearby pages.
-                    if (pageIdx >= 0 && pageIdx < pageImages.length && pageImages[pageIdx]) {
+                // Attach embedded image if available; visual-keyword questions without
+                // an embedded image will get a full-page render later in runParse.
+                if (imageKeywords.test(question)) {
+                    if (pageImages && pageIdx >= 0 && pageIdx < pageImages.length && pageImages[pageIdx]) {
                         obj.image = pageImages[pageIdx];
                     }
+                    // Mark for fallback page render (handled by caller)
+                    obj._needsPageRender = true;
                 }
 
                 return obj;
@@ -1236,6 +1238,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 sourcePages = fallbackExtraction.pages;
                 state.proofPageImages = fallbackExtraction.pagePreviews || [];
             }
+        }
+
+        // Render full-page images for questions that mention visuals but lack embedded images.
+        for (const q of parsedQuestions) {
+            if (q._needsPageRender && !q.image && extracted.pdf) {
+                try {
+                    const page = await extracted.pdf.getPage(q.sourcePage);
+                    q.image = await extractPageImage(page);
+                } catch { /* skip if render fails */ }
+            }
+            delete q._needsPageRender;
         }
 
         if (answerRows && formNumber) {
