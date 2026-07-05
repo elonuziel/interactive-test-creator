@@ -1304,7 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let answerRows = null;
         if (csv) {
             const fileName = csv.name.toLowerCase();
-            if (fileName.endsWith('.xlsx')) {
+            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
                 const xlsxBuffer = await csv.arrayBuffer();
                 answerRows = parseXlsxToRows(xlsxBuffer);
             } else {
