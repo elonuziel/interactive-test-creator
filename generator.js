@@ -1327,7 +1327,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const html = await createStandaloneQuizHtml();
             const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
-            window.open(url, '_blank', 'noopener,noreferrer');
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.click();
             setTimeout(() => URL.revokeObjectURL(url), 60_000);
             setStatus('המבחן נפתח בלשונית חדשה.');
         } catch (error) {
