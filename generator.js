@@ -18,11 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const GEMINI_CONFIG = {
         apiVersions: ['v1', 'v1beta'],
         preferredModels: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
-        maxQuotaRetries: 3,
-        initialRetryDelayMs: 2500,
-        maxRetryDelayMs: 30000,
-        interPageDelayMs: 4200,
-        ocrChunkSize: 2
+        maxQuotaRetries: 5,
+        initialRetryDelayMs: 5000,
+        maxRetryDelayMs: 60000,
+        interPageDelayMs: 8000,
+        ocrChunkSize: 20
     };
 
     const state = {
