@@ -139,6 +139,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return value.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
+    function stripExamFooterArtifacts(value) {
+        return value.replace(/-+\s*סוף\s+המבחן\s*-+/g, ' ');
+    }
+
     function fixHebrewWordOrder(text) {
         return text
             .split('\n')
@@ -708,6 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Matches: 'text א.' or 'text .א' at end of line
         const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$|^(.*)\s+[\.]\s*([אבגדהוזחטי])$/;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
+        const footerPattern = /^-+\s*סוף\s+המבחן\s*-+$/;
 
         const rawQuestions = [];
         let current = null;
@@ -726,6 +731,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const reversedLine = line.split(/\s+/).reverse().join(' ');
+            if (footerPattern.test(line) || footerPattern.test(reversedLine)) {
+                continue;
+            }
 
             if (qPattern.test(line) || qPattern.test(reversedLine)) {
                 pushCurrent();
@@ -774,8 +782,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const diagnostics = [];
         const formatted = rawQuestions
             .map((q, idx) => {
-                const question = normalizeWhitespace(q.text.join(' '));
-                const options = q.answers.map((a) => normalizeWhitespace(a.text.join(' '))).filter(Boolean);
+                const question = normalizeWhitespace(stripExamFooterArtifacts(q.text.join(' ')));
+                const options = q.answers
+                    .map((a) => normalizeWhitespace(stripExamFooterArtifacts(a.text.join(' '))))
+                    .filter(Boolean);
                 const pageIdx = filteredLinePageMap[q.lineIdx] ?? 0;
                 const obj = { question, options, correctIndex: 0, sourcePage: pageIdx + 1 };
 
