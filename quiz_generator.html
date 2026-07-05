@@ -47,6 +47,39 @@
             font-size: .78rem;
             color: var(--text-secondary);
         }
+        .field-note-block {
+            margin-top: 6px;
+            font-size: .82rem;
+            line-height: 1.45;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            padding: 8px 10px;
+            border: 1px solid transparent;
+            background: rgba(148,163,184,.08);
+        }
+        .field-note-block.hidden {
+            display: none;
+        }
+        .field-note-block.is-loading {
+            color: var(--primary-color);
+            background: rgba(59,130,246,.08);
+            border-color: rgba(59,130,246,.18);
+        }
+        .field-note-block.is-digital {
+            color: #047857;
+            background: rgba(16,185,129,.10);
+            border-color: rgba(16,185,129,.22);
+        }
+        .field-note-block.is-scanned {
+            color: #b45309;
+            background: rgba(245,158,11,.10);
+            border-color: rgba(245,158,11,.24);
+        }
+        .field-note-block.is-error {
+            color: var(--danger);
+            background: rgba(239,68,68,.08);
+            border-color: rgba(239,68,68,.20);
+        }
         .warning-note {
             color: var(--danger);
             font-size: .82rem;
@@ -315,6 +348,7 @@
                     <input id="pdf-file" type="file" accept="application/pdf">
                     <button class="file-clear hidden" data-target="pdf-file" type="button" title="הסר קובץ">✕ הסר</button>
                 </div>
+                <div id="pdf-type-note" class="field-note-block hidden"></div>
             </div>
             <div class="field">
                 <label for="csv-file">קובץ תשובות <span class="field-note-inline">CSV / XLS — אופציונלי (בהיעדר קובץ, ברירת המחדל של התשובה הנכונה תהיה א')</span></label>

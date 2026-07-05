@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         credentialSubmit: document.getElementById('credential-submit'),
         credentialCancel: document.getElementById('credential-cancel'),
         htmlFile: document.getElementById('html-file'),
+        pdfTypeNote: document.getElementById('pdf-type-note'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
         takeQuiz: document.getElementById('take-quiz'),
@@ -83,6 +84,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function disableOutputActions(disabled) {
         elements.downloadQuiz.disabled = disabled;
         elements.takeQuiz.disabled = disabled;
+    }
+
+    function setPdfTypeNote(message = '', tone = 'neutral') {
+        if (!elements.pdfTypeNote) return;
+        elements.pdfTypeNote.textContent = message;
+        elements.pdfTypeNote.classList.toggle('hidden', !message);
+        elements.pdfTypeNote.classList.remove('is-loading', 'is-digital', 'is-scanned', 'is-error');
+        if (!message) return;
+        if (tone === 'loading') elements.pdfTypeNote.classList.add('is-loading');
+        else if (tone === 'digital') elements.pdfTypeNote.classList.add('is-digital');
+        else if (tone === 'scanned') elements.pdfTypeNote.classList.add('is-scanned');
+        else if (tone === 'error') elements.pdfTypeNote.classList.add('is-error');
     }
 
     function decodeBase64(base64) {
@@ -342,6 +355,32 @@ document.addEventListener('DOMContentLoaded', () => {
             isScanned: nonWhitespaceChars < Math.max(pdf.numPages * 60, 120),
             text: maybeFixHebrewWordOrder(pages.join('\n')),
             rawPages: pages // preserve per-page text for image association
+        };
+    }
+
+    async function detectPdfType(arrayBuffer) {
+        if (!window.pdfjsLib?.getDocument) {
+            throw new Error('PDF.js לא נטען. רענן את העמוד ונסה שוב.');
+        }
+
+        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        let nonWhitespaceChars = 0;
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item) => (item.str || '').trim()).join(' ');
+            nonWhitespaceChars += pageText.replace(/\s/g, '').length;
+        }
+
+        const isScanned = nonWhitespaceChars < Math.max(pdf.numPages * 60, 120);
+        return {
+            isScanned,
+            pdfTypeLabel: isScanned ? 'PDF סרוק (תמונה)' : 'PDF דיגיטלי (עם טקסט)',
+            recommendation: isScanned
+                ? 'יזדקק ל-OCR. אפשר להשתמש ב-Gemini או ב-OCR החינמי בדפדפן.'
+                : 'יעובד מקומית ללא OCR וללא צורך ב-API Key.'
         };
     }
 
@@ -1418,5 +1457,29 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             setStatus(error.message || 'נכשלה טעינת קובץ HTML.', true);
         }
+    });
+
+    elements.pdfFile.addEventListener('change', async () => {
+        const file = elements.pdfFile.files?.[0];
+        if (!file) {
+            setPdfTypeNote('');
+            return;
+        }
+
+        try {
+            setPdfTypeNote('מזהה את סוג ה-PDF...', 'loading');
+            const pdfBuffer = await file.arrayBuffer();
+            const detection = await detectPdfType(pdfBuffer);
+            setPdfTypeNote(
+                `${detection.pdfTypeLabel}: ${detection.recommendation}`,
+                detection.isScanned ? 'scanned' : 'digital'
+            );
+        } catch (error) {
+            setPdfTypeNote(error.message || 'לא ניתן היה לזהות את סוג ה-PDF.', 'error');
+        }
+    });
+
+    document.querySelector('[data-target="pdf-file"]')?.addEventListener('click', () => {
+        setPdfTypeNote('');
     });
 });
