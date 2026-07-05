@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="מחולל מבחנים בעברית – העלה קובץ PDF סרוק, חלץ שאלות באמצעות Gemini OCR, וצור מבחן אינטראקטיבי להורדה.">
     <title>יוצר מבחן אינטראקטיבי</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -259,14 +260,14 @@
                 <label for="api-key">Gemini API Key <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
                 <div class="password-wrap">
                     <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
-                    <button class="eye-btn" type="button" data-target="api-key" title="הצג/הסתר">👁️</button>
+                    <button class="eye-btn" type="button" data-target="api-key" aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
                 </div>
             </div>
             <div class="field">
                 <label for="passcode">קוד גישה למפתח מוצפן (אופציונלי)</label>
                 <div class="password-wrap">
                     <input id="passcode" type="password" autocomplete="off" placeholder="הזן קוד סודי (Passcode)">
-                    <button class="eye-btn" type="button" data-target="passcode" title="הצג/הסתר">👁️</button>
+                    <button class="eye-btn" type="button" data-target="passcode" aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
                 </div>
             </div>
             <div class="field">
@@ -303,13 +304,13 @@
         <p>
             <span class="key-type">1. Gemini API Key</span> <code>AIza...</code><br>
             חינמי, מתקבל מ־
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.
             מתאים לשימוש אישי עם מכסה נדיבה.
         </p>
         <p>
             <span class="key-type">2. Interactions API Key</span> <code>AQ...</code><br>
             בתשלום דרך Google Cloud, מתקבל דרך
-            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>.
+            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>.
             דורש הפעלת Generative Language API.
         </p>
         <p style="font-size:.82rem;color:var(--text-secondary);">
