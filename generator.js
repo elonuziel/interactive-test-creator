@@ -734,45 +734,75 @@ document.addEventListener('DOMContentLoaded', () => {
             'You MUST insert the exact delimiter "---PAGE_BOUNDARY---" on its own line between the text of EACH physical page of the PDF to allow us to map text back to the original page number.'
         ].join('\n');
 
+        const attemptErrors = [];
         const candidates = await discoverGeminiModelCandidates(apiKey);
         // Prefer pro model for complex PDF Native processing
         const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model));
-        const candidate = sortedCandidates[0]; // Take the best model available
-        const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
+        let extractedPages = null;
 
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: prompt },
-                        { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
-                    ]
-                }],
-                generationConfig: {
-                    temperature: 0,
-                    topP: 0.1,
-                    maxOutputTokens: 8192
+        for (const candidate of sortedCandidates) {
+            const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
+
+            for (let retryCount = 0; retryCount <= GEMINI_CONFIG.maxQuotaRetries; retryCount++) {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0,
+                            topP: 0.1,
+                            maxOutputTokens: 8192
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    const payload = await response.json();
+                    const responseParts = payload.candidates?.[0]?.content?.parts || [];
+                    const text = responseParts.map((part) => part.text || '').join('\n').trim();
+
+                    if (!text) {
+                        const finishReason = payload.candidates?.[0]?.finishReason || 'UNKNOWN';
+                        throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}`);
+                    }
+
+                    extractedPages = text.split(/---PAGE_BOUNDARY---/i).map((s) => s.trim());
+                    break;
                 }
-            })
-        });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Gemini Native PDF OCR failed: ${response.status} ${errText}`);
+                const errorText = await response.text();
+                const errorInfo = getGeminiErrorInfo(response.status, errorText);
+
+                if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
+                    const delayMs = computeRetryDelayMs(response, retryCount);
+                    setStatus(`Gemini החזיר 429 ב-Native PDF. ממתין ${Math.ceil(delayMs / 1000)} שניות ומנסה שוב...`);
+                    await delay(delayMs);
+                    continue;
+                }
+
+                attemptErrors.push(`[${candidate.version}/${candidate.model}] ${response.status} ${errorInfo.userMessage}`);
+
+                if (errorInfo.retryNextModel) {
+                    break;
+                }
+
+                throw new Error(`Gemini Native PDF OCR failed: ${errorInfo.userMessage}`);
+            }
+
+            if (extractedPages) {
+                break;
+            }
         }
 
-        const payload = await response.json();
-        const responseParts = payload.candidates?.[0]?.content?.parts || [];
-        const text = responseParts.map((part) => part.text || '').join('\n').trim();
-        
-        if (!text) {
-            const finishReason = payload.candidates?.[0]?.finishReason || 'UNKNOWN';
-            throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}`);
+        if (!extractedPages) {
+            throw new Error(`Gemini Native PDF OCR failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
         }
-
-        const extractedPages = text.split(/---PAGE_BOUNDARY---/i).map(s => s.trim());
         
         // Generate previews for proof mode
         const pagePreviews = [];
@@ -1353,7 +1383,17 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatus('זוהה PDF סרוק במצב מקומי בלבד. מנסה להמשיך בלי LLM, אבל התוצאה עלולה להיות חלקית.');
         }
 
-        let parsedQuestions = parseQuestionsFromText(examText, sourcePages, extracted.pageImages);
+        let parsedQuestions;
+        try {
+            parsedQuestions = parseQuestionsFromText(examText, sourcePages, extracted.pageImages);
+        } catch (error) {
+            if (useLlmExtraction) {
+                setStatus('פענוח ה-LLM לא היה בפורמט צפוי. מנסה פרסור מקומי מהטקסט הדיגיטלי...');
+                parsedQuestions = parseQuestionsFromText(extracted.text, extracted.rawPages, extracted.pageImages);
+            } else {
+                throw error;
+            }
+        }
 
         if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
             setStatus('זוהו מעט שאלות. מנסה פענוח מדויק יותר עמוד-עמוד...');
