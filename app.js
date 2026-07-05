@@ -95,17 +95,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             questions = data.map(q => {
                 const options = q.options.map((text, id) => ({ id, text }));
-                // Fisher-Yates shuffle
-                for (let i = options.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [options[i], options[j]] = [options[j], options[i]];
+                if (q.shuffleOptions) {
+                    // Fisher-Yates shuffle for 000-style tests that default all answers to א.
+                    for (let i = options.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [options[i], options[j]] = [options[j], options[i]];
+                    }
                 }
                 return { ...q, options };
             });
 
             // Update welcome text now that questions are confirmed loaded
             const welcomeDesc = document.querySelector('.welcome-card > p');
-            if (welcomeDesc) welcomeDesc.textContent = `נטענו ${questions.length} שאלות בהצלחה. סדר התשובות מעורבב בכל שאלה.`;
+            if (welcomeDesc) {
+                const shuffledQuestions = questions.filter(q => q.shuffleOptions).length;
+                welcomeDesc.textContent = shuffledQuestions
+                    ? `נטענו ${questions.length} שאלות בהצלחה. סדר התשובות מעורבב אוטומטית במבחני 000 ללא קובץ תשובות.`
+                    : `נטענו ${questions.length} שאלות בהצלחה.`;
+            }
 
             // Check for saved progress
             const saved = loadProgress();

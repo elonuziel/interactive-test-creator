@@ -1081,9 +1081,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return questions.map((question, index) => {
             const answer = answerMap.get(index + 1);
             if (typeof answer === 'number' && answer >= 0 && answer < question.options.length) {
-                return { ...question, correctIndex: answer };
+                return { ...question, correctIndex: answer, shuffleOptions: false };
             }
-            return { ...question };
+            return { ...question, shuffleOptions: false };
         });
     }
 
@@ -1252,6 +1252,7 @@ document.addEventListener('DOMContentLoaded', () => {
             question: normalizeWhitespace(q.question),
             options: q.options.map((opt) => normalizeWhitespace(opt)),
             correctIndex: q.correctIndex,
+            ...(q.shuffleOptions ? { shuffleOptions: true } : {}),
             ...(q.image ? { image: q.image } : {}) // embed base64 image directly
         }));
 
@@ -1380,7 +1381,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // No answer file: Default correct answer to index 0 ('א')
             state.questions = parsedQuestions.map(q => ({
                 ...q,
-                correctIndex: 0
+                correctIndex: 0,
+                shuffleOptions: true
             }));
         }
 

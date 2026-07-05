@@ -351,7 +351,7 @@
                 <div id="pdf-type-note" class="field-note-block hidden"></div>
             </div>
             <div class="field">
-                <label for="csv-file">קובץ תשובות <span class="field-note-inline">CSV / XLS — אופציונלי (בהיעדר קובץ, ברירת המחדל של התשובה הנכונה תהיה א')</span></label>
+                <label for="csv-file">קובץ תשובות <button id="answer-help-btn" class="help-btn" type="button" title="מה קורה בלי קובץ תשובות?">?</button> <span class="field-note-inline">CSV / XLS — אופציונלי</span></label>
                 <div class="file-wrap">
                     <input id="csv-file" type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
                     <button class="file-clear hidden" data-target="csv-file" type="button" title="הסר קובץ">✕ הסר</button>
@@ -457,6 +457,15 @@
     </div>
 </div>
 
+<div id="answer-help-popup" class="help-popup">
+    <div class="help-popup-content">
+        <h3>מה קורה בלי קובץ תשובות?</h3>
+        <p>אם לא מעלים קובץ תשובות, המערכת מניחה שמדובר בטופס 000 ולכן ברירת המחדל של כל התשובות הנכונות היא <strong>א'</strong>.</p>
+        <p>במבחן הסופי סדר התשובות יתערבב <strong>רק</strong> במבחנים כאלה, כדי לא להשאיר את כל התשובות במקום הראשון.</p>
+        <button id="answer-help-close" class="help-popup-close">הבנתי</button>
+    </div>
+</div>
+
 <div id="credential-popup" class="help-popup">
     <div class="help-popup-content">
         <h3>נדרש אימות ל-Gemini</h3>
@@ -481,11 +490,20 @@
 document.getElementById('api-help-btn').addEventListener('click', () => {
     document.getElementById('api-help-popup').classList.add('show');
 });
+document.getElementById('answer-help-btn').addEventListener('click', () => {
+    document.getElementById('answer-help-popup').classList.add('show');
+});
 document.getElementById('api-help-close').addEventListener('click', () => {
     document.getElementById('api-help-popup').classList.remove('show');
 });
+document.getElementById('answer-help-close').addEventListener('click', () => {
+    document.getElementById('answer-help-popup').classList.remove('show');
+});
 document.getElementById('api-help-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('api-help-popup').classList.remove('show');
+});
+document.getElementById('answer-help-popup').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) document.getElementById('answer-help-popup').classList.remove('show');
 });
 document.getElementById('credential-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('credential-popup').classList.remove('show');
