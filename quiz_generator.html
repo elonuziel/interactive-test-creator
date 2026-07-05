@@ -337,7 +337,7 @@
                     <strong style="display: block; margin-bottom: 4px; font-size: .9rem;">איך הקובץ שלך יעובד?</strong>
                     <ul style="margin: 0; padding-right: 18px; list-style-type: disc; display: grid; gap: 4px;">
                         <li><strong>PDF דיגיטלי (עם טקסט להעתקה):</strong> יעובד <strong>מקומי על המחשב שלך</strong> — בחינם, ללא הגבלה וללא צורך בחיבור לאינטרנט או ב-API Key.</li>
-                        <li><strong>PDF סרוק (צילום/תמונה):</strong> דורש פענוח תמונה (OCR) — באמצעות <strong>Gemini (דיוק מושלם, חינמי, דורש API Key <button class="help-btn" type="button" title="איך משיגים API Key?" onclick="document.getElementById('api-help-popup').classList.add('show')">?</button>)</strong> או באמצעות <strong>OCR חינמי מקומי</strong> (מתבצע בדפדפן, דיוק נמוך יותר).</li>
+                        <li><strong>PDF סרוק (צילום/תמונה):</strong> דורש פענוח תמונה (OCR) — באמצעות <strong>Gemini</strong> (מפתח מנוהל אוטומטית ברמת המערכת) או באמצעות <strong>OCR חינמי מקומי</strong> (מתבצע בדפדפן, דיוק נמוך יותר).</li>
                     </ul>
                 </div>
             </div>
@@ -386,21 +386,9 @@
             </div>
 
             <div id="llm-auth-section" class="auth-section">
-                <p class="section-label">🔑&nbsp; אימות Gemini</p>
-                <div class="field">
-                    <label for="api-key">API Key <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
-                    <div class="password-wrap">
-                        <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
-                        <button class="eye-btn" type="button" data-target="api-key" aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
-                    </div>
-                </div>
-                <div class="field">
-                    <label for="passcode">Passcode <span class="field-note-inline">למפתח מוצפן — אופציונלי</span></label>
-                    <div class="password-wrap">
-                        <input id="passcode" type="password" autocomplete="off" placeholder="קוד גישה סודי">
-                        <button class="eye-btn" type="button" data-target="passcode" aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
-                    </div>
-                </div>
+                <p class="section-label">🔐&nbsp; חיבור Gemini</p>
+                <p class="muted">האפליקציה לא מבקשת מפתח מהמשתמש. במצב AI Studio המפתח מנוהל ומוזרק אוטומטית בסביבת הריצה.</p>
+                <div id="gemini-runtime-note" class="field-note-block hidden"></div>
             </div>
 
             <hr class="section-divider">
@@ -434,29 +422,6 @@
     </div>
 </main>
 
-<div id="api-help-popup" class="help-popup">
-    <div class="help-popup-content">
-        <h3>🔑 איך משיגים API Key?</h3>
-        <p>המערכת תומכת בשני סוגי מפתחות:</p>
-        <p>
-            <span class="key-type">1. Gemini API Key</span> <code>AIza...</code><br>
-            חינמי, מתקבל מ־
-            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.
-            מתאים לשימוש אישי עם מכסה נדיבה.
-        </p>
-        <p>
-            <span class="key-type">2. Interactions API Key</span> <code>AQ...</code><br>
-            בתשלום דרך Google Cloud, מתקבל דרך
-            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>.
-            דורש הפעלת Generative Language API.
-        </p>
-        <p style="font-size:.82rem;color:var(--text-secondary);">
-            💡 את המפתח מדביקים בשדה API Key — המערכת מזהה את סוגו אוטומטית.
-        </p>
-        <button id="api-help-close" class="help-popup-close">הבנתי, תודה</button>
-    </div>
-</div>
-
 <div id="answer-help-popup" class="help-popup">
     <div class="help-popup-content">
         <h3>מה קורה בלי קובץ תשובות?</h3>
@@ -466,47 +431,15 @@
     </div>
 </div>
 
-<div id="credential-popup" class="help-popup">
-    <div class="help-popup-content">
-        <h3>נדרש אימות ל-Gemini</h3>
-        <p>הקובץ דורש עיבוד עם Gemini. אפשר להזין עכשיו API Key או Passcode למפתח המוצפן.</p>
-        <div class="field">
-            <label for="credential-api-key">Gemini API Key</label>
-            <input id="credential-api-key" type="password" placeholder="AIza...">
-        </div>
-        <div class="field">
-            <label for="credential-passcode">Passcode למפתח מוצפן</label>
-            <input id="credential-passcode" type="password" autocomplete="off" placeholder="קוד גישה">
-        </div>
-        <p id="credential-popup-note" class="warning-note">אפשר להשאיר אחד מהשדות ריק. אם מזינים Passcode, המערכת תנסה לפענח ממנו מפתח Gemini.</p>
-        <div class="actions">
-            <button id="credential-submit" class="primary-btn" type="button">המשך</button>
-            <button id="credential-cancel" class="secondary-btn" type="button">ביטול</button>
-        </div>
-    </div>
-</div>
-
 <script>
-document.getElementById('api-help-btn').addEventListener('click', () => {
-    document.getElementById('api-help-popup').classList.add('show');
-});
 document.getElementById('answer-help-btn').addEventListener('click', () => {
     document.getElementById('answer-help-popup').classList.add('show');
-});
-document.getElementById('api-help-close').addEventListener('click', () => {
-    document.getElementById('api-help-popup').classList.remove('show');
 });
 document.getElementById('answer-help-close').addEventListener('click', () => {
     document.getElementById('answer-help-popup').classList.remove('show');
 });
-document.getElementById('api-help-popup').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) document.getElementById('api-help-popup').classList.remove('show');
-});
 document.getElementById('answer-help-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('answer-help-popup').classList.remove('show');
-});
-document.getElementById('credential-popup').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) document.getElementById('credential-popup').classList.remove('show');
 });
 document.querySelectorAll('.file-clear').forEach(btn => {
     const input = document.getElementById(btn.dataset.target);

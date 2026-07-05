@@ -1,16 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
     const STORAGE = {
-        theme: 'theme'
-    };
-
-    const EMBEDDED_KEY = {
-        encryptedKeyB64: 'Jk71s+jMhwvQREzIhFB3OeeBOAHMTrX5tQn/PflNsFfZABcZEaoK1s0nONNDm8jFBi8VVp1RcRc6E0MA4t3PD4FCkL/b',
-        ivB64: 'Klg+fy9R79W9jMIz',
-        saltB64: 'DDyNzdsTLeWBGAnJIuT/Wg=='
+        theme: 'theme',
+        builderPrefill: 'builderPrefillV1'
     };
 
     const GEMINI_CONFIG = {
-        apiVersions: ['v1', 'v1beta'],
         preferredModels: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
         maxQuotaRetries: 5,
         initialRetryDelayMs: 5000,
@@ -22,9 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = {
         questions: [],
         templateCache: null,
-        geminiModelCandidates: null,
         proofPageImages: [],
-        proofMode: true
+        proofMode: true,
+        geminiRuntimeHealth: null
     };
 
     const elements = {
@@ -33,19 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
         formNumber: document.getElementById('form-number'),
         ocrEngine: document.getElementById('ocr-engine'),
         llmPolicy: document.getElementById('llm-policy'),
-        apiKey: document.getElementById('api-key'),
-        passcode: document.getElementById('passcode'),
-        credentialPopup: document.getElementById('credential-popup'),
-        credentialApiKey: document.getElementById('credential-api-key'),
-        credentialPasscode: document.getElementById('credential-passcode'),
-        credentialSubmit: document.getElementById('credential-submit'),
-        credentialCancel: document.getElementById('credential-cancel'),
         htmlFile: document.getElementById('html-file'),
         pdfTypeNote: document.getElementById('pdf-type-note'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
         takeQuiz: document.getElementById('take-quiz'),
         status: document.getElementById('status'),
+        geminiRuntimeNote: document.getElementById('gemini-runtime-note'),
         preview: document.getElementById('preview'),
         proofModeToggle: document.getElementById('proof-mode-toggle'),
         themeToggle: document.getElementById('theme-toggle'),
@@ -65,20 +53,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function setStatus(message, isError = false) {
+        elements.status.textContent = message;
+        elements.status.classList.toggle('muted', !isError);
+        elements.status.style.color = isError ? 'var(--danger)' : 'var(--text-primary)';
+    }
+
+    function applyBuilderPrefill() {
+        const raw = localStorage.getItem(STORAGE.builderPrefill);
+        if (!raw) return;
+
+        try {
+            const payload = JSON.parse(raw);
+            if (payload && typeof payload === 'object') {
+                if (typeof payload.formNumber === 'string' && payload.formNumber.trim()) {
+                    elements.formNumber.value = payload.formNumber.trim();
+                }
+                if (typeof payload.llmPolicy === 'string' && elements.llmPolicy.querySelector(`option[value="${payload.llmPolicy}"]`)) {
+                    elements.llmPolicy.value = payload.llmPolicy;
+                }
+                if (typeof payload.ocrEngine === 'string' && elements.ocrEngine.querySelector(`option[value="${payload.ocrEngine}"]`)) {
+                    elements.ocrEngine.value = payload.ocrEngine;
+                }
+                setStatus('הוגדרו ערכי ברירת מחדל ממסך ה-React. אפשר להמשיך בהעלאת קבצים ולהפעיל ניתוח.');
+            }
+        } catch {
+            // Ignore malformed prefill payloads.
+        } finally {
+            localStorage.removeItem(STORAGE.builderPrefill);
+        }
+    }
+
     setTheme(theme);
     elements.themeToggle.addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
+    applyBuilderPrefill();
     if (elements.proofModeToggle) {
         state.proofMode = !!elements.proofModeToggle.checked;
         elements.proofModeToggle.addEventListener('change', () => {
             state.proofMode = !!elements.proofModeToggle.checked;
             renderPreview();
         });
-    }
-
-    function setStatus(message, isError = false) {
-        elements.status.textContent = message;
-        elements.status.classList.toggle('muted', !isError);
-        elements.status.style.color = isError ? 'var(--danger)' : 'var(--text-primary)';
     }
 
     function disableOutputActions(disabled) {
@@ -98,142 +112,78 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (tone === 'error') elements.pdfTypeNote.classList.add('is-error');
     }
 
-    function decodeBase64(base64) {
-        const str = atob(base64);
-        const bytes = new Uint8Array(str.length);
-        for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
-        return bytes;
+    function setGeminiRuntimeNote(message = '', tone = 'neutral') {
+        const note = elements.geminiRuntimeNote;
+        if (!note) return;
+        note.textContent = message;
+        note.classList.toggle('hidden', !message);
+        note.classList.remove('is-loading', 'is-digital', 'is-scanned', 'is-error');
+        if (!message) return;
+        if (tone === 'loading') note.classList.add('is-loading');
+        else if (tone === 'ok') note.classList.add('is-digital');
+        else if (tone === 'warn') note.classList.add('is-scanned');
+        else if (tone === 'error') note.classList.add('is-error');
     }
 
-    async function decryptSingleKey(passcode, keyObj) {
-        if (!keyObj || !keyObj.encryptedKeyB64 || !keyObj.ivB64 || !keyObj.saltB64 || !passcode) {
-            return '';
-        }
+    function isGeminiMissingKeyMessage(message) {
+        return /gemini api key is not configured on server/i.test(String(message || ''));
+    }
 
+    function normalizeGeminiErrorMessage(message) {
+        if (isGeminiMissingKeyMessage(message)) {
+            return 'Gemini לא מוגדר בשרת. יש להגדיר GEMINI_API_KEY או GOOGLE_API_KEY בסביבת הריצה, או לעבור ל-OCR מקומי חינמי.';
+        }
+        return message;
+    }
+
+    async function refreshGeminiRuntimeHealth() {
+        setGeminiRuntimeNote('בודק זמינות Gemini בשרת...', 'loading');
         try {
-            const encoder = new TextEncoder();
-            const keyMaterial = await crypto.subtle.importKey(
-                'raw',
-                encoder.encode(passcode),
-                'PBKDF2',
-                false,
-                ['deriveKey']
-            );
+            const response = await fetch('/api/gemini/health');
+            if (!response.ok) {
+                throw new Error(`Gemini health check failed: ${response.status}`);
+            }
 
-            const aesKey = await crypto.subtle.deriveKey(
-                {
-                    name: 'PBKDF2',
-                    salt: decodeBase64(keyObj.saltB64),
-                    iterations: 100000,
-                    hash: 'SHA-256'
-                },
-                keyMaterial,
-                { name: 'AES-GCM', length: 256 },
-                false,
-                ['decrypt']
-            );
-
-            const decrypted = await crypto.subtle.decrypt(
-                {
-                    name: 'AES-GCM',
-                    iv: decodeBase64(keyObj.ivB64)
-                },
-                aesKey,
-                decodeBase64(keyObj.encryptedKeyB64)
-            );
-
-            return new TextDecoder().decode(decrypted).trim();
+            const payload = await response.json();
+            state.geminiRuntimeHealth = payload;
+            if (payload.configured) {
+                setGeminiRuntimeNote('Gemini זמין בשרת ומוכן לעיבוד OCR.', 'ok');
+            } else {
+                setGeminiRuntimeNote('Gemini לא מוגדר בשרת. אם צריך OCR סרוק, הגדר מפתח בשרת או בחר OCR מקומי.', 'warn');
+            }
+            return payload;
         } catch {
-            return '';
+            state.geminiRuntimeHealth = { ok: false, configured: false };
+            setGeminiRuntimeNote('לא ניתן לאמת זמינות Gemini מהשרת כרגע. אפשר להמשיך עם OCR מקומי.', 'error');
+            return state.geminiRuntimeHealth;
         }
     }
 
-    async function decryptEmbeddedApiKey(passcode) {
-        const gemini = await decryptSingleKey(passcode, EMBEDDED_KEY);
-        if (!gemini) return null;
-        return gemini;
+    async function ensureGeminiRuntimeReady() {
+        const health = state.geminiRuntimeHealth || await refreshGeminiRuntimeHealth();
+        if (health && health.configured) return;
+        throw new Error('Gemini לא מוגדר בשרת. הגדר GEMINI_API_KEY/GOOGLE_API_KEY או בחר OCR מקומי (offline_local).');
     }
 
-    function requestGeminiCredentials() {
-        return new Promise((resolve, reject) => {
-            const popup = elements.credentialPopup;
-            const apiKeyInput = elements.credentialApiKey;
-            const passcodeInput = elements.credentialPasscode;
-            const submitButton = elements.credentialSubmit;
-            const cancelButton = elements.credentialCancel;
-
-            if (!popup || !apiKeyInput || !passcodeInput || !submitButton || !cancelButton) {
-                reject(new Error('ממשק הזנת האישורים לא נטען. רענן את העמוד ונסה שוב.'));
-                return;
-            }
-
-            apiKeyInput.value = elements.apiKey.value.trim();
-            passcodeInput.value = '';
-            popup.classList.add('show');
-
-            const cleanup = () => {
-                popup.classList.remove('show');
-                submitButton.removeEventListener('click', handleSubmit);
-                cancelButton.removeEventListener('click', handleCancel);
-            };
-
-            const handleSubmit = () => {
-                const apiKey = apiKeyInput.value.trim();
-                const passcode = passcodeInput.value.trim();
-                cleanup();
-                resolve({ apiKey, passcode });
-            };
-
-            const handleCancel = () => {
-                cleanup();
-                reject(new Error('העיבוד הנוכחי דורש Gemini. הזן API Key או Passcode כדי להמשיך, או עבור למצב ללא LLM.'));
-            };
-
-            submitButton.addEventListener('click', handleSubmit);
-            cancelButton.addEventListener('click', handleCancel);
-            apiKeyInput.focus();
+    async function callGeminiApiViaProxy(parts, generationConfig) {
+        const response = await fetch('/api/gemini/generate-content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                modelCandidates: GEMINI_CONFIG.preferredModels,
+                contents: [{ parts }],
+                generationConfig
+            })
         });
-    }
 
-    async function resolveGeminiApiKey(allowPrompt = false) {
-        const typedApiKey = elements.apiKey.value.trim();
-        if (typedApiKey) {
-            return typedApiKey;
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(normalizeGeminiErrorMessage(errorText || 'Gemini proxy request failed.'));
         }
 
-        const currentPasscode = elements.passcode.value.trim();
-        if (currentPasscode) {
-            const decrypted = await decryptEmbeddedApiKey(currentPasscode);
-            if (decrypted) {
-                elements.apiKey.value = decrypted;
-                return decrypted;
-            }
-            if (!allowPrompt) {
-                throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
-            }
-        }
-
-        if (!allowPrompt) {
-            return '';
-        }
-
-        const { apiKey: promptedApiKey, passcode: promptedPasscode } = await requestGeminiCredentials();
-        if (promptedApiKey) {
-            elements.apiKey.value = promptedApiKey;
-            return promptedApiKey;
-        }
-
-        if (promptedPasscode) {
-            elements.passcode.value = promptedPasscode;
-            const decrypted = await decryptEmbeddedApiKey(promptedPasscode);
-            if (decrypted) {
-                elements.apiKey.value = decrypted;
-                return decrypted;
-            }
-            throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
-        }
-
-        throw new Error('העיבוד הנוכחי דורש Gemini. הזן API Key או Passcode כדי להמשיך, או עבור למצב ללא LLM.');
+        const payload = await response.json();
+        const responseParts = payload.candidates?.[0]?.content?.parts || [];
+        return responseParts.map((part) => part.text || '').join('\n').trim();
     }
 
     function normalizeWhitespace(value) {
@@ -455,155 +405,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function buildGeminiEndpoint(version, model, apiKey) {
-        return `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    }
-
-    function normalizeModelName(name) {
-        if (!name) return '';
-        return name.startsWith('models/') ? name.slice('models/'.length) : name;
-    }
-
-    async function discoverGeminiModelCandidates(apiKey) {
-        if (state.geminiModelCandidates) {
-            return state.geminiModelCandidates;
-        }
-
-        const discovered = [];
-        const seen = new Set();
-
-        for (const version of GEMINI_CONFIG.apiVersions) {
-            const endpoint = `https://generativelanguage.googleapis.com/${version}/models?key=${encodeURIComponent(apiKey)}`;
-            try {
-                const response = await fetch(endpoint);
-                if (!response.ok) {
-                    continue;
-                }
-
-                const payload = await response.json();
-                const models = payload.models || [];
-                for (const model of models) {
-                    const modelName = normalizeModelName(model.name || '');
-                    const supportedMethods = model.supportedGenerationMethods || [];
-                    if (!modelName || !supportedMethods.includes('generateContent')) {
-                        continue;
-                    }
-
-                    if (!modelName.includes('gemini') || !modelName.includes('flash')) {
-                        continue;
-                    }
-
-                    const key = `${version}:${modelName}`;
-                    if (seen.has(key)) {
-                        continue;
-                    }
-
-                    seen.add(key);
-                    discovered.push({ version, model: modelName });
-                }
-            } catch {
-                // Fall through to static fallback list.
-            }
-        }
-
-        if (!discovered.length) {
-            for (const version of GEMINI_CONFIG.apiVersions) {
-                for (const model of GEMINI_CONFIG.preferredModels) {
-                    discovered.push({ version, model });
-                }
-            }
-        }
-
-        state.geminiModelCandidates = discovered;
-        return discovered;
-    }
-
-    function getGeminiErrorInfo(status, errorText) {
-        const raw = String(errorText || '');
-        let parsedMessage = '';
-
-        try {
-            const parsed = JSON.parse(raw);
-            parsedMessage = parsed?.error?.message || '';
-        } catch {
-            parsedMessage = raw;
-        }
-
-        const message = String(parsedMessage || raw || '').trim();
-        const normalized = message.toLowerCase();
-
-        if (status === 401 || status === 403) {
-            return {
-                code: 'auth',
-                retryNextModel: false,
-                userMessage: 'מפתח Gemini לא תקין, חסום או חסרות הרשאות (401/403).'
-            };
-        }
-
-        if (status === 429) {
-            return {
-                code: 'quota',
-                retryNextModel: false,
-                userMessage: 'חריגה ממכסה או קצב בקשות Gemini (429). נסה שוב מאוחר יותר.'
-            };
-        }
-
-        if (
-            status === 404 ||
-            normalized.includes('not found') ||
-            normalized.includes('not supported for generatecontent') ||
-            normalized.includes('is not supported for generatecontent') ||
-            normalized.includes('only supports interactions api')
-        ) {
-            return {
-                code: 'model_not_found',
-                retryNextModel: true,
-                userMessage: 'המודל אינו זמין עבור המפתח/גרסת API, מנסה מודל חלופי...'
-            };
-        }
-
-        if (status >= 500) {
-            return {
-                code: 'server',
-                retryNextModel: true,
-                userMessage: 'שגיאת שרת זמנית של Gemini. מנסה מודל חלופי...'
-            };
-        }
-
-        return {
-            code: 'unknown',
-            retryNextModel: false,
-            userMessage: message || `Gemini request failed (${status}).`
-        };
-    }
-
     function delay(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    function computeRetryDelayMs(response, retryCount) {
-        const retryAfter = response.headers.get('Retry-After');
-        if (retryAfter) {
-            const asSeconds = Number(retryAfter);
-            if (Number.isFinite(asSeconds) && asSeconds > 0) {
-                return Math.min(asSeconds * 1000, GEMINI_CONFIG.maxRetryDelayMs);
-            }
-
-            const asDate = Date.parse(retryAfter);
-            if (!Number.isNaN(asDate)) {
-                const delta = asDate - Date.now();
-                if (delta > 0) {
-                    return Math.min(delta, GEMINI_CONFIG.maxRetryDelayMs);
-                }
-            }
-        }
-
-        const exponential = GEMINI_CONFIG.initialRetryDelayMs * (2 ** retryCount);
-        const jitter = Math.floor(Math.random() * 500);
-        return Math.min(exponential + jitter, GEMINI_CONFIG.maxRetryDelayMs);
-    }
-
-    async function callGeminiOcr(apiKey, imageDatas) {
+    async function callGeminiOcr(imageDatas) {
         const prompt = [
             'You are an OCR engine for scanned Hebrew exams.',
             'Extract visible text exactly as printed.',
@@ -617,80 +423,30 @@ document.addEventListener('DOMContentLoaded', () => {
             'CRITICAL: You are receiving multiple page images.',
             'You MUST separate each page output with the exact delimiter "---PAGE_BOUNDARY---" on its own line.'
         ].join('\n');
-        const attemptErrors = [];
-        const candidates = await discoverGeminiModelCandidates(apiKey);
 
         const parts = [{ text: prompt }];
         for (const data of imageDatas) {
             parts.push({ inlineData: { mimeType: 'image/png', data } });
         }
 
-        // Prefer pro model for complex OCR
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model)); // pro before flash
+        const text = await callGeminiApiViaProxy(parts, {
+            temperature: 0,
+            topP: 0.1,
+            maxOutputTokens: 8192
+        });
 
-        for (const candidate of sortedCandidates) {
-            const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-
-            for (let retryCount = 0; retryCount <= GEMINI_CONFIG.maxQuotaRetries; retryCount++) {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts }],
-                        generationConfig: {
-                            temperature: 0,
-                            topP: 0.1,
-                            maxOutputTokens: 8192
-                        }
-                    })
-                });
-
-                if (response.ok) {
-                    const payload = await response.json();
-                    const responseParts = payload.candidates?.[0]?.content?.parts || [];
-                    const text = responseParts.map((part) => part.text || '').join('\n').trim();
-                    if (!text) {
-                        const finishReason = payload.candidates?.[0]?.finishReason || 'UNKNOWN';
-                        const promptFeedback = payload.promptFeedback?.blockReason || 'NONE';
-                        throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}, Prompt Blocked: ${promptFeedback}. Raw: ${JSON.stringify(payload)}`);
-                    }
-                    // Split the text by the delimiter to return an array of pages
-                    const extractedPages = text.split(/---PAGE_BOUNDARY---/i).map(s => s.trim());
-                    // Pad with empty strings if Gemini returned fewer pages than expected
-                    while (extractedPages.length < imageDatas.length) {
-                        extractedPages.push('');
-                    }
-                    return extractedPages;
-                }
-
-                const errorText = await response.text();
-                const errorInfo = getGeminiErrorInfo(response.status, errorText);
-
-                if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
-                    const delayMs = computeRetryDelayMs(response, retryCount);
-                    setStatus(`Gemini החזיר 429. ממתין ${Math.ceil(delayMs / 1000)} שניות ומנסה שוב...`);
-                    await delay(delayMs);
-                    continue;
-                }
-
-                attemptErrors.push(`[${candidate.version}/${candidate.model}] ${response.status} ${errorInfo.userMessage}`);
-
-                if (errorInfo.retryNextModel) {
-                    break;
-                }
-
-                throw new Error(`Gemini request failed: ${errorInfo.userMessage}`);
-            }
+        if (!text) {
+            throw new Error('Gemini החזיר טקסט ריק מהפרוקסי.');
         }
 
-        throw new Error(`Gemini request failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
+        const extractedPages = text.split(/---PAGE_BOUNDARY---/i).map((s) => s.trim());
+        while (extractedPages.length < imageDatas.length) {
+            extractedPages.push('');
+        }
+        return extractedPages;
     }
 
-    async function extractTextViaGemini(pdf, apiKey, chunkSizeOverride = null) {
-        if (!apiKey) {
-            throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
-        }
-
+    async function extractTextViaGemini(pdf, chunkSizeOverride = null) {
         const pages = [];
         const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf);
 
@@ -699,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
             setStatus(`מפענח עמודים ${i + 1}-${Math.min(i + CHUNK_SIZE, imageDatas.length)} מתוך ${imageDatas.length} ב-Gemini...`);
             
-            const chunkPagesText = await callGeminiOcr(apiKey, chunk);
+            const chunkPagesText = await callGeminiOcr(chunk);
             pages.push(...chunkPagesText.map((pageText) => maybeFixHebrewWordOrder(pageText || '')));
 
             if (i + CHUNK_SIZE < imageDatas.length && GEMINI_CONFIG.interPageDelayMs > 0) {
@@ -715,11 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    async function extractTextViaGeminiNativePdf(pdfFile, pdf, apiKey) {
-        if (!apiKey) {
-            throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
-        }
-
+    async function extractTextViaGeminiNativePdf(pdfFile, pdf) {
         setStatus('מעלה את מסמך ה-PDF ישירות ל-Gemini (Native PDF)...');
 
         const base64Pdf = await fileToBase64(pdfFile);
@@ -734,75 +486,23 @@ document.addEventListener('DOMContentLoaded', () => {
             'You MUST insert the exact delimiter "---PAGE_BOUNDARY---" on its own line between the text of EACH physical page of the PDF to allow us to map text back to the original page number.'
         ].join('\n');
 
-        const attemptErrors = [];
-        const candidates = await discoverGeminiModelCandidates(apiKey);
-        // Prefer pro model for complex PDF Native processing
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model));
-        let extractedPages = null;
-
-        for (const candidate of sortedCandidates) {
-            const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-
-            for (let retryCount = 0; retryCount <= GEMINI_CONFIG.maxQuotaRetries; retryCount++) {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
-                            ]
-                        }],
-                        generationConfig: {
-                            temperature: 0,
-                            topP: 0.1,
-                            maxOutputTokens: 8192
-                        }
-                    })
-                });
-
-                if (response.ok) {
-                    const payload = await response.json();
-                    const responseParts = payload.candidates?.[0]?.content?.parts || [];
-                    const text = responseParts.map((part) => part.text || '').join('\n').trim();
-
-                    if (!text) {
-                        const finishReason = payload.candidates?.[0]?.finishReason || 'UNKNOWN';
-                        throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}`);
-                    }
-
-                    extractedPages = text.split(/---PAGE_BOUNDARY---/i).map((s) => s.trim());
-                    break;
-                }
-
-                const errorText = await response.text();
-                const errorInfo = getGeminiErrorInfo(response.status, errorText);
-
-                if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
-                    const delayMs = computeRetryDelayMs(response, retryCount);
-                    setStatus(`Gemini החזיר 429 ב-Native PDF. ממתין ${Math.ceil(delayMs / 1000)} שניות ומנסה שוב...`);
-                    await delay(delayMs);
-                    continue;
-                }
-
-                attemptErrors.push(`[${candidate.version}/${candidate.model}] ${response.status} ${errorInfo.userMessage}`);
-
-                if (errorInfo.retryNextModel) {
-                    break;
-                }
-
-                throw new Error(`Gemini Native PDF OCR failed: ${errorInfo.userMessage}`);
+        const text = await callGeminiApiViaProxy(
+            [
+                { text: prompt },
+                { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
+            ],
+            {
+                temperature: 0,
+                topP: 0.1,
+                maxOutputTokens: 8192
             }
+        );
 
-            if (extractedPages) {
-                break;
-            }
+        if (!text) {
+            throw new Error('Gemini Native PDF OCR failed: התקבלה תשובה ריקה מהפרוקסי.');
         }
 
-        if (!extractedPages) {
-            throw new Error(`Gemini Native PDF OCR failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
-        }
+        const extractedPages = text.split(/---PAGE_BOUNDARY---/i).map((s) => s.trim());
         
         // Generate previews for proof mode
         const pagePreviews = [];
@@ -821,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    async function verifyTestWithGemini(parsedQuestions, apiKey) {
+    async function verifyTestWithGemini(parsedQuestions) {
         setStatus('מבצע הגהה ותיקון של המבחן עם Gemini...');
         const prompt = [
             'You are an expert exam proofreader.',
@@ -836,32 +536,17 @@ document.addEventListener('DOMContentLoaded', () => {
             JSON.stringify(parsedQuestions, null, 2)
         ].join('\n');
 
-        const candidates = await discoverGeminiModelCandidates(apiKey);
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model));
-        const candidate = sortedCandidates[0]; // Pro model preferred
-        const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.1,
-                    topP: 0.8,
-                    maxOutputTokens: 8192
-                }
-            })
-        });
-
-        if (!response.ok) {
+        let text;
+        try {
+            text = await callGeminiApiViaProxy([{ text: prompt }], {
+                temperature: 0.1,
+                topP: 0.8,
+                maxOutputTokens: 8192
+            });
+        } catch {
             console.warn('Gemini verification failed, using original parsed questions.');
             return parsedQuestions;
         }
-
-        const payload = await response.json();
-        const responseParts = payload.candidates?.[0]?.content?.parts || [];
-        let text = responseParts.map((part) => part.text || '').join('\n').trim();
         
         // Remove markdown formatting if Gemini included it despite instructions
         text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -1326,8 +1011,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus('קורא קובצי מקור...');
 
-        let apiKey = '';
-
         const pdfBuffer = await pdf.arrayBuffer();
         const pdfBufferForParse = pdfBuffer.slice(0);
         let answerRows = null;
@@ -1353,6 +1036,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const useLlmExtraction = llmPolicy === 'force_llm' || (llmPolicy === 'auto' && extracted.isScanned && ocrEngine !== 'offline_local');
         const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
 
+        if (useLlmExtraction) {
+            await ensureGeminiRuntimeReady();
+        }
+
         if (!extracted.isScanned && llmPolicy !== 'force_llm') {
             setStatus('זוהה PDF דיגיטלי. ממשיך בעיבוד מקומי ללא LLM.');
         }
@@ -1364,17 +1051,16 @@ document.addEventListener('DOMContentLoaded', () => {
             sourcePages = offlineExtraction.pages;
             state.proofPageImages = offlineExtraction.pagePreviews || [];
         } else if (useLlmExtraction) {
-            apiKey = await resolveGeminiApiKey(true);
             if (ocrEngine === 'gemini_native') {
                 setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...' : 'נבחר מצב LLM כפוי. שולח את ה-PDF ל-Gemini Native PDF...');
-                const nativeExtraction = await extractTextViaGeminiNativePdf(pdf, extracted.pdf, apiKey);
+                const nativeExtraction = await extractTextViaGeminiNativePdf(pdf, extracted.pdf);
                 examText = nativeExtraction.text;
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
                 state.proofPageImages = previews.pagePreviews || [];
             } else {
                 setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini (Page Chunking)...' : 'נבחר מצב LLM כפוי. שולח עמודים ל-Gemini OCR...');
-                const geminiExtraction = await extractTextViaGemini(extracted.pdf, apiKey);
+                const geminiExtraction = await extractTextViaGemini(extracted.pdf);
                 examText = geminiExtraction.text;
                 sourcePages = geminiExtraction.pages;
                 state.proofPageImages = geminiExtraction.pagePreviews || [];
@@ -1397,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
             setStatus('זוהו מעט שאלות. מנסה פענוח מדויק יותר עמוד-עמוד...');
-            const fallbackExtraction = await extractTextViaGemini(extracted.pdf, apiKey, 1);
+            const fallbackExtraction = await extractTextViaGemini(extracted.pdf, 1);
             const fallbackQuestions = parseQuestionsFromText(
                 fallbackExtraction.text,
                 fallbackExtraction.pages,
@@ -1436,8 +1122,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Verification step using Gemini Pro
-        if (llmPolicy === 'force_llm' && apiKey) {
-            state.questions = await verifyTestWithGemini(state.questions, apiKey);
+        if (llmPolicy === 'force_llm') {
+            state.questions = await verifyTestWithGemini(state.questions);
         }
 
         renderPreview();
@@ -1533,4 +1219,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('[data-target="pdf-file"]')?.addEventListener('click', () => {
         setPdfTypeNote('');
     });
+
+    refreshGeminiRuntimeHealth();
 });

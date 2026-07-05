@@ -12,6 +12,9 @@ Turn scanned Hebrew exam PDFs into interactive, self-grading quizzes. The repo n
 - Presents the repo as a React-based build target for AI Studio.
 - Links to the existing builder and quiz player pages.
 - Keeps the migration path open for moving Gemini calls to AI Studio server-side code later.
+- Exposes route entry points: `/` (home), `/builder` (native React builder shell with runtime health), `/player` (legacy taker embedded).
+- React `/builder` pre-fills legacy builder settings (`formNumber`, `llmPolicy`, `ocrEngine`) when launching `quiz_generator.html`.
+- React `/builder` now supports local digital-PDF parsing directly in React (question extraction + optional CSV answer merge), with legacy fallback for scanned/LLM flows.
 
 ## Legacy pages kept in place
 
@@ -27,19 +30,23 @@ Turn scanned Hebrew exam PDFs into interactive, self-grading quizzes. The repo n
 - Image detection — charts, graphs, tables auto-attach page images for cropping
 - Re-edit existing quizzes — upload a previously downloaded quiz HTML to continue editing
 - File clear buttons — remove uploaded files without refreshing
+- Keyless Gemini UX — no user API key input in the UI; requests go through server proxy
 
 ## AI Studio notes
 
 - Google AI Studio Build mode generates web apps with React by default and a Node.js server runtime for secrets.
-- The next migration step is to move Gemini calls to server-side code so the API key stays out of the browser.
-- This repo is now structured so AI Studio can import the React shell while preserving the current HTML workflow.
+- Gemini requests now go through `/api/gemini/generate-content` in `server.js`, using `GEMINI_API_KEY` or `GOOGLE_API_KEY` from runtime environment variables.
+- The browser no longer asks users to paste API keys or passcodes.
+- This repo is structured so AI Studio can import the React shell while preserving the current HTML workflow.
 
-## API Keys
+## Runtime secrets
 
-| Type | Prefix | How to get |
-|---|---|---|
-| Gemini (free) | `AIza...` | [Google AI Studio](https://aistudio.google.com/apikey) |
-| Gemini (Cloud) | `AQ...` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+- Configure one of these server-side environment variables:
+- `GEMINI_API_KEY`
+- `GOOGLE_API_KEY`
+- Do not place API keys in client-side code or user-facing forms.
+- Runtime health check endpoint: `GET /api/gemini/health`
+: Returns non-secret configuration status (`configured: true|false`) so UI/deploy checks can fail fast with clear messaging.
 
 ## Project Structure
 
@@ -61,6 +68,14 @@ tests/              — Sample exam PDFs and answer keys
 npm install
 npm run dev
 ```
+
+In a second terminal (for Gemini proxy):
+
+```bash
+GEMINI_API_KEY=your_key_here npm run dev:server
+```
+
+Then open `http://localhost:5173`.
 
 ## Build
 

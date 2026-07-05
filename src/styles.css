@@ -78,6 +78,31 @@ a {
   margin-bottom: 28px;
 }
 
+.route-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.route-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.route-chip.active {
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(56, 189, 248, 0.18);
+}
+
 .eyebrow,
 .hero-kicker,
 .panel-title {
@@ -247,10 +272,212 @@ p {
   gap: 10px;
 }
 
+.embed-wrap {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 16px;
+}
+
+.builder-react-wrap {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 16px;
+}
+
+.builder-react-card,
+.builder-side-card {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.builder-info-banner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border-radius: 12px;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  background: rgba(56, 189, 248, 0.1);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.builder-info-banner p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.builder-form-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.builder-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.builder-field span {
+  color: var(--muted);
+}
+
+.builder-field input,
+.builder-field select {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.builder-field select option {
+  color: #0f172a;
+}
+
+.builder-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.runtime-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  margin: 2px 0 10px;
+}
+
+.runtime-pill.loading {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.runtime-pill.ok {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.runtime-pill.warn {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.48);
+}
+
+.builder-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.runtime-warning {
+  margin-top: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fcd34d;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+.runtime-note {
+  margin-top: 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+.runtime-note.success {
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.12);
+  color: #86efac;
+}
+
+.builder-preview-block {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.builder-preview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.builder-preview-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+}
+
+.builder-preview-item h3 {
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.builder-preview-item p {
+  margin-bottom: 8px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.builder-preview-item ol {
+  margin: 0;
+  padding-right: 18px;
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+}
+
+.embed-head {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 24px;
+  padding: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.embed-head h2 {
+  margin-bottom: 0;
+}
+
+.embed-frame-card {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.legacy-frame {
+  width: 100%;
+  min-height: 78vh;
+  border: 0;
+  background: #ffffff;
+}
+
 @media (max-width: 900px) {
   .hero-grid,
   .link-grid,
-  .topbar {
+  .topbar,
+  .builder-react-wrap {
     grid-template-columns: 1fr;
   }
 
@@ -266,5 +493,9 @@ p {
   .stack-card,
   .notes-card {
     padding: 20px;
+  }
+
+  .legacy-frame {
+    min-height: 82vh;
   }
 }
