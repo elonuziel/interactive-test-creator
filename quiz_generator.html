@@ -132,20 +132,21 @@
             display: none;
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,.45);
+            background: rgba(0,0,0,.65);
+            backdrop-filter: blur(4px);
             z-index: 1000;
             align-items: center;
             justify-content: center;
         }
         .help-popup.show { display: flex; }
         .help-popup-content {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: var(--card-bg, #fff);
+            border: 2px solid var(--primary-color);
             border-radius: 16px;
-            padding: 24px;
+            padding: 28px;
             max-width: 460px;
             width: 90%;
-            box-shadow: var(--shadow-sm);
+            box-shadow: 0 8px 40px rgba(0,0,0,.35);
             direction: rtl;
             text-align: right;
         }
