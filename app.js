@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextBtn       = document.getElementById('next-btn');
     const submitBtn     = document.getElementById('submit-btn');
     const restartBtn    = document.getElementById('restart-btn');
+    const reviewBackBtn = document.getElementById('review-back-btn');
 
     const questionCounter   = document.getElementById('question-counter');
     const questionText      = document.getElementById('question-text');
@@ -194,6 +195,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         switchScreen(resultsScreen, setupScreen);
     });
+
+    if (reviewBackBtn) {
+        reviewBackBtn.addEventListener('click', () => {
+            isReviewMode = true;
+            currentQuestionIndex = questions.length - 1;
+            switchScreen(resultsScreen, quizScreen);
+            renderQuestion();
+        });
+    }
 
     // ── Navigation Buttons ────────────────────────────────────────────────────
     nextBtn.addEventListener('click', () => {
