@@ -147,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!submitBtn.classList.contains('hidden')) submitBtn.click();
             else if (!nextBtn.classList.contains('hidden')) nextBtn.click();
         }
+    });
 
     // ── Screen Switching ──────────────────────────────────────────────────────
     function switchScreen(from, to) {
