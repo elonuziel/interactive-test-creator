@@ -126,8 +126,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!zoomOverlay.classList.contains('hidden')) { closeZoom(); return; }
         }
 
-        // Only act when quiz screen is active
-        if (!quizScreen.classList.contains('active')) return;
+        // Only act when quiz or results screen is active
+        const onQuiz = quizScreen.classList.contains('active');
+        const onResults = resultsScreen.classList.contains('active');
+        if (!onQuiz && !onResults) return;
+
+        if (onResults) {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                isReviewMode = true;
+                currentQuestionIndex = questions.length - 1;
+                switchScreen(resultsScreen, quizScreen);
+                renderQuestion();
+            }
+            return;
+        }
 
         // Option selection: dynamic keys based on number of options (1-9)
         const keyNum = parseInt(e.key);
