@@ -1072,8 +1072,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return rows;
     }
 
-    function extractAnswersForForm(csvText, formNumber) {
-        const rows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
+    function parseXlsxToRows(arrayBuffer) {
+        if (!window.XLSX) {
+            throw new Error('ספריית XLSX לא נטענה. אנא רענן את העמוד.');
+        }
+        const workbook = window.XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        // Convert to array of arrays, with raw cell values as strings
+        const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+        // Filter out completely empty rows
+        return rows.filter((row) => row.some((cell) => String(cell).trim() !== ''));
+    }
+
+    function extractAnswersForForm(rows, formNumber) {
         let headers = null;
         let selectedRow = null;
 
@@ -1090,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!headers || !selectedRow) {
-            throw new Error(`לא נמצאה שורת שאלון ${formNumber} בקובץ ה-CSV.`);
+            throw new Error(`לא נמצאה שורת שאלון ${formNumber} בקובץ התשובות.`);
         }
 
         const answers = new Map();
@@ -1289,11 +1301,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const pdfBuffer = await pdf.arrayBuffer();
-        let csvText = null;
+        let answerRows = null;
         if (csv) {
-            csvText = await csv.text();
+            const fileName = csv.name.toLowerCase();
+            if (fileName.endsWith('.xlsx')) {
+                const xlsxBuffer = await csv.arrayBuffer();
+                answerRows = parseXlsxToRows(xlsxBuffer);
+            } else {
+                const csvText = await csv.text();
+                answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
+            }
             if (!formNumber) {
-                throw new Error('אם הועלה קובץ CSV, יש להזין מספר שאלון.');
+                throw new Error('אם הועלה קובץ תשובות, יש להזין מספר שאלון.');
             }
         }
 
@@ -1344,11 +1363,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (csvText && formNumber) {
-            const answerMap = extractAnswersForForm(csvText, formNumber);
+        if (answerRows && formNumber) {
+            const answerMap = extractAnswersForForm(answerRows, formNumber);
             state.questions = mergeAnswers(parsedQuestions, answerMap);
         } else {
-            // Optional CSV bypass: Default correct answer to index 0 ('א')
+            // No answer file: Default correct answer to index 0 ('א')
             state.questions = parsedQuestions.map(q => ({
                 ...q,
                 correctIndex: 0

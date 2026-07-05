@@ -129,8 +129,8 @@
                 <input id="pdf-file" type="file" accept="application/pdf">
             </div>
             <div class="field">
-                <label for="csv-file">קובץ CSV תשובות (אופציונלי - יוגדר א' כברירת מחדל)</label>
-                <input id="csv-file" type="file" accept=".csv,text/csv">
+                <label for="csv-file">קובץ CSV / XLSX תשובות (אופציונלי - יוגדר א' כברירת מחדל)</label>
+                <input id="csv-file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
             </div>
             <div class="field">
                 <label for="form-number">מספר שאלון (אופציונלי)</label>
@@ -172,6 +172,7 @@
     </div>
 </main>
 
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="generator.js"></script>
 </body>
 </html>
