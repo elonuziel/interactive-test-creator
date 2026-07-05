@@ -1,44 +1,65 @@
-# Interactive Hebrew Quiz & Study Guides
+# Interactive Hebrew Quiz Generator
 
-> **🚀 Try the Generator Now:** The Quiz Generator is live at [https://elonuziel.github.io/html-test-creator/quiz_generator.html](https://elonuziel.github.io/html-test-creator/quiz_generator.html)
+> **Try it live:** [elonuziel.github.io/html-test-creator/quiz_generator.html](https://elonuziel.github.io/html-test-creator/quiz_generator.html)
 
-This repository contains a modern, interactive web-based quiz application tailored for Hebrew (RTL support) along with guides for study material processing.
+Turn scanned Hebrew exam PDFs into interactive, self-grading quizzes — in your browser. Upload a PDF, let Gemini OCR extract the questions, attach an answer key, and export a standalone HTML quiz.
 
-## 🚀 Interactive Quiz Application
+## 🎯 Quiz Generator
 
-The web application (`index.html`, `app.js`, `style.css`) is a premium-designed, fully responsive, and accessible interactive quiz interface.
+**`quiz_generator.html`** + **`generator.js`** — the builder UI.
+
+### Workflow
+1. Upload a **PDF** (digital or scanned)
+2. (Optional) Upload an **answer key** — CSV, XLS, or XLSX — with a form number
+3. Enter a **Gemini API key** (free from [Google AI Studio](https://aistudio.google.com/apikey))
+4. Click **הפעל ניתוח** — Gemini extracts and parses all questions
+5. Edit questions, answers, and correct choices in the preview
+6. Click **הורד מבחן עצמאי** to download, or **פתור מבחן כעת** to take it immediately
+
+### Generator Features
+- **OCR engines** — Gemini chunked (default, best for Hebrew) or Gemini native PDF
+- **Answer key formats** — CSV, XLS, XLSX with automatic form-number matching
+- **Proof mode** — view the original PDF page alongside each question
+- **Add/remove answers** — adjust option counts per question in the editor
+- **Image detection** — charts, graphs, tables auto-attach page images for cropping
+- **Re-edit existing quizzes** — upload a previously downloaded quiz HTML to continue editing
+- **File clear buttons** — remove uploaded files without refreshing
+
+### API Keys
+| Type | Prefix | How to get |
+|---|---|---|
+| Gemini (free) | `AIza...` | [Google AI Studio](https://aistudio.google.com/apikey) |
+| Gemini (Cloud) | `AQ...` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+
+Free tier tip: the generator sends all pages in one request to stay within rate limits.
+
+## 📝 Quiz Taker
+
+**`index.html`** + **`app.js`** + **`style.css`** — the standalone quiz player.
 
 ### Features
-- **RTL & Hebrew Support**: Built from the ground up for right-to-left layout and Hebrew text.
-- **Immediate Feedback Mode**: Optional toggle to check answers instantly.
-- **Keyboard Navigation**:
-  - `1` to `4` keys to select option answers.
-  - Left (`←`) and Right (`→`) arrow keys to navigate questions.
-  - `Esc` key to close image zoom.
-- **Visual Progress Tracking**: Real-time progress bar and a question jump navigation bar.
-- **Dynamic Question Order**: Answers are shuffled/randomized for each question run.
-- **Auto-Save & Resume**: Save your progress automatically in LocalStorage to resume later if the tab is closed.
-- **Rich Review Screen**: View your score and filter questions by All, Wrong Only, or Unanswered.
-- **Responsive Theme**: Dark/Light mode support.
+- **RTL Hebrew** — full right-to-left support
+- **Keyboard navigation** — `1`–`9` to select, `←` `→` to navigate, `Esc` to close zoom
+- **Immediate feedback** — optional toggle to check answers as you go
+- **Progress tracking** — progress bar + question jump bar
+- **Auto-save & resume** — localStorage persistence
+- **Review mode** — after submitting, click any question to jump back and review, or use the **חזרה לשאלות** button
+- **Image zoom & crop** — zoom into attached images, crop to focus on specific areas
+- **Dark/light theme** — toggle in the header
+- **Answer shuffle** — options randomized per session
 
-## 📚 Conversion and Extraction Guides
+## 🗂️ Project Structure
 
-This repository also hosts comprehensive documentation on digitizing and extracting study materials:
-
-1. **[Hebrew PDF Conversion Guide](hebrew_pdf_conversion_guide.md)**: A detailed walkthrough on converting Hebrew PDFs to markdown formats using state-of-the-art tools (e.g., MarkItDown).
-2. **[LLM CSV Extraction Guide](llm_csv_extraction_guide.md)**: Guidance on parsing exams and answer keys using LLMs and structured formats (like CSV files).
-
-## 🛠️ Quiz Generator (Implementation Started)
-
-A first implementation pass is now available:
-- **[quiz_generator.html](quiz_generator.html)**: Browser UI to upload exam PDF + answers CSV.
-- **[generator.js](generator.js)**: Extracts text from PDF pages, parses questions, merges CSV answer keys by form number, and exports `questions.json`.
-
-### Gemini OCR Reliability Note
-- The scanned-PDF OCR flow uses Gemini with automatic model fallback.
-- If one model becomes unavailable (for example, due to API/version rollout changes), the generator automatically tries the next supported model.
-- A 404 model error usually indicates model availability drift, not necessarily a bad passcode.
+```
+quiz_generator.html   — Builder UI
+generator.js          — PDF extraction, OCR, parsing, export logic
+index.html            — Quiz taker shell
+app.js                — Quiz player logic (navigation, scoring, review)
+style.css             — Shared styles (RTL, dark mode, responsive)
+vendor/pdfjs/         — PDF.js for in-browser PDF rendering
+tests/                — Sample exam PDFs and answer keys
+```
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
