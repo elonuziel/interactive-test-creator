@@ -233,21 +233,13 @@
                 <select id="ocr-engine">
                     <option value="gemini_chunked">Gemini AI - פיצול עמודים לאימג'ים (מומלץ)</option>
                     <option value="gemini_native">Gemini AI - העלאת PDF ישירה (מהיר יותר)</option>
-                    <option value="google_vision">Google Cloud Vision (אמין במיוחד)</option>
                 </select>
             </div>
-            <div class="field" id="gemini-key-field">
+            <div class="field">
                 <label for="api-key">Gemini API Key <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
                 <div class="password-wrap">
                     <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
                     <button class="eye-btn" type="button" data-target="api-key" title="הצג/הסתר">👁️</button>
-                </div>
-            </div>
-            <div class="field hidden" id="vision-key-field">
-                <label for="vision-key">Google Vision API Key</label>
-                <div class="password-wrap">
-                    <input id="vision-key" type="password" placeholder="הזן Google Vision API Key">
-                    <button class="eye-btn" type="button" data-target="vision-key" title="הצג/הסתר">👁️</button>
                 </div>
             </div>
             <div class="field">
@@ -318,16 +310,7 @@ document.querySelectorAll('.eye-btn').forEach(btn => {
         btn.textContent = isPassword ? '🙈' : '👁️';
     });
 });
-const ocrEngine = document.getElementById('ocr-engine');
-const geminiField = document.getElementById('gemini-key-field');
-const visionField = document.getElementById('vision-key-field');
-function toggleKeyFields() {
-    const isVision = ocrEngine.value === 'google_vision';
-    geminiField.classList.toggle('hidden', isVision);
-    visionField.classList.toggle('hidden', !isVision);
-}
-ocrEngine.addEventListener('change', toggleKeyFields);
-toggleKeyFields();
+
 </script>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>

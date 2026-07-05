@@ -9,12 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
         saltB64: 'DDyNzdsTLeWBGAnJIuT/Wg=='
     };
 
-    const GOOGLE_VISION_EMBEDDED_KEY = {
-        encryptedKeyB64: '',
-        ivB64: '',
-        saltB64: ''
-    };
-
     const GEMINI_CONFIG = {
         apiVersions: ['v1', 'v1beta'],
         preferredModels: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
@@ -39,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
         formNumber: document.getElementById('form-number'),
         ocrEngine: document.getElementById('ocr-engine'),
         apiKey: document.getElementById('api-key'),
-        visionKey: document.getElementById('vision-key'),
         passcode: document.getElementById('passcode'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
@@ -137,10 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function decryptEmbeddedApiKey(passcode) {
         const gemini = await decryptSingleKey(passcode, EMBEDDED_KEY);
-        const googleVision = await decryptSingleKey(passcode, GOOGLE_VISION_EMBEDDED_KEY);
-        
-        if (!gemini) return null; // We require at least the Gemini key to consider the passcode valid
-        return { gemini, googleVision };
+        if (!gemini) return null;
+        return { gemini };
     }
 
     function normalizeWhitespace(value) {
@@ -610,63 +601,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    async function extractTextViaGoogleVision(pdf, apiKey) {
-        if (!apiKey) {
-            throw new Error('עבור Google Cloud Vision יש להזין Google Cloud API key תקף.');
-        }
-
-        const visionEndpoint = `https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(apiKey)}`;
-        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf);
-        const pages = [];
-
-        const CHUNK_SIZE = GEMINI_CONFIG.ocrChunkSize;
-        for (let i = 0; i < imageDatas.length; i += CHUNK_SIZE) {
-            const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
-            setStatus(`מפענח עמודים ${i + 1}-${Math.min(i + CHUNK_SIZE, imageDatas.length)} מתוך ${imageDatas.length} ב-Google Vision...`);
-
-            const response = await fetch(visionEndpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    requests: chunk.map((data) => ({
-                        image: { content: data },
-                        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
-                    }))
-                })
-            });
-
-            if (!response.ok) {
-                const raw = await response.text();
-                throw new Error(`Google Vision נכשל (${response.status}): ${raw || 'שגיאה לא ידועה'}`);
-            }
-
-            const payload = await response.json();
-            const responses = payload.responses || [];
-
-            for (let r = 0; r < chunk.length; r++) {
-                const pageResult = responses[r] || {};
-                if (pageResult.error?.message) {
-                    throw new Error(`Google Vision OCR נכשל בעמוד ${i + r + 1}: ${pageResult.error.message}`);
-                }
-                const pageText =
-                    pageResult.fullTextAnnotation?.text ||
-                    pageResult.textAnnotations?.[0]?.description ||
-                    '';
-                pages.push(maybeFixHebrewWordOrder(String(pageText || '').trim()));
-            }
-
-            if (i + CHUNK_SIZE < imageDatas.length && GEMINI_CONFIG.interPageDelayMs > 0) {
-                await delay(GEMINI_CONFIG.interPageDelayMs);
-            }
-        }
-
-        return {
-            pages,
-            pagePreviews,
-            text: pages.join('\n')
-        };
-    }
-
     // --- New OCR Engines & Verification ---
 
     async function arrayBufferToBase64(buffer) {
@@ -751,58 +685,6 @@ document.addEventListener('DOMContentLoaded', () => {
             pages: extractedPages.map(p => maybeFixHebrewWordOrder(p || '')),
             pagePreviews,
             text: extractedPages.join('\n')
-        };
-    }
-
-    async function extractTextViaGoogleVision(pdf, apiKey) {
-        if (!apiKey) {
-            throw new Error('חסר מפתח API של Google Cloud Vision.');
-        }
-
-        const pages = [];
-        const imageDatas = [];
-        const pagePreviews = [];
-
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            setStatus(`מכין עמוד ${pageNumber}/${pdf.numPages} לשליחה ל-Google Vision...`);
-            const page = await pdf.getPage(pageNumber);
-            const imageData = await renderPageImageData(page);
-            imageDatas.push(imageData);
-            pagePreviews.push(`data:image/png;base64,${imageData}`);
-        }
-
-        const CHUNK_SIZE = 5; // Google Vision batches up to 16, but we'll use 5
-        const endpoint = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
-
-        for (let i = 0; i < imageDatas.length; i += CHUNK_SIZE) {
-            const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
-            setStatus(`מפענח עמודים ${i + 1}-${Math.min(i + CHUNK_SIZE, imageDatas.length)} ב-Google Vision...`);
-            
-            const requests = chunk.map(data => ({
-                image: { content: data },
-                features: [{ type: 'DOCUMENT_TEXT_DETECTION' }]
-            }));
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requests })
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`Google Vision request failed: ${response.status} ${errText}`);
-            }
-
-            const payload = await response.json();
-            const chunkPagesText = payload.responses.map(res => res.fullTextAnnotation?.text || '');
-            pages.push(...chunkPagesText);
-        }
-
-        return {
-            pages, // Vision returns text in correct reading order for Hebrew generally, no need for maybeFixHebrewWordOrder
-            pagePreviews,
-            text: pages.join('\n')
         };
     }
 
@@ -1289,20 +1171,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus('קורא קובצי מקור...');
 
-        const isVision = ocrEngine === 'google_vision';
-        const typedApiKey = isVision
-            ? (elements.visionKey?.value || '').trim()
-            : elements.apiKey.value.trim();
+        const typedApiKey = elements.apiKey.value.trim();
         let apiKey = typedApiKey;
         const passcode = elements.passcode.value.trim();
-        if (!apiKey && passcode && !isVision) {
+        if (!apiKey && passcode) {
             apiKey = await decryptEmbeddedApiKey(passcode);
             if (!apiKey) {
                 throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
             }
-        }
-        if (isVision && !apiKey) {
-            throw new Error('Google Vision דורש Google Cloud API key בשדה Vision API Key.');
         }
 
         const pdfBuffer = await pdf.arrayBuffer();
@@ -1334,12 +1210,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
                 state.proofPageImages = previews.pagePreviews || [];
-            } else if (ocrEngine === 'google_vision') {
-                setStatus('זוהה PDF סרוק. מנסה חילוץ עם Google Vision...');
-                const visionExtraction = await extractTextViaGoogleVision(extracted.pdf, typedApiKey);
-                examText = visionExtraction.text;
-                sourcePages = visionExtraction.pages;
-                state.proofPageImages = visionExtraction.pagePreviews || [];
             } else {
                 setStatus('זוהה PDF סרוק. מנסה חילוץ עם Gemini (Page Chunking)...');
                 const geminiExtraction = await extractTextViaGemini(extracted.pdf, apiKey);
@@ -1379,18 +1249,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         }
 
-        // Verification step using Gemini Pro (skip if Google Vision used without Gemini key)
-        if (apiKey && ocrEngine !== 'google_vision') {
+        // Verification step using Gemini Pro
+        if (apiKey) {
             state.questions = await verifyTestWithGemini(state.questions, apiKey);
-        } else if (ocrEngine === 'google_vision') {
-            // If we have a Gemini key in the background (via passcode), use it for verification
-            const passcode = elements.passcode.value.trim();
-            if (passcode) {
-                const keys = await decryptEmbeddedApiKey(passcode);
-                if (keys && keys.gemini) {
-                    state.questions = await verifyTestWithGemini(state.questions, keys.gemini);
-                }
-            }
         }
 
         renderPreview();
