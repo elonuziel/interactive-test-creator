@@ -699,8 +699,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        // Matches: 'שאלה מספר 1:', 'שאלה מספר :1', 'שאלה 1:', AND standalone lines like '1.' '1)' only at line start
-        const qPattern = /(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?|\d+\s*:?\s*מספר\s+שאלה|^\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/;
+        // Matches common Hebrew exam question headers in both normal and extracted-reversed forms.
+        // Supports numeric-start styles such as "22.", "22)", "22 -", and optional leading dot artifacts (". 22").
+        const qPattern = /(?:שאלה\s+(?:מספר\s*)?:?\s*\d+\s*:?|\d+\s*:?\s*מספר\s+שאלה|^\.?\s*\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/;
         // Matches: 'א. text', 'א . text' (space between letter and dot from PDF.js visual layout)
         // Also: '.א text' or '. א text' (dot-before-letter, another Hebrew PDF extraction artifact)
         const ansPatternStart = /^([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^([אבגדהוזחטי1-9])[\)]\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/;
@@ -737,7 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
 
-            // ansPatternStart has two capture groups: (letter)(text) OR (letter2)(text2)
+            // ansPatternStart captures: (1,2) => 'א. text', (3,4) => 'א) text', (5,6) => '. א text'.
             let match = line.match(ansPatternStart) || reversedLine.match(ansPatternStart);
             let endMatch = (!match) && (line.match(ansPatternEnd) || reversedLine.match(ansPatternEnd));
 
@@ -745,16 +746,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 stateMode = 2;
                 let letter, answerText;
                 if (match) {
-                    // group 1+2 for 'א. text', group 3+4 for 'א) text'
-                    letter = match[1] || match[3];
-                    answerText = (match[2] || match[4] || '').trim();
+                    letter = match[1] || match[3] || match[5];
+                    answerText = (match[2] || match[4] || match[6] || '').trim();
                 } else {
-                    letter = endMatch[2];
+                    letter = endMatch[2] || endMatch[4];
                     answerText = (endMatch[1] || '').trim();
                 }
 
-                if ((letter === 'א' || letter === '1') && !answerText && current.text.length > 0) {
-                    answerText = current.text.pop();
+                if (!letter) {
+                    continue;
                 }
                 current.answers.push({ text: answerText ? [answerText] : [] });
                 continue;
@@ -771,8 +771,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const imageKeywords = /לפניכם|גרף|תרשים|תמונה|טבלה|לוח|איור|מפה|ציור|דיאגרמה|צילום|סכמה|טבלאות|תרשים/;
 
+        const diagnostics = [];
         const formatted = rawQuestions
-            .map((q) => {
+            .map((q, idx) => {
                 const question = normalizeWhitespace(q.text.join(' '));
                 const options = q.answers.map((a) => normalizeWhitespace(a.text.join(' '))).filter(Boolean);
                 const pageIdx = filteredLinePageMap[q.lineIdx] ?? 0;
@@ -788,9 +789,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     obj._needsPageRender = true;
                 }
 
+                if (!question || options.length < 2) {
+                    diagnostics.push({
+                        index: idx + 1,
+                        sourcePage: pageIdx + 1,
+                        lineIdx: q.lineIdx,
+                        questionPreview: question.slice(0, 80),
+                        optionCount: options.length,
+                        dropReason: !question ? 'empty-question' : 'insufficient-options'
+                    });
+                }
+
                 return obj;
             })
             .filter((q) => q.question && q.options.length >= 2);
+
+        if (diagnostics.length) {
+            console.warn(`[parseQuestionsFromText] Dropped ${diagnostics.length} question candidate(s).`, diagnostics);
+        }
 
         if (!formatted.length) {
             throw new Error('לא נמצאו שאלות בפורמט הנתמך.');
