@@ -44,6 +44,7 @@ NOISE_RE = re.compile(
     r'|^\d+\s+מתוך\s*\d+\s+עמוד$)'             # 1 מתוך5 עמוד  (LTR-grouped)
 )
 NOISE_WORDS = ("קוד מבחן", "מבחן מס'", "מבחן מס")
+END_EXAM_MARKER_RE = re.compile(r'^\s*-*\s*סוף\s+המבחן\s*-*\s*$', re.IGNORECASE)
 
 # Step 2.4: image keyword detection
 IMAGE_KEYWORDS = re.compile(
@@ -53,12 +54,24 @@ IMAGE_KEYWORDS = re.compile(
 
 def is_noise(line):
     """Return True if the line is a page-number marker or exam-header fluff."""
-    return NOISE_RE.match(line) or any(w in line for w in NOISE_WORDS)
+    return (
+        NOISE_RE.match(line)
+        or any(w in line for w in NOISE_WORDS)
+        or END_EXAM_MARKER_RE.match(line)
+    )
 
 
 def normalize_whitespace(text):
     """Replace non‑breaking spaces, collapse whitespace, strip. (L288–295)"""
     return re.sub(r'\s+', ' ', text.replace('\u00A0', ' ')).strip()
+
+def strip_end_exam_marker(text):
+    """
+    Remove end-of-exam markers that may leak into the last parsed question.
+    Supports variants like 'סוף המבחן' and '--- סוף המבחן ---'.
+    """
+    text = re.sub(r'-*\s*סוף\s+המבחן\s*-*', '', text, flags=re.IGNORECASE)
+    return normalize_whitespace(text)
 
 def clean_option_text(text):
     """
@@ -72,7 +85,7 @@ def clean_option_text(text):
     # Split merged Hebrew+digit / digit+Hebrew
     text = re.sub(r'([א-ת])(\d)', r'\1 \2', text)
     text = re.sub(r'(\d)([א-ת])', r'\1 \2', text)
-    return normalize_whitespace(text)
+    return strip_end_exam_marker(text)
 
 
 def clean_question_text(text):
@@ -107,7 +120,7 @@ def clean_question_text(text):
     elif text.startswith(':'):
         text = text[1:] + ':'
 
-    return normalize_whitespace(text)
+    return strip_end_exam_marker(text)
 
 def reverse_words(line):
     """Return the line with word order reversed (for RTL edge‑case matching)."""

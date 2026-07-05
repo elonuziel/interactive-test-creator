@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מחולל מבחן</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <div class="welcome-card" style="text-align:right; margin-bottom: 1rem;">
+      <h1>מחולל מבחן אינטראקטיבי</h1>
+      <p><strong>המלצה:</strong> אם זה PDF דיגיטלי (עם טקסט נבחר), עדיף לא להשתמש ב‑LLM כדי לחסוך זמן ועלויות API.</p>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:center; margin-top: 1rem;">
+        <label class="toggle">
+          <span class="toggle-label">השתמש ב‑LLM (אופציונלי)</span>
+          <div class="toggle-wrapper">
+            <input type="checkbox" id="use-llm-toggle">
+            <span class="slider"></span>
+          </div>
+        </label>
+        <label class="toggle">
+          <span class="toggle-label">OCR אופליין לסרוקים (איכות כנראה נמוכה)</span>
+          <div class="toggle-wrapper">
+            <input type="checkbox" id="use-offline-ocr-toggle">
+            <span class="slider"></span>
+          </div>
+        </label>
+      </div>
+      <p id="parse-mode-note" style="margin-top:0.75rem; color:var(--text-secondary);"></p>
+    </div>
+
+    <div class="quiz-card" style="margin-bottom:1rem;">
+      <h2 style="margin-bottom:1rem;">שלב התחלתי: הדבק טקסט שחולץ מה‑PDF</h2>
+      <textarea id="raw-text-input" rows="8" style="width:100%; border:1px solid var(--border-color); background:var(--surface-color); color:var(--text-primary); border-radius:0.5rem; padding:0.75rem;" placeholder="הדבק כאן טקסט שחולץ...\nשאלה מספר 1:\nא. ...\nב. ..."></textarea>
+      <div style="display:flex; gap:0.75rem; margin-top:1rem; flex-wrap:wrap;">
+        <button id="run-parse-btn" class="primary-btn">Run Parse</button>
+        <button id="add-question-btn" class="secondary-btn">הוסף שאלה ידנית</button>
+      </div>
+    </div>
+
+    <div id="preview-container" class="review-list"></div>
+  </main>
+
+  <script src="generator.js"></script>
+</body>
+</html>
