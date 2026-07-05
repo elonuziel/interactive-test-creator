@@ -32,8 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
         csvFile: document.getElementById('csv-file'),
         formNumber: document.getElementById('form-number'),
         ocrEngine: document.getElementById('ocr-engine'),
+        llmPolicy: document.getElementById('llm-policy'),
         apiKey: document.getElementById('api-key'),
         passcode: document.getElementById('passcode'),
+        credentialPopup: document.getElementById('credential-popup'),
+        credentialApiKey: document.getElementById('credential-api-key'),
+        credentialPasscode: document.getElementById('credential-passcode'),
+        credentialSubmit: document.getElementById('credential-submit'),
+        credentialCancel: document.getElementById('credential-cancel'),
         htmlFile: document.getElementById('html-file'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
@@ -132,7 +138,89 @@ document.addEventListener('DOMContentLoaded', () => {
     async function decryptEmbeddedApiKey(passcode) {
         const gemini = await decryptSingleKey(passcode, EMBEDDED_KEY);
         if (!gemini) return null;
-        return { gemini };
+        return gemini;
+    }
+
+    function requestGeminiCredentials() {
+        return new Promise((resolve, reject) => {
+            const popup = elements.credentialPopup;
+            const apiKeyInput = elements.credentialApiKey;
+            const passcodeInput = elements.credentialPasscode;
+            const submitButton = elements.credentialSubmit;
+            const cancelButton = elements.credentialCancel;
+
+            if (!popup || !apiKeyInput || !passcodeInput || !submitButton || !cancelButton) {
+                reject(new Error('ממשק הזנת האישורים לא נטען. רענן את העמוד ונסה שוב.'));
+                return;
+            }
+
+            apiKeyInput.value = elements.apiKey.value.trim();
+            passcodeInput.value = '';
+            popup.classList.add('show');
+
+            const cleanup = () => {
+                popup.classList.remove('show');
+                submitButton.removeEventListener('click', handleSubmit);
+                cancelButton.removeEventListener('click', handleCancel);
+            };
+
+            const handleSubmit = () => {
+                const apiKey = apiKeyInput.value.trim();
+                const passcode = passcodeInput.value.trim();
+                cleanup();
+                resolve({ apiKey, passcode });
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                reject(new Error('העיבוד הנוכחי דורש Gemini. הזן API Key או Passcode כדי להמשיך, או עבור למצב ללא LLM.'));
+            };
+
+            submitButton.addEventListener('click', handleSubmit);
+            cancelButton.addEventListener('click', handleCancel);
+            apiKeyInput.focus();
+        });
+    }
+
+    async function resolveGeminiApiKey(allowPrompt = false) {
+        const typedApiKey = elements.apiKey.value.trim();
+        if (typedApiKey) {
+            return typedApiKey;
+        }
+
+        const currentPasscode = elements.passcode.value.trim();
+        if (currentPasscode) {
+            const decrypted = await decryptEmbeddedApiKey(currentPasscode);
+            if (decrypted) {
+                elements.apiKey.value = decrypted;
+                return decrypted;
+            }
+            if (!allowPrompt) {
+                throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
+            }
+        }
+
+        if (!allowPrompt) {
+            return '';
+        }
+
+        const { apiKey: promptedApiKey, passcode: promptedPasscode } = await requestGeminiCredentials();
+        if (promptedApiKey) {
+            elements.apiKey.value = promptedApiKey;
+            return promptedApiKey;
+        }
+
+        if (promptedPasscode) {
+            elements.passcode.value = promptedPasscode;
+            const decrypted = await decryptEmbeddedApiKey(promptedPasscode);
+            if (decrypted) {
+                elements.apiKey.value = decrypted;
+                return decrypted;
+            }
+            throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
+        }
+
+        throw new Error('העיבוד הנוכחי דורש Gemini. הזן API Key או Passcode כדי להמשיך, או עבור למצב ללא LLM.');
     }
 
     function normalizeWhitespace(value) {
@@ -291,6 +379,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         return { imageDatas, pagePreviews };
+    }
+
+    async function extractTextViaOfflineOcr(pdf) {
+        if (!window.Tesseract?.createWorker) {
+            throw new Error('OCR מקומי לא נטען בדפדפן. רענן את העמוד ונסה שוב, או בחר Gemini.');
+        }
+
+        setStatus('מכין OCR מקומי. האיכות כנראה תהיה נמוכה יותר מ-Gemini...');
+        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf);
+        const pages = [];
+        const worker = await window.Tesseract.createWorker('heb');
+
+        try {
+            for (let i = 0; i < imageDatas.length; i++) {
+                setStatus(`OCR מקומי מעבד עמוד ${i + 1}/${imageDatas.length}... האיכות כנראה תהיה נמוכה יותר מ-Gemini.`);
+                const { data } = await worker.recognize(`data:image/png;base64,${imageDatas[i]}`);
+                pages.push(maybeFixHebrewWordOrder((data && data.text) || ''));
+            }
+        } finally {
+            await worker.terminate();
+        }
+
+        return {
+            pages,
+            pagePreviews,
+            text: pages.join('\n')
+        };
     }
 
     function buildGeminiEndpoint(version, model, apiKey) {
@@ -1125,6 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const csv = elements.csvFile.files?.[0];
         const formNumber = elements.formNumber.value.trim();
         const ocrEngine = (elements.ocrEngine?.value || 'gemini_chunked').trim();
+        const llmPolicy = (elements.llmPolicy?.value || 'auto').trim();
 
         if (!pdf) {
             throw new Error('יש לבחור קובץ PDF לפענוח.');
@@ -1132,15 +1248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus('קורא קובצי מקור...');
 
-        const typedApiKey = elements.apiKey.value.trim();
-        let apiKey = typedApiKey;
-        const passcode = elements.passcode.value.trim();
-        if (!apiKey && passcode) {
-            apiKey = await decryptEmbeddedApiKey(passcode);
-            if (!apiKey) {
-                throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
-            }
-        }
+        let apiKey = '';
 
         const pdfBuffer = await pdf.arrayBuffer();
         let answerRows = null;
@@ -1163,26 +1271,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let examText = extracted.text;
         let sourcePages = extracted.rawPages;
-        if (extracted.isScanned) {
+        const useLlmExtraction = llmPolicy === 'force_llm' || (llmPolicy === 'auto' && extracted.isScanned && ocrEngine !== 'offline_local');
+        const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
+
+        if (!extracted.isScanned && llmPolicy !== 'force_llm') {
+            setStatus('זוהה PDF דיגיטלי. ממשיך בעיבוד מקומי ללא LLM.');
+        }
+
+        if (useOfflineOcr) {
+            setStatus('זוהה PDF סרוק. מפעיל OCR מקומי בלבד; האיכות כנראה תהיה נמוכה יותר מ-Gemini.');
+            const offlineExtraction = await extractTextViaOfflineOcr(extracted.pdf);
+            examText = offlineExtraction.text;
+            sourcePages = offlineExtraction.pages;
+            state.proofPageImages = offlineExtraction.pagePreviews || [];
+        } else if (useLlmExtraction) {
+            apiKey = await resolveGeminiApiKey(true);
             if (ocrEngine === 'gemini_native') {
-                setStatus('זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...');
+                setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...' : 'נבחר מצב LLM כפוי. שולח את ה-PDF ל-Gemini Native PDF...');
                 const nativeExtraction = await extractTextViaGeminiNativePdf(pdfBuffer, extracted.pdf, apiKey);
                 examText = nativeExtraction.text;
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
                 state.proofPageImages = previews.pagePreviews || [];
             } else {
-                setStatus('זוהה PDF סרוק. מנסה חילוץ עם Gemini (Page Chunking)...');
+                setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini (Page Chunking)...' : 'נבחר מצב LLM כפוי. שולח עמודים ל-Gemini OCR...');
                 const geminiExtraction = await extractTextViaGemini(extracted.pdf, apiKey);
                 examText = geminiExtraction.text;
                 sourcePages = geminiExtraction.pages;
                 state.proofPageImages = geminiExtraction.pagePreviews || [];
             }
+        } else if (extracted.isScanned) {
+            setStatus('זוהה PDF סרוק במצב מקומי בלבד. מנסה להמשיך בלי LLM, אבל התוצאה עלולה להיות חלקית.');
         }
 
         let parsedQuestions = parseQuestionsFromText(examText, sourcePages, extracted.pageImages);
 
-        if (extracted.isScanned && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
+        if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
             setStatus('זוהו מעט שאלות. מנסה פענוח מדויק יותר עמוד-עמוד...');
             const fallbackExtraction = await extractTextViaGemini(extracted.pdf, apiKey, 1);
             const fallbackQuestions = parseQuestionsFromText(
@@ -1222,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Verification step using Gemini Pro
-        if (apiKey) {
+        if (llmPolicy === 'force_llm' && apiKey) {
             state.questions = await verifyTestWithGemini(state.questions, apiKey);
         }
 

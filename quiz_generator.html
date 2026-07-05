@@ -42,6 +42,17 @@
             gap: 6px;
             margin-bottom: 12px;
         }
+        .field-note {
+            margin: 2px 0 0;
+            color: var(--text-secondary);
+            font-size: .84rem;
+            line-height: 1.5;
+        }
+        .warning-note {
+            color: var(--danger);
+            font-size: .82rem;
+            line-height: 1.45;
+        }
         .field input, .field textarea, .field select {
             background: var(--input-bg);
             color: var(--text-primary);
@@ -232,6 +243,7 @@
     <div class="builder-grid">
         <section class="builder-card">
             <h2>קבצי מקור</h2>
+            <p class="field-note">PDF דיגיטלי יעובד מקומית בלי LLM כברירת מחדל. אם הקובץ סרוק, אפשר לעבור ל-Gemini או ל-OCR מקומי, אבל OCR מקומי כנראה יהיה פחות מדויק.</p>
             <div class="field">
                 <label for="pdf-file">קובץ PDF</label>
                 <div class="file-wrap">
@@ -255,6 +267,16 @@
                 <select id="ocr-engine">
                     <option value="gemini_chunked">Gemini AI - פיצול עמודים לאימג'ים (מומלץ)</option>
                     <option value="gemini_native">Gemini AI - העלאת PDF ישירה (מהיר יותר)</option>
+                    <option value="offline_local">OCR מקומי בדפדפן (כנראה פחות טוב)</option>
+                </select>
+                <p class="warning-note">ה-OCR המקומי עובד בלי LLM ובלי API key, אבל בסריקות בעברית התוצאה כנראה תהיה פחות טובה מ-Gemini.</p>
+            </div>
+            <div class="field">
+                <label for="llm-policy">מדיניות שימוש ב-LLM</label>
+                <select id="llm-policy">
+                    <option value="auto">אוטומטי: מקומי לדיגיטלי, LLM רק לסרוק</option>
+                    <option value="force_llm">תמיד להשתמש ב-LLM</option>
+                    <option value="force_no_llm">ללא LLM: מקומי בלבד</option>
                 </select>
             </div>
             <div class="field">
@@ -287,7 +309,7 @@
                 <label for="proof-mode-toggle">מצב הגהה (הצגת עמוד מקור לכל שאלה)</label>
                 <input id="proof-mode-toggle" type="checkbox" checked>
             </div>
-            <div id="status" class="status muted">מוכן להתחלה.</div>
+            <div id="status" class="status muted">מוכן להתחלה. PDF דיגיטלי יעובד מקומית, ו-PDF סרוק יבקש OCR רק אם צריך.</div>
         </section>
 
         <section class="builder-card">
@@ -321,6 +343,26 @@
     </div>
 </div>
 
+<div id="credential-popup" class="help-popup">
+    <div class="help-popup-content">
+        <h3>נדרש אימות ל-Gemini</h3>
+        <p>הקובץ דורש עיבוד עם Gemini. אפשר להזין עכשיו API Key או Passcode למפתח המוצפן.</p>
+        <div class="field">
+            <label for="credential-api-key">Gemini API Key</label>
+            <input id="credential-api-key" type="password" placeholder="AIza...">
+        </div>
+        <div class="field">
+            <label for="credential-passcode">Passcode למפתח מוצפן</label>
+            <input id="credential-passcode" type="password" autocomplete="off" placeholder="קוד גישה">
+        </div>
+        <p id="credential-popup-note" class="warning-note">אפשר להשאיר אחד מהשדות ריק. אם מזינים Passcode, המערכת תנסה לפענח ממנו מפתח Gemini.</p>
+        <div class="actions">
+            <button id="credential-submit" class="primary-btn" type="button">המשך</button>
+            <button id="credential-cancel" class="secondary-btn" type="button">ביטול</button>
+        </div>
+    </div>
+</div>
+
 <script>
 document.getElementById('api-help-btn').addEventListener('click', () => {
     document.getElementById('api-help-popup').classList.add('show');
@@ -330,6 +372,9 @@ document.getElementById('api-help-close').addEventListener('click', () => {
 });
 document.getElementById('api-help-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('api-help-popup').classList.remove('show');
+});
+document.getElementById('credential-popup').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) document.getElementById('credential-popup').classList.remove('show');
 });
 document.querySelectorAll('.file-clear').forEach(btn => {
     const input = document.getElementById(btn.dataset.target);
@@ -353,6 +398,7 @@ document.querySelectorAll('.eye-btn').forEach(btn => {
 </script>
 
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="generator.js"></script>
 </body>
 </html>
