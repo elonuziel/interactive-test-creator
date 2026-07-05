@@ -702,8 +702,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Matches: 'שאלה מספר 1:', 'שאלה מספר :1', 'שאלה 1:', AND standalone lines like '1.' '1)' only at line start
         const qPattern = /(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?|\d+\s*:?\s*מספר\s+שאלה|^\d+\s*[\.\)]\s|^\d+\s*-\s)/;
         // Matches: 'א. text', 'א . text' (space between letter and dot from PDF.js visual layout)
-        const ansPatternStart = /^([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^([אבגדהוזחטי1-9])[\)]\s*(.*)$/;
-        const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$/;
+        // Also: '.א text' or '. א text' (dot-before-letter, another Hebrew PDF extraction artifact)
+        const ansPatternStart = /^([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^([אבגדהוזחטי1-9])[\)]\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/;
+        // Matches: 'text א.' or 'text .א' at end of line
+        const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$|^(.*)\s+[\.]\s*([אבגדהוזחטי])$/;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
 
         const rawQuestions = [];
