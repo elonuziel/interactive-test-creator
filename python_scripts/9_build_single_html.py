@@ -120,32 +120,36 @@ def build_html(test_dir, embed_images=True, title=None):
     # ── Inline CSS: replace <link rel="stylesheet" href="style.css"> ──────
     html = re.sub(
         r'<link\s+rel="stylesheet"\s+href="style\.css"\s*/?>',
-        f'<style>\n{css}\n</style>',
+        lambda _: f'<style>\n{css}\n</style>',
         html
     )
 
-    # ── Remove Cropper.js CDN links (not available offline) ────────────────
-    html = re.sub(
-        r'<link\s+href="[^"]*cropperjs[^"]*"\s+rel="stylesheet"\s*/?>',
-        '<!-- Cropper.js CSS removed for offline use -->',
-        html
-    )
-    html = re.sub(
-        r'<script\s+src="[^"]*cropperjs[^"]*">\s*</script>',
-        '<!-- Cropper.js script removed for offline use -->',
-        html
-    )
+    # ── Inline Cropper.js CSS and JS for offline use ─────────────────────
+    cropper_css_path = os.path.join(WEB_DIR, 'cropper.min.css')
+    cropper_js_path = os.path.join(WEB_DIR, 'cropper.min.js')
+
+    cropper_css = read_file(cropper_css_path) if os.path.isfile(cropper_css_path) else ''
+    cropper_js = read_file(cropper_js_path) if os.path.isfile(cropper_js_path) else ''
+
+    if cropper_css:
+        html = re.sub(
+            r'<link\s+href="[^"]*cropperjs[^"]*"\s+rel="stylesheet"\s*/?>',
+            lambda _: f'<style>\n{cropper_css}\n</style>',
+            html
+        )
+    if cropper_js:
+        html = re.sub(
+            r'<script\s+src="[^"]*cropperjs[^"]*">\s*</script>',
+            lambda _: f'<script>\n{cropper_js}\n</script>',
+            html
+        )
 
     # ── Inline JS: replace <script src="app.js"></script> ──────────────────
     html = re.sub(
         r'<script\s+src="app\.js">\s*</script>',
-        f'{embedded_script}\n<script>\n{js}\n</script>',
+        lambda _: f'{embedded_script}\n<script>\n{js}\n</script>',
         html
     )
-
-    # ── Hide the cropper button via embedded CSS (no Cropper.js) ───────────
-    cropper_hide_css = "<style>#open-cropper-btn { display: none !important; }</style>"
-    html = html.replace('</head>', f'{cropper_hide_css}\n</head>')
 
     # ── Remove menu screen elements (single-test file) ─────────────────────
     # Hide menu screen and error back-to-menu via CSS

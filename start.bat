@@ -305,6 +305,51 @@ if !HAS_PDF!==1 echo   OK - PDF file found
 if !HAS_ANSWERS!==1 echo   OK - Answer key file found
 echo.
 
+:: ---------------------------------------------------------------------------
+:: STEP 3: PRE-PROCESSING (Automated)
+:: ---------------------------------------------------------------------------
+echo  [Step 3/5] Running automated pre-processing steps...
+echo  -------------------------------------
+echo.
+if !HAS_PDF!==1 (
+    echo   Detecting PDF type...
+    python python_scripts\1_detect_pdf_type.py "!TEST_DIR!\exam.pdf" > "!TEST_DIR!\pdf_type_result.txt"
+    type "!TEST_DIR!\pdf_type_result.txt"
+    
+    set "IS_DIGITAL=0"
+    findstr /C:"DIGITAL PDF detected" "!TEST_DIR!\pdf_type_result.txt" >nul
+    if not errorlevel 1 set "IS_DIGITAL=1"
+    
+    echo.
+    echo   Rendering PDF pages...
+    python python_scripts\3_render_pdf_pages.py "!TEST_DIR!"
+    
+    if !IS_DIGITAL!==1 (
+        echo.
+        echo   DIGITAL PDF detected! Automating text extraction...
+        python python_scripts\2_extract_text_fitz.py "!TEST_DIR!\exam.pdf" -o "!TEST_DIR!\raw_text.md" --extract-images "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
+        python python_scripts\5_parse_questions_md.py "!TEST_DIR!\raw_text.md" -o "!TEST_DIR!\questions.json" --image-dir "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
+        echo   Automated extraction complete!
+    )
+)
+
+if !HAS_ANSWERS!==1 (
+    echo.
+    echo   Please enter the Form Number for the answer key ^(e.g., 076, 76, 1^).
+    echo   This is required to extract the correct answers from the CSV/Excel.
+    echo.
+    set /p FORM_NUMBER="   Form Number: "
+    if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
+    echo.
+    echo   Extracting answers from CSV...
+    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!" "!FORM_NUMBER!"
+) else (
+    set "FORM_NUMBER=1"
+)
+echo.
+echo   Pre-processing complete!
+echo.
+
 :agent_extraction_step
 :: ---------------------------------------------------------------------------
 :: STEP 4: Launch AI Agent
@@ -312,20 +357,21 @@ echo.
 echo  [Step 4/5] Launching AI agent for extraction
 echo  -------------------------------------
 echo.
-echo   The extraction pipeline needs an AI agent to read the PDF
-echo   and run the steps in LLM_RUNBOOK.md.
-echo.
-
-if !HAS_ANSWERS!==1 (
-    echo   Please enter the Form Number for the answer key ^(e.g., 076, 76, 1^).
-    echo   This is required to extract the correct answers from the CSV/Excel.
+if exist "!TEST_DIR!\questions.json" (
+    echo   We auto-extracted questions from your digital PDF!
+    echo   However, sometimes Hebrew extraction has reversed words or formatting quirks.
     echo.
-    set /p FORM_NUMBER="   Form Number: "
-    if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
+    set /p PROOF_CHOICE="   Would you like an AI agent to proofread and fix the JSON? (Y/n): "
+    if /i "!PROOF_CHOICE!"=="n" (
+        goto :post_process
+    )
     echo.
+    echo   The AI agent will now perform a proofreading pass...
 ) else (
-    set "FORM_NUMBER=1"
+    echo   The extraction pipeline needs an AI agent to read the rendered images
+    echo   and extract the multiple-choice questions into questions.json.
 )
+echo.
 
 :: Generate prompt files (prompt_local_agent.txt & prompt_web_ai.txt)
 python python_scripts\generate_prompts.py "!TEST_DIR!" "!TEST_NAME!" "!FORM_NUMBER!" "!HAS_ANSWERS!" >nul 2>&1
@@ -356,8 +402,8 @@ if not errorlevel 1 (
         echo.
         echo   What is happening now:
         echo     1. agy is starting in a NEW window with prompt auto-injected.
-        echo     2. It will automatically read LLM_RUNBOOK.md and run scripts.
-        echo     3. Check that window if agy asks questions or finishes.
+        echo     2. It will automatically read the images and output questions.json.
+        echo     3. Once questions.json is ready, come back here to continue.
         echo.
         echo  ===========================================================
         echo.
@@ -544,11 +590,38 @@ goto :end
 
 
 :: ===========================================================================
-:: POST-PROCESS: Build HTML or start server
+:: POST-PROCESS: Automated Steps and Build HTML
 :: ===========================================================================
 :post_process
 echo.
-echo  [Step 5/5] What would you like to do with the quiz?
+echo  [Step 5/5] Running automated post-processing...
+echo  -------------------------------------
+if !HAS_ANSWERS!==1 (
+    echo.
+    echo   Merging answers into questions.json...
+    python python_scripts\6_merge_json_answers.py "!TEST_DIR!"
+)
+
+echo.
+echo   Running QA checks...
+python python_scripts\7_check_json.py "!TEST_DIR!"
+
+echo.
+echo   Updating manifest...
+python python_scripts\8_generate_manifest.py
+
+echo.
+echo   Cleaning up temporary files...
+if exist "!TEST_DIR!\answers_extracted.json" del /q "!TEST_DIR!\answers_extracted.json"
+if exist "!TEST_DIR!\prompt_local_agent.txt" del /q "!TEST_DIR!\prompt_local_agent.txt"
+if exist "!TEST_DIR!\prompt_web_ai.txt" del /q "!TEST_DIR!\prompt_web_ai.txt"
+if exist "!TEST_DIR!\pdf_type_result.txt" del /q "!TEST_DIR!\pdf_type_result.txt"
+if exist "!TEST_DIR!\raw_text.md" del /q "!TEST_DIR!\raw_text.md"
+if exist "!TEST_DIR!\page_map.json" del /q "!TEST_DIR!\page_map.json"
+echo   Cleanup complete!
+
+echo.
+echo  What would you like to do with the quiz?
 echo  -------------------------------------
 echo.
 echo   [H] Build a SINGLE HTML file (double-click to open, no server^)

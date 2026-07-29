@@ -124,8 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (errorScreen) errorScreen.classList.add('active');
     }
 
-    if (!testPath) {
-        // No test selected: show exam selection menu
+    if (!testPath && !window.__EMBEDDED_QUESTIONS) {
+        // No test selected and no embedded questions: show exam selection menu
         setupScreen.classList.remove('active');
         if(menuScreen) menuScreen.classList.add('active');
         // Load dynamic test list
@@ -145,11 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Adjust relative image path if present (skip for data URIs)
             let img = q.image;
-            if (img && !img.startsWith('http') && !img.startsWith('data:')) {
+            if (img && !img.startsWith('http') && !img.startsWith('data:') && testPath) {
                 img = `../${testPath}/${img}`;
             }
             let pageImg = q.pageImage;
-            if (pageImg && !pageImg.startsWith('http') && !pageImg.startsWith('data:')) {
+            if (pageImg && !pageImg.startsWith('http') && !pageImg.startsWith('data:') && testPath) {
                 pageImg = `../${testPath}/${pageImg}`;
             }
 
@@ -348,19 +348,21 @@ document.addEventListener('DOMContentLoaded', () => {
         questionCounter.textContent = `שאלה ${currentQuestionIndex + 1} מתוך ${questions.length}`;
         questionText.innerHTML = q.question;
 
-        // Image
-        const hasQuestionImage = !!q.image;
-        const hasPageImage = !!q.pageImage;
+        // Image & Page Image Cropping Support
+        const imageSrc = q.image || q.pageImage;
+        const fullPageSrc = q.pageImage || q.image;
 
-        if (hasQuestionImage) {
-            if (croppedImages[q.image]) {
-                questionImage.src = croppedImages[q.image];
+        if (imageSrc) {
+            if (croppedImages[fullPageSrc]) {
+                questionImage.src = croppedImages[fullPageSrc];
+            } else if (croppedImages[imageSrc]) {
+                questionImage.src = croppedImages[imageSrc];
             } else {
-                questionImage.src = q.image;
+                questionImage.src = imageSrc;
             }
             questionImage.classList.remove('hidden');
-            // Cropper: use full page when available, fall back to question image
-            questionImage.dataset.fullSrc = hasPageImage ? q.pageImage : q.image;
+            // Cropper: use full page when available, fall back to main image
+            questionImage.dataset.fullSrc = fullPageSrc;
             openCropperBtn.classList.remove('hidden');
         } else {
             questionImage.classList.add('hidden');
