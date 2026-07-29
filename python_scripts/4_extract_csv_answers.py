@@ -57,60 +57,75 @@ def parse_answer_cell(cell_value):
 def main():
     parser = argparse.ArgumentParser(description="Extract correct answers from a CSV or Excel file based on the form number.")
     parser.add_argument("csv_file", help="Path to the CSV or Excel file")
-    parser.add_argument("form_num", help="Test form number (e.g. '76' or '63')")
+    parser.add_argument("form_num", help="Test form number (e.g. '76', '32', or '0' for Form Zero)")
     parser.add_argument("-o", "--output", help="Output JSON file", default="answers.json")
     
     args = parser.parse_args()
 
     input_path = Path(args.csv_file)
-    if not input_path.exists():
-        print(f"Input file not found: {input_path}")
-        return 1
+    form_str = str(args.form_num).strip().lstrip('0')
+    if not form_str:
+        form_str = '0'
 
+    is_form_zero = (form_str in {'0', 'zero', '00', '000'})
     answers_map = {}
-    
-    try:
-        rows = load_rows(input_path)
-        header_row_index, headers = find_header_row(rows)
 
-        if header_row_index is None:
-            print("Could not find a header row containing both 'שאלון' and 'שאלה'.")
-            return 1
+    if input_path.exists():
+        try:
+            rows = load_rows(input_path)
+            header_row_index, headers = find_header_row(rows)
 
-        target_row = None
-        for row in rows[header_row_index + 1:]:
-            if not row:
-                continue
+            if is_form_zero and header_row_index is not None:
+                # Form Zero extraction from bracket metadata [Z] {W} across all student rows
+                form0_q_pattern = re.compile(r'\[(\d+)\]')
+                form0_ans_pattern = re.compile(r'\{(\d+)\}')
+                for row in rows[header_row_index + 1:]:
+                    for cell in row:
+                        cell_str = str(cell).strip()
+                        q_match = form0_q_pattern.search(cell_str)
+                        ans_match = form0_ans_pattern.search(cell_str)
+                        if q_match and ans_match:
+                            answers_map[q_match.group(1)] = int(ans_match.group(1))
 
-            if any(str(cell).strip() == args.form_num for cell in row[:3]):
-                target_row = row
-                break
+            elif header_row_index is not None:
+                target_row = None
+                for row in rows[header_row_index + 1:]:
+                    if not row:
+                        continue
 
-        if target_row is None:
-            print(f"No answers found for form {args.form_num}. Check if the form number exists in the file.")
-            return 1
+                    if any(str(cell).strip().lstrip('0') == form_str for cell in row[:3]):
+                        target_row = row
+                        break
 
-        for column_index, header_text in enumerate(headers):
-            if not header_text.startswith("שאלה"):
-                continue
+                if target_row is not None:
+                    for column_index, header_text in enumerate(headers):
+                        if not header_text.startswith("שאלה"):
+                            continue
 
-            q_num_match = re.search(r"\d+", header_text)
-            if not q_num_match:
-                continue
+                        q_num_match = re.search(r"\d+", header_text)
+                        if not q_num_match:
+                            continue
 
-            q_num = q_num_match.group(0)
-            if column_index >= len(target_row):
-                continue
+                        q_num = q_num_match.group(0)
+                        if column_index >= len(target_row):
+                            continue
 
-            parsed_answer = parse_answer_cell(target_row[column_index])
-            if parsed_answer is not None:
-                answers_map[q_num] = parsed_answer
-            elif any(token in str(target_row[column_index]) for token in ("והת", "מבוטל")):
-                answers_map[q_num] = None
+                        parsed_answer = parse_answer_cell(target_row[column_index])
+                        if parsed_answer is not None:
+                            answers_map[q_num] = parsed_answer
+                        elif any(token in str(target_row[column_index]) for token in ("והת", "מבוטל")):
+                            answers_map[q_num] = None
 
-    except Exception as e:
-        print(f"Error reading answers file: {e}")
-        return 1
+        except Exception as e:
+            print(f"Warning/Error reading answers file: {e}")
+
+    # Fallback for Form Zero: default questions 1..50 to answer 1 (the first option)
+    if is_form_zero:
+        max_q = max([int(k) for k in answers_map.keys()], default=50)
+        for i in range(1, max_q + 1):
+            q_key = str(i)
+            if q_key not in answers_map or answers_map[q_key] is None:
+                answers_map[q_key] = 1
 
     if not answers_map:
         print(f"No answers found for form {args.form_num}. Check if the form number exists in the CSV.")

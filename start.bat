@@ -322,24 +322,65 @@ echo.
 :: ---------------------------------------------------------------------------
 :: STEP 3: PRE-PROCESSING (Automated)
 :: ---------------------------------------------------------------------------
-echo  [Step 3/5] Running automated pre-processing steps...
+echo  [Step 3/5] Pre-processing & Document Analysis
 echo  -------------------------------------
 echo.
+
+:: 1. Detect PDF Type First (Digital vs Scanned)
+set "IS_DIGITAL=0"
+if !HAS_PDF!==1 (
+    echo   [1/2] Detecting PDF type (Digital vs Scanned)...
+    python python_scripts\1_detect_pdf_type.py "!PDF_FULL_PATH!" > "!TEST_DIR!\pdf_type_result.txt"
+    type "!TEST_DIR!\pdf_type_result.txt"
+    
+    findstr /C:"DIGITAL PDF detected" "!TEST_DIR!\pdf_type_result.txt" >nul
+    if not errorlevel 1 set "IS_DIGITAL=1"
+    echo.
+)
+
+:: 2. Ask Form Number Setup
+if !HAS_ANSWERS!==1 (
+    echo  ===========================================================
+    echo   [2/2] ANSWER KEY FORM NUMBER SETUP
+    echo   Please enter the Form Number (שאלון) for the answer key.
+    echo   (e.g., 32, 76, 6, 1, 0). Check your PDF title page if unsure!
+    echo  ===========================================================
+    set "FORM_NUMBER="
+    set /p FORM_NUMBER="   Form Number (שאלון): "
+    if "!FORM_NUMBER!"=="" (
+        echo   NOTE: No form number entered. Defaulting to 1.
+        set "FORM_NUMBER=1"
+    )
+    echo.
+    echo   Extracting answers from CSV/Excel for Form !FORM_NUMBER!...
+    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!\!ANSWERS_NAME!" "!FORM_NUMBER!" -o "!TEST_DIR!\answers.json"
+    echo.
+) else (
+    echo  ===========================================================
+    echo   [2/2] FORM NUMBER SETUP (No answer spreadsheet found)
+    echo   Is this Form 0 (Master Exam where option 1/א is always correct)?
+    echo   - Enter '0' to auto-generate answer key (all correct answers = option 1)
+    echo   - Enter Form Number (e.g. 1, 32) if you will add answers manually
+    echo  ===========================================================
+    set "FORM_NUMBER="
+    set /p FORM_NUMBER="   Form Number [DEFAULT: 0 for Form Zero]: "
+    if "!FORM_NUMBER!"=="" set "FORM_NUMBER=0"
+    
+    if "!FORM_NUMBER!"=="0" (
+        echo.
+        echo   Form 0 detected! Auto-generating answer key (all correct answers = option 1)...
+        python python_scripts\4_extract_csv_answers.py "none" "0" -o "!TEST_DIR!\answers.json"
+        set "HAS_ANSWERS=1"
+    )
+)
+
+:: Option to skip further pre-processing (rendering / page cleaning)
 set "SKIP_STEP3="
-set /p SKIP_STEP3="   Press Enter to run pre-processing, or type 's' to skip to Step 4: "
+set /p SKIP_STEP3="   Press Enter to run page cleaning & rendering, or type 's' to skip to Step 4: "
 if /i "!SKIP_STEP3!"=="s" goto :agent_extraction_step
 
 echo.
 if !HAS_PDF!==1 (
-    echo   Detecting PDF type...
-    python python_scripts\1_detect_pdf_type.py "!PDF_FULL_PATH!" > "!TEST_DIR!\pdf_type_result.txt"
-    type "!TEST_DIR!\pdf_type_result.txt"
-    
-    set "IS_DIGITAL=0"
-    findstr /C:"DIGITAL PDF detected" "!TEST_DIR!\pdf_type_result.txt" >nul
-    if not errorlevel 1 set "IS_DIGITAL=1"
-    
-    echo.
     echo   Page cleaning / page removal:
     echo     - Press Enter for Standard cleaning ^(pages 1-4, then 6,8,10... until end^)
     echo     - Type custom pages to discard ^(e.g., '1-3, 5'^)
@@ -361,19 +402,6 @@ if !HAS_PDF!==1 (
     )
 )
 
-if !HAS_ANSWERS!==1 (
-    echo.
-    echo   Please enter the Form Number for the answer key ^(e.g., 076, 76, 1^).
-    echo   This is required to extract the correct answers from the CSV/Excel.
-    echo.
-    set /p FORM_NUMBER="   Form Number: "
-    if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
-    echo.
-    echo   Extracting answers from CSV...
-    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!\!ANSWERS_NAME!" "!FORM_NUMBER!" -o "!TEST_DIR!\answers.json"
-) else (
-    set "FORM_NUMBER=1"
-)
 echo.
 echo   Pre-processing complete!
 echo.
