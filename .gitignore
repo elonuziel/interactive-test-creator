@@ -1,2 +1,28 @@
+# Sample test files & test runs
+tests/
 test*/
+
+# Python & Pytest Caches
+__pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Generated Standalone Quiz Exports
+interactive_quiz*.html
+
+# OS & IDE Artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.antigravity/
+
+# Temporary & Log Files
+*.log
+*.tmp
