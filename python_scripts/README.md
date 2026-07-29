@@ -75,6 +75,10 @@ python 5_parse_questions_md.py "raw_text.md" -o "questions.json" \
 | `--page-map FILE` | JSON file from `2_extract_text_fitz.py --page-map` |
 | `--include-source-page` | Add `sourcePage` field to each question for debugging |
 
+**C. `8_proofread_llm.py` (Optional Post-Processing LLM Pass)**
+Optional pass to fix RTL chunk reversal, scrambled LTR/RTL parentheses (e.g. `(zoea)`), or option boundary artifacts in digital PDF extractions using Gemini 1.5 Flash or GPT-4o-mini.
+**Usage:** `python 8_proofread_llm.py "questions.json" -o "questions_clean.json" --api-key "sk-..."`
+
 ### 3. Scanned PDF Path (if Step 1 is Scanned)
 Use these scripts to render the PDF to images and extract text manually (via Vision LLMs or manual transcription).
 
@@ -88,12 +92,12 @@ Renders a PDF to PNG images per page.
 
 **A. `4_extract_csv_answers.py`**
 Extracts the correct answers for a specific exam form from the master student answers CSV or Excel export.
-The script scans for the row containing `שאלון` and handles the `3 (2) [15] {4}`-style cell format.
+The script scans for the row containing `שאלון` and handles the `3 (2) [15] {4}`-style cell format. Recommend using `encoding='utf-8-sig'` when reading CSV files to properly process Windows Byte Order Marks (BOM) in Hebrew CSVs.
 **Usage:** `python 4_extract_csv_answers.py "answers.xlsx" "76" -o "answers.json"`
 *(Where "76" is the test form number)*
 
 **B. `6_merge_json_answers.py`**
-Merges the extracted answers from the CSV with the raw questions JSON (which might just have `correctIndex: 0` placeholders) and updates the `correctIndex` accordingly.
+Merges the extracted answers from the CSV with the raw questions JSON and maps 1-based CSV selections (1, 2, 3, 4) to 0-based `correctIndex` values (0, 1, 2, 3) stored in `questions.json`.
 **Usage:** `python 6_merge_json_answers.py "questions.json" "answers.json" -o "final_questions.json"`
 
 ### 5. Quality Assurance

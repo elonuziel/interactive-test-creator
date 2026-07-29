@@ -85,6 +85,25 @@ For debugging, add `--include-source-page` to see which PDF page each question c
 
 ---
 
+## Step 2C: Optional Post-Processing Pass (LLM Proofreading)
+
+For digital PDFs where heuristic extraction produces minor text ordering artifacts, an optional LLM proofreader pass can be run on `questions.json` before merging answers:
+
+```bash
+python python_scripts/8_proofread_llm.py "questions.json" -o "questions_clean.json" --api-key "YOUR_GEMINI_API_KEY"
+```
+*(Or in the browser-based builder via `verifyTestWithGemini()`)*
+
+### Problem Addressed
+Heuristic extraction handles ~90–95% of digital Hebrew PDFs clean, but ~5–10% of questions suffer from PyMuPDF chunk reversal (e.g., reversed RTL phrases, scrambled LTR/RTL parentheses like `(zoea)`, or merged table cells).
+
+### Proposed Pipeline Addition
+- **Opt-in, Batch-Mode LLM Pass:** Uses Gemini 1.5 Flash or GPT-4o-mini to clean up extracted questions.
+- **Single-Prompt Processing:** Sends all extracted questions in a single prompt call to repair word order, fix reversed parentheses, and verify option boundaries while retaining strict JSON schema compliance.
+- **Verification:** Verification with `7_check_json.py` ensures data integrity before final quiz generation.
+
+---
+
 ## Step 2 Alternative: Extract Questions (Scanned PDF Path)
 If the PDF is scanned (or has heavily complex diagrams that break digital extraction), you must render it to images.
 
@@ -108,6 +127,7 @@ If it's a standard CSV, use the provided script:
 ```bash
 python python_scripts/4_extract_csv_answers.py "answers.csv" "FORM_NUMBER" -o "answers.json"
 ```
+* **CSV Encoding (`utf-8-sig`):** Recommend `encoding='utf-8-sig'` in Python scripts to properly handle Windows Byte Order Marks (BOM) in Hebrew CSV files.
 
 ### Scenario B: Tomamix / TTP Excel Exports (`.xls` or `.xlsx`)
 If the file is an Excel export from Tomamix, it often has the following quirks:
@@ -123,7 +143,9 @@ Merge the extracted `answers.json` into the `questions.json` to populate the `co
 ```bash
 python python_scripts/6_merge_json_answers.py "questions.json" "answers.json" -o "final_questions.json"
 ```
-*(Note: `correctIndex` in `questions.json` is 0-indexed, meaning Option 1 = 0, Option 2 = 1, etc.)*
+
+### Index Mapping Clarification
+Convert 1-based CSV correct answer selections (where Option 1 = `1`, Option 2 = `2`, Option 3 = `3`, Option 4 = `4`) to 0-based `correctIndex` stored in `questions.json` (where Option 1 = `0`, Option 2 = `1`, Option 3 = `2`, Option 4 = `3`). The `6_merge_json_answers.py` script performs this 1-based to 0-based index conversion automatically during the merge.
 
 ---
 
