@@ -1,6 +1,6 @@
 # Interactive Hebrew Quiz Generator
 
-> **Try it live:** [elonuziel.github.io/html-test-creator/quiz_generator.html](https://elonuziel.github.io/html-test-creator/quiz_generator.html)
+> **Try it live:** [elonuziel.github.io/interactive-test-creator/quiz_generator.html](https://elonuziel.github.io/interactive-test-creator/quiz_generator.html)
 
 Turn scanned Hebrew exam PDFs into interactive, self-grading quizzes — in your browser. Upload a PDF, let Gemini OCR extract the questions, attach an answer key, and export a standalone HTML quiz.
 
