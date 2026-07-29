@@ -46,7 +46,7 @@ Requirements:
 1. Extract every question with its full text in correct Hebrew reading order (do not reverse words or punctuation).
 2. Extract all options (usually 4 options: א, ב, ג, ד) for each question.
 3. Determine correctIndex (0-based integer) matching Form {form_number} from the answer key (if uploaded).
-4. Set "pageImage": "pages_output/page_X.png" ONLY if the question references or contains a diagram, graph, image, or table. Omit "pageImage" for text-only questions.
+4. For questions referencing or containing a diagram, graph, image, or table: set "pageImage": "pages_output/page_X.png" (replace X with the 1-based page number where the question appears, e.g., "pages_output/page_3.png"). Do NOT attempt to crop sub-images. Omit "pageImage" for text-only questions.
 5. Return ONLY a valid JSON array matching this exact schema:
 
 [

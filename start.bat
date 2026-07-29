@@ -524,17 +524,19 @@ echo   Would you like to open a Web AI service in your browser now?
 echo     [1] ChatGPT (chatgpt.com^)
 echo     [2] Gemini Web (gemini.google.com^)
 echo     [3] Claude (claude.ai^)
+echo     [4] Google AI Studio (aistudio.google.com^)
 echo     [N] No, I will paste manually
 echo.
-set /p WEB_CHOICE="   Your choice (1/2/3/n): "
+set /p WEB_CHOICE="   Your choice (1/2/3/4/n): "
 if "!WEB_CHOICE!"=="1" start https://chatgpt.com
 if "!WEB_CHOICE!"=="2" start https://gemini.google.com
 if "!WEB_CHOICE!"=="3" start https://claude.ai
+if "!WEB_CHOICE!"=="4" start https://aistudio.google.com
 echo.
-echo   INSTRUCTIONS FOR WEB AI:
-echo     1. Upload your PDF (and answer key CSV^) in the opened browser window.
+echo   INSTRUCTIONS FOR WEB AI / AI STUDIO:
+echo     1. Upload your exam PDF (or rendered images in !TEST_DIR!\pages_output\^).
 echo     2. Press Ctrl+V to paste the copied prompt.
-echo     3. Save the generated JSON to !TEST_DIR!\questions.json
+echo     3. Save the generated JSON response directly to: !TEST_DIR!\questions.json
 echo.
 goto :wait_for_questions
 

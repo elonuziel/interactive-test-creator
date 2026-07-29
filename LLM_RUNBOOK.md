@@ -57,7 +57,7 @@ Before saving the final `questions.json`, perform a proofreading audit using you
 1. **Audit Hebrew Word Order:** Ensure phrases are in correct logical order. Do not output reversed text.
 2. **Audit Mixed Language Terms:** Correct reversed parentheses or English terms inside Hebrew text.
 3. **Verify Option Boundaries:** Ensure each question has clean, non-truncated option strings.
-4. **Preserve Schema:** Ensure every question has `"question"`, `"options"`, `"correctIndex": 0`, and `"pageImage"`.
+4. **Preserve Schema:** Ensure every question has `"question"`, `"options"`, `"correctIndex": 0`, and optional `"pageImage"` (only for questions with diagrams/images/tables).
 
 ---
 
