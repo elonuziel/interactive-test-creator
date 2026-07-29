@@ -47,8 +47,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-for /f "tokens=*" %%v in ('python --version 2^>^&1') do set PYVER=%%v
-echo   !C_GREEN![OK]!C_RESET! Python Environment: %PYVER%
+for /f "tokens=*" %%v in ('python --version 2^>^&1') do set "PYVER=%%v"
+echo   !C_GREEN![OK]!C_RESET! Python Environment: !PYVER!
 
 set "MISSING_PKGS="
 python -c "import fitz" >nul 2>&1
@@ -147,8 +147,17 @@ set "ACTION=!ACTION: =!"
 
 if /i "!ACTION!"=="q" goto :end
 if /i "!ACTION!"=="n" goto :create_test
-if /i "!ACTION!"=="s" goto :start_server
 if /i "!ACTION!"=="b" goto :build_html
+if /i "!ACTION!"=="s" (
+    if !HAS_READY_TESTS!==1 (
+        goto :start_server
+    ) else (
+        echo.
+        echo  !C_YELLOW![!] No ready tests available yet. Create and process a test first.!C_RESET!
+        echo.
+        goto :get_action_choice
+    )
+)
 
 set "IS_NUMERIC=1"
 for /f "delims=0123456789" %%i in ("!ACTION!") do set "IS_NUMERIC=0"
@@ -311,8 +320,12 @@ if !HAS_ANSWERS!==0 (
     echo   !C_CYAN![i] NOTE: No answer key spreadsheet found.!C_RESET!
     echo       Questions will be extracted with placeholder answers until merged.
 )
-if !HAS_PDF!==1 echo   !C_GREEN![OK] PDF File Found: !PDF_NAME!!C_RESET!
-if !HAS_ANSWERS!==1 echo   !C_GREEN![OK] Answer Key Found: !ANSWERS_NAME!!C_RESET!
+if !HAS_PDF!==1 (
+    echo   !C_GREEN![OK] PDF File Found: !PDF_NAME!!C_RESET!
+)
+if !HAS_ANSWERS!==1 (
+    echo   !C_GREEN![OK] Answer Key Found: !ANSWERS_NAME!!C_RESET!
+)
 echo.
 
 :pre_processing_step
@@ -457,7 +470,8 @@ if not errorlevel 1 (
         echo   3. Once finished, return here and press any key to continue.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
         echo.
-        start "" cmd /k "cd /d "%~dp0" && type "!TEST_DIR!\prompt_local_agent.txt" | agy"
+        :: Pass TEST_DIR via %% (eager) so the child cmd process receives a literal path
+        start "" cmd /k "cd /d "%~dp0" && type "%TEST_DIR%\prompt_local_agent.txt" | agy"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
@@ -479,7 +493,8 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
         echo   3. Once finished, return here and press any key to continue.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
         echo.
-        start "" cmd /k "cd /d "%~dp0" && type "!TEST_DIR!\prompt_local_agent.txt" | gemini"
+        :: Pass TEST_DIR via %% (eager) so the child cmd process receives a literal path
+        start "" cmd /k "cd /d "%~dp0" && type "%TEST_DIR%\prompt_local_agent.txt" | gemini"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
@@ -501,7 +516,8 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
         echo   3. Once finished, return here and press any key to continue.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
         echo.
-        start "" cmd /k "cd /d "%~dp0" && type "!TEST_DIR!\prompt_local_agent.txt" | claude"
+        :: Pass TEST_DIR via %% (eager) so the child cmd process receives a literal path
+        start "" cmd /k "cd /d "%~dp0" && type "%TEST_DIR%\prompt_local_agent.txt" | claude"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
@@ -739,7 +755,7 @@ if exist "!OUTPUT_FILE!" (
 echo.
 echo   Press any key to return to main menu...
 pause >nul
-exit /b 0
+goto :select_test_step
 
 
 :build_html
@@ -782,7 +798,18 @@ goto :build_single
 
 
 :build_and_serve
-call :build_single
+:: Build the HTML first (inline — do not use call :build_single which would exit /b)
+echo.
+echo   !C_CYAN![i] Building standalone HTML quiz file...!C_RESET!
+set "OUTPUT_FILE=!TEST_DIR!\!TEST_NAME!_quiz.html"
+python python_scripts\9_build_single_html.py "!TEST_DIR!" -o "!OUTPUT_FILE!"
+if not exist "!OUTPUT_FILE!" (
+    echo   !C_RED![X] ERROR: HTML Build failed. Cannot start server.!C_RESET!
+    echo.
+    pause >nul
+    goto :select_test_step
+)
+echo   !C_GREEN![OK] HTML built. Starting server...!C_RESET!
 goto :start_server
 
 
