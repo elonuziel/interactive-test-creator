@@ -4,9 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const EMBEDDED_KEY = {
-        encryptedKeyB64: 'Jk71s+jMhwvQREzIhFB3OeeBOAHMTrX5tQn/PflNsFfZABcZEaoK1s0nONNDm8jFBi8VVp1RcRc6E0MA4t3PD4FCkL/b',
-        ivB64: 'Klg+fy9R79W9jMIz',
-        saltB64: 'DDyNzdsTLeWBGAnJIuT/Wg=='
+        encryptedKeyB64: 'Hv6PPzBzdBiwexOLNv2KF4vTQZCo0clZUyZNkw0zSWH/+pWkySSOJEZnv585nIoFtl/3ovyRf5vaaBE1GB2NOJKRHvyN',
+        ivB64: '/5FGe5eK7voMUlB/',
+        saltB64: '0FgJhVvq66HJ3YTs6XHn3Q=='
     };
 
     const GEMINI_CONFIG = {
