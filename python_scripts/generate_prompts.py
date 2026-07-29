@@ -31,7 +31,8 @@ Return ONLY the corrected JSON array ready to save as {test_dir}/questions.json.
         local_prompt = (
             f"Read the rendered pages in {test_dir}/pages_output/ and extract all multiple-choice "
             f"questions into {test_dir}/questions.json. For each question, extract the full text and all options. "
-            f"Set 'pageImage' to point to its source page (e.g. pages_output/page_3.png). "
+            f"Set 'pageImage' to point to its source page (e.g. pages_output/page_3.png) ONLY if the question "
+            f"references or contains a diagram, graph, image, or table. Omit 'pageImage' for text-only questions. "
             f"Do not worry about extracting answers or running other scripts (start.bat handles that)."
         )
 
@@ -45,7 +46,7 @@ Requirements:
 1. Extract every question with its full text in correct Hebrew reading order (do not reverse words or punctuation).
 2. Extract all options (usually 4 options: א, ב, ג, ד) for each question.
 3. Determine correctIndex (0-based integer) matching Form {form_number} from the answer key (if uploaded).
-4. Set "pageImage": "pages_output/page_X.png" pointing to the page image where the question appears (do not spend time cropping sub-images).
+4. Set "pageImage": "pages_output/page_X.png" ONLY if the question references or contains a diagram, graph, image, or table. Omit "pageImage" for text-only questions.
 5. Return ONLY a valid JSON array matching this exact schema:
 
 [

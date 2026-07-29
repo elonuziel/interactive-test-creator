@@ -25,6 +25,24 @@ def main():
     print(f"Total questions: {len(qs)}\n")
     errors = []
     warnings = []
+    
+    # ── Auto-clean pageImage from purely text-only questions ──────────────────
+    import re
+    IMAGE_KEYWORDS_RE = re.compile(
+        r'לפניכם|גרף|תרשים|תמונה|איור|מפה|ציור|דיאגרמה|צילום|טבלה|בטבלה|תרשים|scheme', re.IGNORECASE
+    )
+    cleaned_count = 0
+    for q in qs:
+        question_text = q.get('question', '')
+        if 'pageImage' in q:
+            if not q.get('image') and not IMAGE_KEYWORDS_RE.search(question_text):
+                del q['pageImage']
+                cleaned_count += 1
+
+    if cleaned_count > 0:
+        with open(args.json_file, 'w', encoding='utf-8') as f:
+            json.dump(qs, f, ensure_ascii=False, indent=2)
+        print(f"Cleaned pageImage field from {cleaned_count} text-only question(s).\n")
 
     for i, q in enumerate(qs):
         issues = []

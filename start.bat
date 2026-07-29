@@ -667,7 +667,10 @@ if exist "!OUTPUT_FILE!" (
 ) else (
     echo   ERROR: Build failed. Check the error messages above.
 )
-goto :end
+echo.
+echo   Press any key to return to the main menu...
+pause >nul
+goto :select_test_step
 
 
 :build_html
@@ -685,7 +688,10 @@ for /d %%d in (tests\*) do (
 )
 if !IDX!==0 (
     echo   No test folders with questions.json found.
-    goto :end
+    echo.
+    echo   Press any key to return to the main menu...
+    pause >nul
+    goto :select_test_step
 )
 echo.
 set /p BUILD_CHOICE="   Enter number: "
@@ -693,7 +699,10 @@ set "TEST_DIR=!TEST_OPTION_%BUILD_CHOICE%!"
 set "TEST_NAME=!TEST_OPTNAME_%BUILD_CHOICE%!"
 if "!TEST_DIR!"=="" (
     echo   ERROR: Invalid selection.
-    goto :end
+    echo.
+    echo   Press any key to return to the main menu...
+    pause >nul
+    goto :select_test_step
 )
 goto :build_single
 
@@ -713,7 +722,9 @@ echo   Opening http://localhost:8000/web/index.html
 echo.
 start http://localhost:8000/web/index.html
 python -m http.server 8000
-goto :end
+echo.
+echo   Server stopped. Returning to main menu...
+goto :select_test_step
 
 
 :: ===========================================================================
