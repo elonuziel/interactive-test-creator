@@ -37,20 +37,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install pymupdf pandas openpyxl pyinstaller
 
-      - name: Build Executable with PyInstaller
-        run: |
-          python cli-legacy/build_exe.py
-
-      - name: Upload Workflow Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: quiz_builder_exe
-          path: cli-legacy/dist/quiz_builder.exe
-          if-no-files-found: error
-
-      - name: Determine Release Tag
+      - name: Determine Release Tag & Version
         id: tag_name
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
         shell: bash
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
@@ -61,6 +49,17 @@ jobs:
             TAG="v1.0.${{ github.run_number }}"
           fi
           echo "TAG_NAME=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build Executable with PyInstaller & Embed Version
+        run: |
+          python cli-legacy/build_exe.py --version ${{ steps.tag_name.outputs.TAG_NAME }}
+
+      - name: Upload Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quiz_builder_exe
+          path: cli-legacy/dist/quiz_builder.exe
+          if-no-files-found: error
 
       - name: Create GitHub Release & Upload Executable Asset
         if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
