@@ -1,4 +1,4 @@
-test*/
+tests/
 _*/
 *.pyc
 __pycache__/
