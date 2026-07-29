@@ -17,9 +17,17 @@ import webbrowser
 import threading
 import time
 
-# Ensure UTF-8 output
+# Ensure UTF-8 output and enable Windows Virtual Terminal ANSI color mode
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
+
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except Exception:
+        os.system('')
 
 # PyMuPDF, pandas, openpyxl imports
 try:
