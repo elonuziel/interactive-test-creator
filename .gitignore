@@ -2,3 +2,4 @@ tests/
 _*/
 *.pyc
 __pycache__/
+.pytest_cache/
