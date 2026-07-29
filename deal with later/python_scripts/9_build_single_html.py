@@ -1,0 +1,241 @@
+"""
+9_build_single_html.py — Build a single self-contained HTML quiz file.
+
+Merges index.html, style.css, app.js, questions.json, and optionally images
+into one standalone HTML file that works by double-clicking (no server needed).
+
+Usage:
+    python 9_build_single_html.py tests/2019_a
+    python 9_build_single_html.py tests/2019_a -o "botany_2019a.html"
+    python 9_build_single_html.py tests/2019_a --no-images
+"""
+
+import argparse
+import base64
+import json
+import mimetypes
+import os
+import re
+import sys
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
+# Resolve paths relative to the repo root (parent of python_scripts/)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+WEB_DIR = os.path.join(REPO_ROOT, 'web')
+
+
+def read_file(path, encoding='utf-8'):
+    """Read and return file contents as a string."""
+    with open(path, 'r', encoding=encoding) as f:
+        return f.read()
+
+
+def read_binary(path):
+    """Read and return file contents as bytes."""
+    with open(path, 'rb') as f:
+        return f.read()
+
+
+def image_to_data_uri(image_path):
+    """Convert an image file to a base64 data URI."""
+    mime_type, _ = mimetypes.guess_type(image_path)
+    if not mime_type:
+        mime_type = 'image/png'
+    data = read_binary(image_path)
+    b64 = base64.b64encode(data).decode('ascii')
+    return f"data:{mime_type};base64,{b64}"
+
+
+def process_questions(questions, test_dir, embed_images=True):
+    """
+    Process questions.json: optionally convert image paths to data URIs.
+    Returns the processed questions list and total image bytes embedded.
+    """
+    total_img_bytes = 0
+
+    for q in questions:
+        for field in ('image', 'pageImage'):
+            img_path = q.get(field)
+            if not img_path:
+                continue
+
+            if embed_images:
+                # Resolve relative to the test directory
+                abs_path = os.path.join(test_dir, img_path)
+                if os.path.isfile(abs_path):
+                    total_img_bytes += os.path.getsize(abs_path)
+                    q[field] = image_to_data_uri(abs_path)
+                else:
+                    print(f"  Warning: image not found: {abs_path}")
+            else:
+                # Strip image fields when --no-images is used
+                q[field] = None
+
+    # Clean up None values
+    for q in questions:
+        for field in ('image', 'pageImage'):
+            if q.get(field) is None and field in q:
+                del q[field]
+
+    return questions, total_img_bytes
+
+
+def build_html(test_dir, embed_images=True, title=None):
+    """Build a self-contained HTML string from the web app + test data."""
+
+    # ── Read source files ──────────────────────────────────────────────────
+    html_path = os.path.join(WEB_DIR, 'index.html')
+    css_path = os.path.join(WEB_DIR, 'style.css')
+    js_path = os.path.join(WEB_DIR, 'app.js')
+    questions_path = os.path.join(test_dir, 'questions.json')
+
+    if not os.path.isfile(questions_path):
+        raise FileNotFoundError(f"questions.json not found in {test_dir}")
+
+    html = read_file(html_path)
+    css = read_file(css_path)
+    js = read_file(js_path)
+
+    with open(questions_path, 'r', encoding='utf-8') as f:
+        questions = json.load(f)
+
+    # ── Process images ─────────────────────────────────────────────────────
+    questions, img_bytes = process_questions(questions, test_dir, embed_images)
+
+    # ── Build the embedded questions script ────────────────────────────────
+    questions_json = json.dumps(questions, ensure_ascii=False, indent=None)
+    embedded_script = f"<script>window.__EMBEDDED_QUESTIONS = {questions_json};</script>"
+
+    # ── Update title if provided ───────────────────────────────────────────
+    if title:
+        # Strip any </title> sequences that would break the HTML structure
+        safe_title = title.replace('</title>', '').replace('</TITLE>', '')
+        html = re.sub(
+            r'<title>.*?</title>',
+            f'<title>{safe_title}</title>',
+            html
+        )
+
+    # ── Inline CSS: replace <link rel="stylesheet" href="style.css"> ──────
+    html = re.sub(
+        r'<link\s+rel="stylesheet"\s+href="style\.css"\s*/?>',
+        lambda _: f'<style>\n{css}\n</style>',
+        html
+    )
+
+    # ── Inline Cropper.js CSS and JS for offline use ─────────────────────
+    cropper_css_path = os.path.join(WEB_DIR, 'cropper.min.css')
+    cropper_js_path = os.path.join(WEB_DIR, 'cropper.min.js')
+
+    cropper_css = read_file(cropper_css_path) if os.path.isfile(cropper_css_path) else ''
+    cropper_js = read_file(cropper_js_path) if os.path.isfile(cropper_js_path) else ''
+
+    if cropper_css:
+        html = re.sub(
+            r'<link\s+href="[^"]*cropperjs[^"]*"\s+rel="stylesheet"\s*/?>',
+            lambda _: f'<style>\n{cropper_css}\n</style>',
+            html
+        )
+    if cropper_js:
+        html = re.sub(
+            r'<script\s+src="[^"]*cropperjs[^"]*">\s*</script>',
+            lambda _: f'<script>\n{cropper_js}\n</script>',
+            html
+        )
+
+    # ── Inline JS: replace <script src="app.js"></script> ──────────────────
+    html = re.sub(
+        r'<script\s+src="app\.js">\s*</script>',
+        lambda _: f'{embedded_script}\n<script>\n{js}\n</script>',
+        html
+    )
+
+    # ── Remove menu screen elements (single-test file) ─────────────────────
+    # Hide menu screen and error back-to-menu via CSS
+    single_test_css = "<style>#menu-screen, #back-to-menu-btn { display: none !important; }</style>"
+    html = html.replace('</head>', f'{single_test_css}\n</head>')
+
+    # ── Make the setup screen active by default ────────────────────────────
+    # The original HTML has setup-screen as active, which is correct
+
+    return html, len(questions), img_bytes
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Build a single self-contained HTML quiz file. "
+                    "Double-click to open — no server needed."
+    )
+    parser.add_argument(
+        'test_dir',
+        help="Path to the test directory containing questions.json "
+             "(e.g. tests/2019_a)"
+    )
+    parser.add_argument(
+        '-o', '--output', default=None,
+        help="Output HTML file path (default: <test_name>_quiz.html)"
+    )
+    parser.add_argument(
+        '--no-images', action='store_true',
+        help="Skip embedding images (reduces file size)"
+    )
+    parser.add_argument(
+        '--title', default=None,
+        help="Custom title for the HTML page"
+    )
+
+    args = parser.parse_args()
+
+    test_dir = args.test_dir
+    if not os.path.isdir(test_dir):
+        print(f"Error: test directory not found: {test_dir}")
+        return 1
+
+    # Derive output filename from test directory name
+    test_name = os.path.basename(os.path.normpath(test_dir))
+    output_path = args.output or f"{test_name}_quiz.html"
+
+    print(f"Building single-file quiz from: {test_dir}")
+    print(f"  Embedding images: {'No' if args.no_images else 'Yes'}")
+
+    try:
+        html, q_count, img_bytes = build_html(
+            test_dir,
+            embed_images=not args.no_images,
+            title=args.title
+        )
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        return 1
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    file_size = os.path.getsize(output_path)
+    size_str = format_size(file_size)
+    img_str = format_size(img_bytes) if img_bytes else "0 B"
+
+    print(f"\n✓ Built successfully: {output_path}")
+    print(f"  Questions: {q_count}")
+    print(f"  Images embedded: {img_str}")
+    print(f"  Total file size: {size_str}")
+    print(f"\n  Double-click the file to open the quiz!")
+
+    return 0
+
+
+def format_size(size_bytes):
+    """Format bytes into a human-readable string."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

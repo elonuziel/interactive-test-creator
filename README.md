@@ -1,131 +1,65 @@
-# 📝 Interactive Hebrew Quiz Creator & Player (`html-test-creator`)
+# Interactive Hebrew Quiz Generator
 
-A modern, end-to-end framework and wizard for transforming Hebrew exam PDFs (digital or scanned) and answer key spreadsheets into fully interactive, RTL-optimized web quizzes and portable single-file HTML applications.
+> **Try it live:** [elonuziel.github.io/interactive-test-creator/quiz_generator.html](https://elonuziel.github.io/interactive-test-creator/quiz_generator.html)
 
----
+Turn scanned Hebrew exam PDFs into interactive, self-grading quizzes — in your browser. Upload a PDF, let Gemini OCR extract the questions, attach an answer key, and export a standalone HTML quiz.
 
-## 🌟 Key Features
+## 🎯 Quiz Generator
 
-### 📱 Premium RTL Interactive Web Quiz (`web/`)
-The web application (`web/index.html`, `web/app.js`, `style.css` in `web/`) offers a responsive and accessible quiz interface:
-- **Native RTL & Hebrew Support**: Built specifically for Hebrew text formatting and right-to-left layout.
-- **Built-in Image Cropper & Viewer**: Powered by Cropper.js (`web/cropper.min.js`), allowing users to view and crop diagrams, tables, and graphs embedded in full-page exam scans directly inside questions.
-- **Immediate Feedback Mode**: Toggle optional instant answer checking.
-- **Keyboard Shortcuts**:
-  - `1` – `4`: Select answer options.
-  - `←` / `→`: Navigate between questions.
-  - `Esc`: Close image viewer/cropper modal.
-- **Progress Tracking & Jump Bar**: Real-time progress bar with visual question status indicators and quick-jump navigation.
-- **Dynamic Shuffling & Auto-Save**: Randomize question choices per run and save test state automatically to `LocalStorage` (scoped per test).
-- **Rich Review Screen**: Detailed score breakdown with filters for **All**, **Wrong Only**, or **Unanswered** questions.
-- **Dark & Light Themes**: Responsive toggle for visual comfort.
+**`quiz_generator.html`** + **`generator.js`** — the builder UI.
 
----
+### Workflow
+1. Upload a **PDF** (digital or scanned)
+2. (Optional) Upload an **answer key** — CSV, XLS, or XLSX — with a form number
+3. Enter a **Gemini API key** (free from [Google AI Studio](https://aistudio.google.com/apikey))
+4. Click **הפעל ניתוח** — Gemini extracts and parses all questions
+5. Edit questions, answers, and correct choices in the preview
+6. Click **הורד מבחן עצמאי** to download, or **פתור מבחן כעת** to take it immediately
 
-### 🧙 Interactive CLI Wizard (`start.bat`)
-A step-by-step Windows wizard (`start.bat`) that automates:
-1. Environment & package prerequisite verification (`pymupdf`, `pandas`, `openpyxl`).
-2. Test folder creation and raw PDF / answer key drop-folder setup.
-3. PDF type detection & page image rendering for Vision LLM extraction.
-4. Automatic answer key merging, schema QA validation (`7_check_json.py`), and test manifest updates (`8_generate_manifest.py`).
-5. Building portable single-file HTML apps or starting local web servers.
+### Generator Features
+- **OCR engines** — Gemini chunked (default, best for Hebrew) or Gemini native PDF
+- **Answer key formats** — CSV, XLS, XLSX with automatic form-number matching
+- **Proof mode** — view the original PDF page alongside each question
+- **Add/remove answers** — adjust option counts per question in the editor
+- **Image detection** — charts, graphs, tables auto-attach page images for cropping
+- **Re-edit existing quizzes** — upload a previously downloaded quiz HTML to continue editing
+- **File clear buttons** — remove uploaded files without refreshing
 
----
+### API Keys
+| Type | Prefix | How to get |
+|---|---|---|
+| Gemini (free) | `AIza...` | [Google AI Studio](https://aistudio.google.com/apikey) |
+| Gemini (Cloud) | `AQ...` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
 
-### 📦 Portable Single-File HTML Exporter
-Build completely **self-contained HTML files** for any test that run by double-clicking without needing a web server or backend:
-```bash
-python python_scripts/9_build_single_html.py tests/2022_moed_a -o "botany_2022a.html"
+Free tier tip: the generator sends all pages in one request to stay within rate limits.
+
+## 📝 Quiz Taker
+
+**`index.html`** + **`app.js`** + **`style.css`** — the standalone quiz player.
+
+### Features
+- **RTL Hebrew** — full right-to-left support
+- **Keyboard navigation** — `1`–`9` to select, `←` `→` to navigate, `Esc` to close zoom
+- **Immediate feedback** — optional toggle to check answers as you go
+- **Progress tracking** — progress bar + question jump bar
+- **Auto-save & resume** — localStorage persistence
+- **Review mode** — after submitting, click any question to jump back and review, or use the **חזרה לשאלות** button
+- **Image zoom & crop** — zoom into attached images, crop to focus on specific areas
+- **Dark/light theme** — toggle in the header
+- **Answer shuffle** — options randomized per session
+
+## 🗂️ Project Structure
+
 ```
-Inlines CSS, JS, question data, and images (as base64 data URIs) into a single portable `.html` file suitable for offline distribution, email, or messaging apps.
-
----
-
-### 🤖 LLM & Vision Extraction Workflow
-Designed for AI agents (such as Antigravity, Gemini, ChatGPT, Claude) to extract questions from scanned or digital exam PDFs:
-- **[LLM Runbook](LLM_RUNBOOK.md)**: Detailed instructions and schema for AI agents processing exam page scans.
-- **[Prompt Generator](python_scripts/generate_prompts.py)**: Helper script to generate standardized LLM extraction prompts.
-
----
-
-## 📁 Repository Structure
-
+quiz_generator.html   — Builder UI
+generator.js          — PDF extraction, OCR, parsing, export logic
+index.html            — Quiz taker shell
+app.js                — Quiz player logic (navigation, scoring, review)
+style.css             — Shared styles (RTL, dark mode, responsive)
+vendor/pdfjs/         — PDF.js for in-browser PDF rendering
+tests/                — Sample exam PDFs and answer keys
 ```
-html-test-creator/
-├── start.bat                  # Interactive Windows wizard CLI
-├── LLM_RUNBOOK.md             # AI Agent instructions for PDF extraction
-├── README.md                  # Main project documentation
-├── web/                       # Interactive Web Quiz App
-│   ├── index.html             # Main quiz HTML structure
-│   ├── app.js                 # Quiz logic, navigation, cropper & state
-│   ├── style.css              # Custom styling & dark mode system
-│   ├── cropper.min.js         # Image cropper library
-│   └── cropper.min.css        # Image cropper stylesheet
-├── python_scripts/            # Pipeline utility scripts
-│   ├── 1_detect_pdf_type.py   # PDF text vs scan detector
-│   ├── 2_extract_text_fitz.py # Text & image extraction via PyMuPDF
-│   ├── 3_render_pdf_pages.py  # Render PDF pages to PNG for LLMs
-│   ├── 4_extract_csv_answers.py# Extract answer keys from CSV/XLSX
-│   ├── 5_parse_questions_md.py# Heuristic Markdown question parser
-│   ├── 6_merge_json_answers.py# Merge answer keys with questions JSON
-│   ├── 7_check_json.py        # QA validator for question JSON schema
-│   ├── 8_generate_manifest.py # Auto-generate tests menu manifest
-│   ├── 9_build_single_html.py # Pack single-file standalone HTML quiz
-│   ├── generate_prompts.py    # Generate LLM extraction prompts
-│   └── README.md              # Documentation for Python scripts
-├── servers/                   # Local web server launchers
-│   ├── run_server.bat         # Windows Python HTTP server runner
-│   └── run_server.sh          # Linux/macOS Python HTTP server runner
-├── tests/                     # Test drop folders (ignored by git)
-│   └── manifest.json          # Auto-generated menu index of available tests
-└── tests_py/                  # Pytest test suite for Python pipeline
-```
-
----
-
-## 🚀 Quick Start
-
-### 1. Using the Interactive Wizard (Windows)
-Double-click `start.bat` or run from terminal:
-```cmd
-start.bat
-```
-Follow the interactive prompts to set up test folders, render pages for LLM processing, validate JSON outputs, build standalone HTML files, or launch the web player.
-
-### 2. Manual Workflow & Test Creation
-1. **Create a Test Folder**: Place raw source files under `tests/` (e.g. `tests/botany_2024_a/`):
-   - Exam PDF: `tests/botany_2024_a/exam.pdf`
-   - Answer key spreadsheet: `tests/botany_2024_a/answers.csv` or `answers.xlsx`
-2. **Process PDF & Extract Questions**:
-   - Follow [LLM_RUNBOOK.md](LLM_RUNBOOK.md) for Vision LLMs or check [python_scripts/README.md](python_scripts/README.md) for script usages (`1_detect_pdf_type.py` through `6_merge_json_answers.py`).
-3. **Validate & Update Manifest**:
-   ```bash
-   python python_scripts/7_check_json.py tests/botany_2024_a/questions.json
-   python python_scripts/8_generate_manifest.py
-   ```
-4. **Launch Local Web App**:
-   ```bash
-   # On Windows:
-   servers\run_server.bat
-   # On Linux/macOS:
-   bash servers/run_server.sh
-   ```
-   Open `http://localhost:8000` in your browser.
-
----
-
-## 🧪 Testing
-
-Run the Python pytest suite covering question parsing, answer merging, and QA validations:
-
-```bash
-pip install pytest
-pytest tests_py/ -v
-```
-
----
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
+MIT — see [LICENSE](LICENSE).
