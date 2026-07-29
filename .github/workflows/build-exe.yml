@@ -1,13 +1,26 @@
-name: Build Standalone Executable
+name: Build & Release Quiz Builder Executable
 
 on:
   push:
     branches: [ main, feat/exe-builder ]
     tags: [ 'v*' ]
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release Version Tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+      create_release:
+        description: 'Publish a GitHub Release with quiz_builder.exe'
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: write
 
 jobs:
-  build-exe:
+  build-and-release:
     runs-on: windows-latest
 
     steps:
@@ -28,9 +41,42 @@ jobs:
         run: |
           python cli-legacy/build_exe.py
 
-      - name: Upload Executable Artifact
+      - name: Upload Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: quiz_builder_exe
           path: cli-legacy/dist/quiz_builder.exe
           if-no-files-found: error
+
+      - name: Determine Release Tag
+        id: tag_name
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [ -n "${{ inputs.release_version }}" ]; then
+            TAG="${{ inputs.release_version }}"
+          else
+            TAG="v1.0.${{ github.run_number }}"
+          fi
+          echo "TAG_NAME=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release & Upload Executable Asset
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+          name: Interactive Quiz Builder ${{ steps.tag_name.outputs.TAG_NAME }}
+          body: |
+            ## 🚀 Interactive Quiz Builder Standalone Executable
+            
+            Download `quiz_builder.exe` below to run the Quiz Builder and Local HTTP Server offline on Windows with **zero dependencies**.
+            
+            - **No Python required**
+            - **Automatic local server & default browser launching**
+            - **Full PDF extraction & standalone HTML quiz exporting**
+          files: |
+            cli-legacy/dist/quiz_builder.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
