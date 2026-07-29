@@ -37,15 +37,7 @@ echo  !C_BOLD![Step 1/6] Checking Prerequisites...!C_RESET!
 echo  !C_GRAY!---------------------------------------------------------------------------!C_RESET!
 
 python --version >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo  !C_RED!!C_BOLD![X] ERROR: Python is not installed or not in your system PATH.!C_RESET!
-    echo      Please install Python from https://python.org
-    echo      Be sure to check "Add Python to PATH" during installation.
-    echo.
-    pause
-    exit /b 1
-)
+if errorlevel 1 goto :no_python
 
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do set "PYVER=%%v"
 echo   !C_GREEN![OK]!C_RESET! Python Environment: !PYVER!
@@ -60,30 +52,44 @@ if errorlevel 1 set "MISSING_PKGS=!MISSING_PKGS! pandas"
 python -c "import openpyxl" >nul 2>&1
 if errorlevel 1 set "MISSING_PKGS=!MISSING_PKGS! openpyxl"
 
-if not "!MISSING_PKGS!"=="" (
-    echo.
-    echo   !C_YELLOW![!] NOTICE: Missing required Python packages:!MISSING_PKGS!!C_RESET!
-    echo.
-    set /p INSTALL_CHOICE="   !C_CYAN![?] Install missing packages now? (Y/n): !C_RESET!"
-    if /i "!INSTALL_CHOICE!"=="n" (
-        echo.
-        echo   !C_YELLOW![!] Skipping package installation. Note: Some pipeline steps may fail.!C_RESET!
-    ) else (
-        echo.
-        echo   !C_CYAN![i] Installing dependencies...!C_RESET!
-        pip install !MISSING_PKGS! --quiet
-        if errorlevel 1 (
-            echo   !C_RED![!] WARNING: Automatic package installation failed.!C_RESET!
-            echo       Please manually run: pip install!MISSING_PKGS!
-        ) else (
-            echo   !C_GREEN![OK] All required packages installed successfully!!C_RESET!
-        )
-    )
-) else (
+if not defined MISSING_PKGS (
     echo   !C_GREEN![OK]!C_RESET! Python Packages: All required libraries are ready
+    echo.
+    goto :select_test_step
 )
 
 echo.
+echo   !C_YELLOW![!] NOTICE: Missing required Python packages:!MISSING_PKGS!!C_RESET!
+echo.
+set /p INSTALL_CHOICE="   [?] Install missing packages now? (Y/n): "
+if /i "!INSTALL_CHOICE!"=="n" (
+    echo.
+    echo   !C_YELLOW![!] Skipping package installation. Note: Some pipeline steps may fail.!C_RESET!
+    echo.
+    goto :select_test_step
+)
+
+echo.
+echo   !C_CYAN![i] Installing dependencies...!C_RESET!
+pip install !MISSING_PKGS! --quiet
+if errorlevel 1 (
+    echo   !C_RED![!] WARNING: Automatic package installation failed.!C_RESET!
+    echo       Please manually run: pip install!MISSING_PKGS!
+) else (
+    echo   !C_GREEN![OK] All required packages installed successfully!!C_RESET!
+)
+echo.
+goto :select_test_step
+
+:no_python
+echo.
+echo  !C_RED!!C_BOLD![X] ERROR: Python is not installed or not in your system PATH.!C_RESET!
+echo      Please install Python from https://python.org
+echo      Be sure to check "Add Python to PATH" during installation.
+echo.
+pause
+exit /b 1
+
 
 :: ---------------------------------------------------------------------------
 :: STEP 2: Select or Create Test Folder
@@ -140,7 +146,7 @@ echo.
 
 :get_action_choice
 set "ACTION="
-set /p ACTION="   !C_CYAN![?] Your choice > !C_RESET!"
+set /p ACTION="   [?] Your choice: "
 
 if "!ACTION!"=="" goto :invalid_choice
 set "ACTION=!ACTION: =!"
@@ -148,51 +154,49 @@ set "ACTION=!ACTION: =!"
 if /i "!ACTION!"=="q" goto :end
 if /i "!ACTION!"=="n" goto :create_test
 if /i "!ACTION!"=="b" goto :build_html
-if /i "!ACTION!"=="s" (
-    if !HAS_READY_TESTS!==1 (
-        goto :start_server
-    ) else (
-        echo.
-        echo  !C_YELLOW![!] No ready tests available yet. Create and process a test first.!C_RESET!
-        echo.
-        goto :get_action_choice
-    )
-)
+if /i "!ACTION!"=="s" goto :handle_start_server_choice
 
 set "IS_NUMERIC=1"
 for /f "delims=0123456789" %%i in ("!ACTION!") do set "IS_NUMERIC=0"
 
-if !IS_NUMERIC!==1 (
-    if !ACTION! GEQ 1 if !ACTION! LEQ !TEST_COUNT! (
-        for %%a in (!ACTION!) do (
-            set "TEST_DIR=!TEST_OPT_PATH_%%a!"
-            set "TEST_NAME=!TEST_OPT_NAME_%%a!"
-            set "IS_READY=!TEST_OPT_READY_%%a!"
-        )
-        
-        echo.
-        echo   Workspace Selected: !C_BOLD!!TEST_NAME!!C_RESET!
-        if !IS_READY!==1 (
-            echo   Status: !C_GREEN!READY (questions.json present)!C_RESET!
-            echo.
-            echo   Select an action for !TEST_NAME!:
-            echo     [1] Build standalone HTML quiz file
-            echo     [2] Re-process with AI agent ^(re-extract / proofread^)
-            echo     [B] Back to main menu
-            echo.
-            set "EXISTING_CHOICE="
-            set /p EXISTING_CHOICE="   !C_CYAN![?] Your choice (1/2/B) [Default: 1]: !C_RESET!"
-            if defined EXISTING_CHOICE set "EXISTING_CHOICE=!EXISTING_CHOICE: =!"
-            if "!EXISTING_CHOICE!"=="1" goto :build_single
-            if "!EXISTING_CHOICE!"=="2" goto :drop_files_check
-            if /i "!EXISTING_CHOICE!"=="b" goto :select_test_step
-            goto :build_single
-        ) else (
-            echo   Status: !C_YELLOW!PENDING (requires processing)!C_RESET!
-            goto :drop_files_check
-        )
-    )
+if !IS_NUMERIC!==0 goto :invalid_choice
+if !ACTION! LSS 1 goto :invalid_choice
+if !ACTION! GTR !TEST_COUNT! goto :invalid_choice
+
+for %%a in (!ACTION!) do (
+    set "TEST_DIR=!TEST_OPT_PATH_%%a!"
+    set "TEST_NAME=!TEST_OPT_NAME_%%a!"
+    set "IS_READY=!TEST_OPT_READY_%%a!"
 )
+
+echo.
+echo   Workspace Selected: !C_BOLD!!TEST_NAME!!C_RESET!
+if !IS_READY!==1 goto :selected_ready_test
+
+echo   Status: !C_YELLOW!PENDING (requires processing)!C_RESET!
+goto :drop_files_check
+
+:selected_ready_test
+echo   Status: !C_GREEN!READY (questions.json present)!C_RESET!
+echo.
+echo   Select an action for !TEST_NAME!:
+echo     [1] Build standalone HTML quiz file
+echo     [2] Re-process with AI agent ^(re-extract / proofread^)
+echo     [B] Back to main menu
+echo.
+set "EXISTING_CHOICE="
+set /p EXISTING_CHOICE="   [?] Your choice (1/2/B) [Default: 1]: "
+if defined EXISTING_CHOICE set "EXISTING_CHOICE=!EXISTING_CHOICE: =!"
+if "!EXISTING_CHOICE!"=="2" goto :drop_files_check
+if /i "!EXISTING_CHOICE!"=="b" goto :select_test_step
+goto :build_single
+
+:handle_start_server_choice
+if !HAS_READY_TESTS!==1 goto :start_server
+echo.
+echo  !C_YELLOW![!] No ready tests available yet. Create and process a test first.!C_RESET!
+echo.
+goto :get_action_choice
 
 :invalid_choice
 echo.
@@ -217,28 +221,29 @@ echo.
 echo   Enter a short identifier name for your test folder.
 echo   Examples: 2024_moed_a, botany_final, bio_exam_3
 echo.
-set /p TEST_NAME="   !C_CYAN![?] Test workspace name [Default: test_1]: !C_RESET!"
+set /p TEST_NAME="   [?] Test workspace name [Default: test_1]: "
 
-if "!TEST_NAME!"=="" (
-    set "TEST_NAME=test_1"
-)
+if "!TEST_NAME!"=="" set "TEST_NAME=test_1"
 
 set "TEST_NAME=!TEST_NAME: =_!"
 set "TEST_DIR=tests\!TEST_NAME!"
 
-if exist "!TEST_DIR!" (
-    echo.
-    echo   !C_CYAN![i] NOTE: Folder !TEST_DIR! already exists.!C_RESET!
-    if exist "!TEST_DIR!\questions.json" (
-        echo   !C_GREEN![OK] questions.json already present. Proceeding to build options.!C_RESET!
-        goto :post_process
-    )
-    echo   !C_CYAN![i] Continuing with existing folder...!C_RESET!
-) else (
-    mkdir "!TEST_DIR!"
-    echo.
-    echo   !C_GREEN![OK] Workspace directory created: !TEST_DIR!\!C_RESET!
+if not exist "!TEST_DIR!" goto :make_new_test_dir
+
+echo.
+echo   !C_CYAN![i] NOTE: Folder !TEST_DIR! already exists.!C_RESET!
+if exist "!TEST_DIR!\questions.json" (
+    echo   !C_GREEN![OK] questions.json already present. Proceeding to build options.!C_RESET!
+    goto :post_process
 )
+echo   !C_CYAN![i] Continuing with existing folder...!C_RESET!
+goto :drop_files_check
+
+:make_new_test_dir
+mkdir "!TEST_DIR!"
+echo.
+echo   !C_GREEN![OK] Workspace directory created: !TEST_DIR!\!C_RESET!
+
 
 :: ---------------------------------------------------------------------------
 :: Check for Source Files (PDF / Answer Key)
@@ -253,30 +258,15 @@ set "PDF_COUNT=0"
 
 for %%f in ("!TEST_DIR!\*.pdf") do (
     set /a PDF_COUNT+=1
-    set "HAS_PDF=1" & set "PDF_NAME=%%~nxf" & set "PDF_FULL_PATH=%%~ff"
+    set "HAS_PDF=1"
+    set "PDF_NAME=%%~nxf"
+    set "PDF_FULL_PATH=%%~ff"
 )
 for %%f in ("!TEST_DIR!\*.csv") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 for %%f in ("!TEST_DIR!\*.xlsx") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 for %%f in ("!TEST_DIR!\*.xls") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 
-if !HAS_PDF!==1 (
-    echo.
-    if !PDF_COUNT! GTR 1 (
-        echo   !C_YELLOW![!] WARNING: Multiple PDF files found in !TEST_DIR! ^(!PDF_COUNT! files^). Using: !PDF_NAME!!C_RESET!
-        echo       Remove extra PDFs if this is not the desired exam file.
-    ) else (
-        echo   !C_GREEN![OK] PDF File Detected: !PDF_NAME!!C_RESET!
-    )
-    if !HAS_ANSWERS!==1 (
-        echo   !C_GREEN![OK] Answer Key Detected: !ANSWERS_NAME!!C_RESET!
-    ) else (
-        echo   !C_CYAN![i] NOTE: No answer key file ^(CSV/Excel^) detected in workspace.!C_RESET!
-    )
-    echo.
-    echo   !C_CYAN![i] Proceeding to document pre-processing...!C_RESET!
-    echo.
-    goto :pre_processing_step
-)
+if !HAS_PDF!==1 goto :pdf_found_already
 
 echo.
 echo !C_YELLOW!!C_BOLD!===========================================================================!C_RESET!
@@ -306,7 +296,9 @@ set "PDF_COUNT=0"
 
 for %%f in ("!TEST_DIR!\*.pdf") do (
     set /a PDF_COUNT+=1
-    set "HAS_PDF=1" & set "PDF_NAME=%%~nxf" & set "PDF_FULL_PATH=%%~ff"
+    set "HAS_PDF=1"
+    set "PDF_NAME=%%~nxf"
+    set "PDF_FULL_PATH=%%~ff"
 )
 for %%f in ("!TEST_DIR!\*.csv") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 for %%f in ("!TEST_DIR!\*.xlsx") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
@@ -327,6 +319,25 @@ if !HAS_ANSWERS!==1 (
     echo   !C_GREEN![OK] Answer Key Found: !ANSWERS_NAME!!C_RESET!
 )
 echo.
+goto :pre_processing_step
+
+:pdf_found_already
+echo.
+if !PDF_COUNT! GTR 1 (
+    echo   !C_YELLOW![!] WARNING: Multiple PDF files found in !TEST_DIR! ^(!PDF_COUNT! files^). Using: !PDF_NAME!!C_RESET!
+    echo       Remove extra PDFs if this is not the desired exam file.
+) else (
+    echo   !C_GREEN![OK] PDF File Detected: !PDF_NAME!!C_RESET!
+)
+if !HAS_ANSWERS!==1 (
+    echo   !C_GREEN![OK] Answer Key Detected: !ANSWERS_NAME!!C_RESET!
+) else (
+    echo   !C_CYAN![i] NOTE: No answer key file ^(CSV/Excel^) detected in workspace.!C_RESET!
+)
+echo.
+echo   !C_CYAN![i] Proceeding to document pre-processing...!C_RESET!
+echo.
+
 
 :pre_processing_step
 :: ---------------------------------------------------------------------------
@@ -337,87 +348,93 @@ echo  !C_GRAY!------------------------------------------------------------------
 echo.
 
 set "IS_DIGITAL=0"
-if !HAS_PDF!==1 (
-    echo   [1/2] Analyzing PDF format ^(Digital vs Scanned^)...
-    python python_scripts\1_detect_pdf_type.py "!PDF_FULL_PATH!" > "!TEST_DIR!\pdf_type_result.txt"
-    type "!TEST_DIR!\pdf_type_result.txt"
-    
-    findstr /C:"DIGITAL PDF detected" "!TEST_DIR!\pdf_type_result.txt" >nul
-    if not errorlevel 1 set "IS_DIGITAL=1"
+if !HAS_PDF!==0 goto :skip_pdf_type_check
+
+echo   [1/2] Analyzing PDF format ^(Digital vs Scanned^)...
+python python_scripts\1_detect_pdf_type.py "!PDF_FULL_PATH!" > "!TEST_DIR!\pdf_type_result.txt"
+type "!TEST_DIR!\pdf_type_result.txt"
+
+findstr /C:"DIGITAL PDF detected" "!TEST_DIR!\pdf_type_result.txt" >nul
+if not errorlevel 1 set "IS_DIGITAL=1"
+echo.
+
+:skip_pdf_type_check
+if !HAS_ANSWERS!==1 goto :setup_has_answers
+goto :setup_no_answers
+
+:setup_has_answers
+echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
+echo !C_CYAN!!C_BOLD!   [2/2] ANSWER KEY FORM SETUP!C_RESET!
+echo   Enter the Form Number corresponding to this answer key.
+echo   ^(e.g., 32, 76, 1, 0^). Refer to your PDF title page if unsure.
+echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
+set "FORM_NUMBER="
+set /p FORM_NUMBER="   [?] Form Number [Default: 1]: "
+if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
+echo.
+echo   !C_CYAN![i] Extracting answers for Form !FORM_NUMBER!...!C_RESET!
+python python_scripts\4_extract_csv_answers.py "!TEST_DIR!\!ANSWERS_NAME!" "!FORM_NUMBER!" -o "!TEST_DIR!\answers.json"
+echo.
+goto :form_number_done
+
+:setup_no_answers
+echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
+echo !C_CYAN!!C_BOLD!   [2/2] FORM NUMBER SETUP ^(No answer spreadsheet found^)!C_RESET!
+echo   Is this Form 0 ^(Master Exam where option 1/א is always the answer^)?
+echo   - Enter '0' to auto-generate Form Zero answer key
+echo   - Enter Form Number ^(e.g., 1, 32^) if adding answers manually later
+echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
+set "FORM_NUMBER="
+set /p FORM_NUMBER="   [?] Form Number [Default: 0 for Form Zero]: "
+if "!FORM_NUMBER!"=="" set "FORM_NUMBER=0"
+
+if "!FORM_NUMBER!"=="0" (
     echo.
+    echo   !C_GREEN![OK] Form 0 selected! Auto-generating baseline answer key...!C_RESET!
+    python python_scripts\4_extract_csv_answers.py "none" "0" -o "!TEST_DIR!\answers.json"
+    set "HAS_ANSWERS=1"
 )
 
-if !HAS_ANSWERS!==1 (
-    echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
-    echo !C_CYAN!!C_BOLD!   [2/2] ANSWER KEY FORM SETUP!C_RESET!
-    echo   Enter the Form Number corresponding to this answer key.
-    echo   ^(e.g., 32, 76, 1, 0^). Refer to your PDF title page if unsure.
-    echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
-    set "FORM_NUMBER="
-    set /p FORM_NUMBER="   !C_CYAN![?] Form Number [Default: 1]: !C_RESET!"
-    if "!FORM_NUMBER!"=="" (
-        set "FORM_NUMBER=1"
-    )
-    echo.
-    echo   !C_CYAN![i] Extracting answers for Form !FORM_NUMBER!...!C_RESET!
-    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!\!ANSWERS_NAME!" "!FORM_NUMBER!" -o "!TEST_DIR!\answers.json"
-    echo.
-) else (
-    echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
-    echo !C_CYAN!!C_BOLD!   [2/2] FORM NUMBER SETUP ^(No answer spreadsheet found^)!C_RESET!
-    echo   Is this Form 0 ^(Master Exam where option 1/א is always the answer^)?
-    echo   - Enter '0' to auto-generate Form Zero answer key
-    echo   - Enter Form Number ^(e.g., 1, 32^) if adding answers manually later
-    echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
-    set "FORM_NUMBER="
-    set /p FORM_NUMBER="   !C_CYAN![?] Form Number [Default: 0 for Form Zero]: !C_RESET!"
-    if "!FORM_NUMBER!"=="" set "FORM_NUMBER=0"
-    
-    if "!FORM_NUMBER!"=="0" (
-        echo.
-        echo   !C_GREEN![OK] Form 0 selected! Auto-generating baseline answer key...!C_RESET!
-        python python_scripts\4_extract_csv_answers.py "none" "0" -o "!TEST_DIR!\answers.json"
-        set "HAS_ANSWERS=1"
-    )
-)
-
+:form_number_done
 set "SKIP_STEP3="
-set /p SKIP_STEP3="   !C_CYAN![?] Press Enter to run page rendering/text extraction, or 's' to skip > !C_RESET!"
+set /p SKIP_STEP3="   [?] Press Enter to run page rendering/text extraction, or 's' to skip: "
 if /i "!SKIP_STEP3!"=="s" goto :agent_extraction_step
 
 echo.
-if !HAS_PDF!==1 (
-    echo   Page Cleaning Options:
-    echo     • Press [Enter] for Standard cleaning ^(skips cover/instructions pages 1-4, 6,8,10...^)
-    echo     • Type custom pages to discard ^(e.g., '1-3, 5'^)
-    echo     • Type 'none' to preserve all pages
+if !HAS_PDF!==0 goto :pre_processing_done
+
+echo   Page Cleaning Options:
+echo     • Press [Enter] for Standard cleaning ^(skips cover/instructions pages 1-4, 6,8,10...^)
+echo     • Type custom pages to discard ^(e.g., '1-3, 5'^)
+echo     • Type 'none' to preserve all pages
+echo.
+set "DISCARD_PAGES="
+set /p DISCARD_PAGES="   [?] Discard pages [Default: standard]: "
+if "!DISCARD_PAGES!"=="" set "DISCARD_PAGES=std"
+
+echo.
+echo   !C_CYAN![i] Rendering clean PDF pages...!C_RESET!
+python python_scripts\3_render_pdf_pages.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\pages_output" --discard-pages "!DISCARD_PAGES!" --merged-pdf "!TEST_DIR!\!TEST_NAME!_clean.pdf"
+
+if !IS_DIGITAL!==1 (
     echo.
-    set "DISCARD_PAGES="
-    set /p DISCARD_PAGES="   !C_CYAN![?] Discard pages [Default: standard]: !C_RESET!"
-    if "!DISCARD_PAGES!"=="" set "DISCARD_PAGES=std"
+    echo   !C_GREEN![OK] DIGITAL PDF DETECTED: Extracting text automatically...!C_RESET!
+    python python_scripts\2_extract_text_fitz.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\raw_text.md" --extract-images "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
+    python python_scripts\5_parse_questions_md.py "!TEST_DIR!\raw_text.md" -o "!TEST_DIR!\questions.json" --image-dir "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
     
-    echo.
-    echo   !C_CYAN![i] Rendering clean PDF pages...!C_RESET!
-    python python_scripts\3_render_pdf_pages.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\pages_output" --discard-pages "!DISCARD_PAGES!" --merged-pdf "!TEST_DIR!\!TEST_NAME!_clean.pdf"
-    
-    if !IS_DIGITAL!==1 (
+    if errorlevel 1 (
         echo.
-        echo   !C_GREEN![OK] DIGITAL PDF DETECTED: Extracting text automatically...!C_RESET!
-        python python_scripts\2_extract_text_fitz.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\raw_text.md" --extract-images "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
-        python python_scripts\5_parse_questions_md.py "!TEST_DIR!\raw_text.md" -o "!TEST_DIR!\questions.json" --image-dir "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
-        
-        if errorlevel 1 (
-            echo.
-            echo   !C_YELLOW![!] WARNING: Automatic parsing encountered issues. questions.json may need AI review.!C_RESET!
-        ) else (
-            echo   !C_GREEN![OK] Automated extraction finished successfully!!C_RESET!
-        )
+        echo   !C_YELLOW![!] WARNING: Automatic parsing encountered issues. questions.json may need AI review.!C_RESET!
+    ) else (
+        echo   !C_GREEN![OK] Automated extraction finished successfully!!C_RESET!
     )
 )
 
+:pre_processing_done
 echo.
 echo   !C_GREEN![OK] Pre-processing complete!!C_RESET!
 echo.
+
 
 :agent_extraction_step
 :: ---------------------------------------------------------------------------
@@ -427,17 +444,15 @@ echo  !C_BOLD![Step 5/6] AI Agent Question Extraction ^& Proofreading!C_RESET!
 echo  !C_GRAY!---------------------------------------------------------------------------!C_RESET!
 echo.
 set "SKIP_STEP4="
-set /p SKIP_STEP4="   !C_CYAN![?] Press Enter to launch AI extraction pass, or 's' to skip to building > !C_RESET!"
+set /p SKIP_STEP4="   [?] Press Enter to launch AI extraction pass, or 's' to skip to building: "
 if /i "!SKIP_STEP4!"=="s" goto :post_process
 echo.
 if exist "!TEST_DIR!\questions.json" (
     echo   !C_CYAN![i] Automated text extraction is complete!!C_RESET!
     echo   Hebrew text extraction may benefit from an AI proofreading pass to fix reversed words.
     echo.
-    set /p PROOF_CHOICE="   !C_CYAN![?] Run AI proofreading pass on questions.json? (Y/n) [Default: Y]: !C_RESET!"
-    if /i "!PROOF_CHOICE!"=="n" (
-        goto :post_process
-    )
+    set /p PROOF_CHOICE="   [?] Run AI proofreading pass on questions.json? (Y/n) [Default: Y]: "
+    if /i "!PROOF_CHOICE!"=="n" goto :post_process
     echo.
     echo   !C_CYAN![i] Preparing AI proofreading prompt...!C_RESET!
 ) else (
@@ -459,7 +474,7 @@ if not errorlevel 1 (
     set "AGENT_FOUND=1"
     echo   !C_GREEN![OK] Detected CLI Agent: agy (Gemini CLI)!C_RESET!
     echo.
-    set /p USE_AGY="   !C_CYAN![?] Launch agy automatically? (Y/n) [Default: Y]: !C_RESET!"
+    set /p USE_AGY="   [?] Launch agy automatically? (Y/n) [Default: Y]: "
     if /i not "!USE_AGY!"=="n" (
         echo.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
@@ -470,7 +485,6 @@ if not errorlevel 1 (
         echo   3. Once finished, return here and press any key to continue.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
         echo.
-        :: Pass TEST_DIR via %% (eager) so the child cmd process receives a literal path
         start "" cmd /k "cd /d "%~dp0" && type "%TEST_DIR%\prompt_local_agent.txt" | agy"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
@@ -482,7 +496,7 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
     set "AGENT_FOUND=1"
     echo   !C_GREEN![OK] Detected CLI Agent: gemini CLI!C_RESET!
     echo.
-    set /p USE_GEMINI="   !C_CYAN![?] Launch gemini CLI automatically? (Y/n) [Default: Y]: !C_RESET!"
+    set /p USE_GEMINI="   [?] Launch gemini CLI automatically? (Y/n) [Default: Y]: "
     if /i not "!USE_GEMINI!"=="n" (
         echo.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
@@ -493,7 +507,6 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
         echo   3. Once finished, return here and press any key to continue.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
         echo.
-        :: Pass TEST_DIR via %% (eager) so the child cmd process receives a literal path
         start "" cmd /k "cd /d "%~dp0" && type "%TEST_DIR%\prompt_local_agent.txt" | gemini"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
@@ -505,7 +518,7 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
     set "AGENT_FOUND=1"
     echo   !C_GREEN![OK] Detected CLI Agent: claude CLI!C_RESET!
     echo.
-    set /p USE_CLAUDE="   !C_CYAN![?] Launch claude CLI automatically? (Y/n) [Default: Y]: !C_RESET!"
+    set /p USE_CLAUDE="   [?] Launch claude CLI automatically? (Y/n) [Default: Y]: "
     if /i not "!USE_CLAUDE!"=="n" (
         echo.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
@@ -516,7 +529,6 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
         echo   3. Once finished, return here and press any key to continue.
         echo !C_CYAN!!C_BOLD!===========================================================================!C_RESET!
         echo.
-        :: Pass TEST_DIR via %% (eager) so the child cmd process receives a literal path
         start "" cmd /k "cd /d "%~dp0" && type "%TEST_DIR%\prompt_local_agent.txt" | claude"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
@@ -545,7 +557,7 @@ echo.
 echo     [3] Print both prompts to console
 echo     [S] Skip prompt helper
 echo.
-set /p PROMPT_CHOICE="   !C_CYAN![?] Your choice (1/2/3/S) [Default: 1]: !C_RESET!"
+set /p PROMPT_CHOICE="   [?] Your choice (1/2/3/S) [Default: 1]: "
 
 if /i "!PROMPT_CHOICE!"=="1" goto :copy_local_prompt
 if /i "!PROMPT_CHOICE!"=="2" goto :copy_web_prompt
@@ -581,7 +593,7 @@ echo     [3] Claude Web (claude.ai)
 echo     [4] Google AI Studio (aistudio.google.com)
 echo     [N] Skip opening browser
 echo.
-set /p WEB_CHOICE="   !C_CYAN![?] Your choice (1/2/3/4/N): !C_RESET!"
+set /p WEB_CHOICE="   [?] Your choice (1/2/3/4/N): "
 if "!WEB_CHOICE!"=="1" start https://chatgpt.com
 if "!WEB_CHOICE!"=="2" start https://gemini.google.com
 if "!WEB_CHOICE!"=="3" start https://claude.ai
@@ -651,7 +663,7 @@ if !JSON_COUNT! GTR 0 (
     )
     echo.
     set "CHOSEN_JSON_INDEX="
-    set /p CHOSEN_JSON_INDEX="   !C_CYAN![?] Select file to use as questions.json (1-!JSON_COUNT! or Enter to skip): !C_RESET!"
+    set /p CHOSEN_JSON_INDEX="   [?] Select file to use as questions.json (1-!JSON_COUNT! or Enter to skip): "
     if defined CHOSEN_JSON_INDEX set "CHOSEN_JSON_INDEX=!CHOSEN_JSON_INDEX: =!"
     if not "!CHOSEN_JSON_INDEX!"=="" (
         for %%a in (!CHOSEN_JSON_INDEX!) do (
@@ -680,20 +692,23 @@ goto :check_questions_exist
 echo.
 echo  !C_BOLD![Step 6/6] Automated Post-Processing ^& Validation!C_RESET!
 echo  !C_GRAY!---------------------------------------------------------------------------!C_RESET!
-if exist "!TEST_DIR!\questions.json" (
-    if !HAS_ANSWERS!==1 (
-        echo.
-        echo   !C_CYAN![i] Merging answer key into questions.json...!C_RESET!
-        python python_scripts\6_merge_json_answers.py "!TEST_DIR!"
-    )
-    echo.
-    echo   !C_CYAN![i] Running QA validation checks...!C_RESET!
-    python python_scripts\7_check_json.py "!TEST_DIR!"
-) else (
-    echo.
-    echo   !C_YELLOW![!] Skipping answer merge and QA (questions.json not present).!C_RESET!
-)
+if not exist "!TEST_DIR!\questions.json" goto :skip_post_qa
 
+if !HAS_ANSWERS!==1 (
+    echo.
+    echo   !C_CYAN![i] Merging answer key into questions.json...!C_RESET!
+    python python_scripts\6_merge_json_answers.py "!TEST_DIR!"
+)
+echo.
+echo   !C_CYAN![i] Running QA validation checks...!C_RESET!
+python python_scripts\7_check_json.py "!TEST_DIR!"
+goto :post_qa_done
+
+:skip_post_qa
+echo.
+echo   !C_YELLOW![!] Skipping answer merge and QA (questions.json not present).!C_RESET!
+
+:post_qa_done
 echo.
 echo   !C_CYAN![i] Updating manifest.json...!C_RESET!
 python python_scripts\8_generate_manifest.py
@@ -719,7 +734,7 @@ echo   [B] Do BOTH ^(Build HTML + Start Server^)
 echo   [M] Return to MAIN MENU
 echo   [Q] Quit
 echo.
-set /p POST_CHOICE="   !C_CYAN![?] Your choice (H/S/B/M/Q) [Default: H]: !C_RESET!"
+set /p POST_CHOICE="   [?] Your choice (H/S/B/M/Q) [Default: H]: "
 
 if /i "!POST_CHOICE!"=="s" goto :start_server
 if /i "!POST_CHOICE!"=="b" goto :build_and_serve
@@ -745,7 +760,7 @@ if exist "!OUTPUT_FILE!" (
     echo   Double-click to open in any web browser.
     echo   Can be shared via email, USB drive, or WhatsApp.
     echo.
-    set /p OPEN_FILE="   !C_CYAN![?] Open the quiz now in browser? (Y/n) [Default: Y]: !C_RESET!"
+    set /p OPEN_FILE="   [?] Open the quiz now in browser? (Y/n) [Default: Y]: "
     if /i not "!OPEN_FILE!"=="n" (
         start "" "!OUTPUT_FILE!"
     )
@@ -779,7 +794,7 @@ if !IDX!==0 (
     goto :select_test_step
 )
 echo.
-set /p BUILD_CHOICE="   !C_CYAN![?] Enter number (1-!IDX!): !C_RESET!"
+set /p BUILD_CHOICE="   [?] Enter number (1-!IDX!): "
 
 set "TEST_DIR="
 set "TEST_NAME="
@@ -798,7 +813,6 @@ goto :build_single
 
 
 :build_and_serve
-:: Build the HTML first (inline — do not use call :build_single which would exit /b)
 echo.
 echo   !C_CYAN![i] Building standalone HTML quiz file...!C_RESET!
 set "OUTPUT_FILE=!TEST_DIR!\!TEST_NAME!_quiz.html"
