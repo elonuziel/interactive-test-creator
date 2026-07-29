@@ -49,16 +49,23 @@ C_CYAN = "\033[36m"
 C_RED = "\033[31m"
 C_GRAY = "\033[90m"
 
-# Path setup
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(BASE_DIR) if os.path.basename(BASE_DIR) == 'cli-legacy' else BASE_DIR
+# Path setup: Resolve actual directory where the .exe or script is executed
+if getattr(sys, 'frozen', False):
+    # Running inside PyInstaller bundled executable
+    REPO_ROOT = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    REPO_ROOT = os.path.dirname(BASE_DIR) if os.path.basename(BASE_DIR) == 'cli-legacy' else BASE_DIR
+
 TESTS_DIR = os.path.join(REPO_ROOT, 'tests')
 
 def print_header():
     print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}  INTERACTIVE HEBREW QUIZ BUILDER (EXECUTABLE WIZARD){C_RESET}")
     print(f"{C_GRAY}  Transform PDF Exams into Interactive Quizzes — 100% Offline Compatible{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
+    print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+    print(f"  {C_YELLOW}[!] TIP: Move quiz_builder.exe to whichever folder you want your tests stored in.{C_RESET}")
+    print(f"  {C_GRAY}    Current Test Location: {TESTS_DIR}{C_RESET}\n")
 
 def check_prerequisites():
     print(f" {C_BOLD}[Step 1/6] Checking Prerequisites...{C_RESET}")
