@@ -111,9 +111,11 @@ def build_html(test_dir, embed_images=True, title=None):
 
     # ── Update title if provided ───────────────────────────────────────────
     if title:
+        # Strip any </title> sequences that would break the HTML structure
+        safe_title = title.replace('</title>', '').replace('</TITLE>', '')
         html = re.sub(
             r'<title>.*?</title>',
-            f'<title>{title}</title>',
+            f'<title>{safe_title}</title>',
             html
         )
 

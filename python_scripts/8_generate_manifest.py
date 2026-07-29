@@ -19,7 +19,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 
 def derive_display_name(folder_name):
-    """Convert a folder name like '2019_moed_a' into ' 2019 Moed A'."""
+    """Convert a folder name like '2019_moed_a' into '2019 Moed A'."""
     return folder_name.replace('_', ' ').replace('-', ' ').title()
 
 

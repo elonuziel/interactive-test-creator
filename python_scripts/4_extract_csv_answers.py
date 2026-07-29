@@ -72,7 +72,8 @@ def main():
     if not form_str:
         form_str = '0'
 
-    is_form_zero = (form_str in {'0', 'zero', '00', '000'})
+    # After lstrip('0'), form_str is already normalized — '00'/'000' are unreachable.
+    is_form_zero = (form_str in {'0', 'zero'})
     answers_map = {}
 
     if input_path.exists():

@@ -106,7 +106,7 @@ def main():
         rendered_count += 1
 
     if clean_doc is not None:
-        os.makedirs(os.path.dirname(os.path.abspath(args.merged_pdf)), exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(args.merged_pdf)) or '.', exist_ok=True)
         clean_doc.save(args.merged_pdf)
         clean_doc.close()
         print(f"Created merged PDF without blank pages: '{args.merged_pdf}'")

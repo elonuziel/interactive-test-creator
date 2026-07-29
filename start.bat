@@ -9,6 +9,9 @@ setlocal enabledelayedexpansion
 :: Navigate to repo root (in case script is double-clicked from Explorer)
 cd /d "%~dp0"
 
+:: B7: Initialize FORM_NUMBER so it is never undefined when re-entering the flow
+set "FORM_NUMBER="
+
 title Interactive Quiz Builder
 
 echo.
@@ -201,7 +204,7 @@ goto :get_action_choice
 :: ===========================================================================
 :create_test
 echo.
-echo  [Step 3/5] Creating new test
+echo  [Step 3/6] Creating new test
 echo  -------------------------------------
 echo.
 echo   Enter a name for your test folder.
@@ -242,14 +245,24 @@ set "PDF_NAME="
 set "PDF_FULL_PATH="
 set "ANSWERS_NAME="
 
-for %%f in ("!TEST_DIR!\*.pdf") do set "HAS_PDF=1" & set "PDF_NAME=%%~nxf" & set "PDF_FULL_PATH=%%~ff"
+:: B8: Count PDFs to warn if multiple are found (last one would silently win)
+set "PDF_COUNT=0"
+for %%f in ("!TEST_DIR!\*.pdf") do (
+    set /a PDF_COUNT+=1
+    set "HAS_PDF=1" & set "PDF_NAME=%%~nxf" & set "PDF_FULL_PATH=%%~ff"
+)
 for %%f in ("!TEST_DIR!\*.csv") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 for %%f in ("!TEST_DIR!\*.xlsx") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 for %%f in ("!TEST_DIR!\*.xls") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 
 if !HAS_PDF!==1 (
     echo.
-    echo   OK - Found PDF file: !PDF_NAME!
+    if !PDF_COUNT! GTR 1 (
+        echo   WARNING: Multiple PDF files found in !TEST_DIR! ^(!PDF_COUNT! files^). Using: !PDF_NAME!
+        echo   Remove extra PDFs if this is not the correct one.
+    ) else (
+        echo   OK - Found PDF file: !PDF_NAME!
+    )
     if !HAS_ANSWERS!==1 (
         echo   OK - Found answer key file: !ANSWERS_NAME!
     ) else (
@@ -289,8 +302,12 @@ set "HAS_ANSWERS=0"
 set "PDF_NAME="
 set "PDF_FULL_PATH="
 set "ANSWERS_NAME="
+set "PDF_COUNT=0"
 
-for %%f in ("!TEST_DIR!\*.pdf") do set "HAS_PDF=1" & set "PDF_NAME=%%~nxf" & set "PDF_FULL_PATH=%%~ff"
+for %%f in ("!TEST_DIR!\*.pdf") do (
+    set /a PDF_COUNT+=1
+    set "HAS_PDF=1" & set "PDF_NAME=%%~nxf" & set "PDF_FULL_PATH=%%~ff"
+)
 for %%f in ("!TEST_DIR!\*.csv") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 for %%f in ("!TEST_DIR!\*.xlsx") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
 for %%f in ("!TEST_DIR!\*.xls") do set "HAS_ANSWERS=1" & set "ANSWERS_NAME=%%~nxf"
@@ -309,9 +326,9 @@ echo.
 
 :pre_processing_step
 :: ---------------------------------------------------------------------------
-:: STEP 3: PRE-PROCESSING (Automated)
+:: STEP 4: PRE-PROCESSING (Automated)
 :: ---------------------------------------------------------------------------
-echo  [Step 3/5] Pre-processing ^& Document Analysis
+echo  [Step 4/6] Pre-processing ^& Document Analysis
 echo  -------------------------------------
 echo.
 
@@ -387,7 +404,14 @@ if !HAS_PDF!==1 (
         echo   DIGITAL PDF detected! Automating text extraction...
         python python_scripts\2_extract_text_fitz.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\raw_text.md" --extract-images "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
         python python_scripts\5_parse_questions_md.py "!TEST_DIR!\raw_text.md" -o "!TEST_DIR!\questions.json" --image-dir "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
-        echo   Automated extraction complete!
+        :: B4: Check if question parsing produced a valid result
+        if errorlevel 1 (
+            echo.
+            echo   WARNING: Question parser exited with an error. questions.json may be empty or missing.
+            echo   You can still continue and fix issues in the AI agent step.
+        ) else (
+            echo   Automated extraction complete!
+        )
     )
 )
 
@@ -397,9 +421,9 @@ echo.
 
 :agent_extraction_step
 :: ---------------------------------------------------------------------------
-:: STEP 4: Launch AI Agent
+:: STEP 5: Launch AI Agent
 :: ---------------------------------------------------------------------------
-echo  [Step 4/5] Launching AI agent for extraction
+echo  [Step 5/6] Launching AI agent for extraction
 echo  -------------------------------------
 echo.
 set "SKIP_STEP4="
@@ -425,9 +449,10 @@ echo.
 :: Generate prompt files (prompt_local_agent.txt & prompt_web_ai.txt)
 python python_scripts\generate_prompts.py "!TEST_DIR!" "!TEST_NAME!" "!FORM_NUMBER!" "!HAS_ANSWERS!" >nul 2>&1
 
-:: Read AGENT_PROMPT from prompt_local_agent.txt and pre-load into Windows Clipboard
+:: B2: Pre-load the local prompt into clipboard.
+:: NOTE: set /p only reads the FIRST line of a file, so we do NOT use it for AGENT_PROMPT.
+:: Instead, CLI agents are launched by piping the full file content with 'type'.
 if exist "!TEST_DIR!\prompt_local_agent.txt" (
-    set /p AGENT_PROMPT=<"!TEST_DIR!\prompt_local_agent.txt"
     type "!TEST_DIR!\prompt_local_agent.txt" | clip
 )
 
@@ -448,17 +473,17 @@ if not errorlevel 1 (
         echo            LAUNCHING AGENT: agy (Gemini CLI^)
         echo  ===========================================================
         echo.
-        echo   Auto-injecting prompt into agy...
-        echo   Command: agy -i "!AGENT_PROMPT!"
+        echo   Auto-injecting prompt into agy ^(via prompt file^)...
         echo.
         echo   What is happening now:
-        echo     1. agy is starting in a NEW window with prompt auto-injected.
+        echo     1. agy is starting in a NEW window with prompt piped in.
         echo     2. It will automatically read the images and output questions.json.
         echo     3. Once questions.json is ready, come back here to continue.
         echo.
         echo  ===========================================================
         echo.
-        start "" cmd /k "cd /d "%~dp0" && agy -i "!AGENT_PROMPT!""
+        :: B2: Pipe the full prompt file to agy instead of using the truncated AGENT_PROMPT variable
+        start "" cmd /k "cd /d "%~dp0" && type "!TEST_DIR!\prompt_local_agent.txt" | agy"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
@@ -477,12 +502,11 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
         echo            LAUNCHING AGENT: gemini CLI
         echo  ===========================================================
         echo.
-        echo   Command: gemini "!AGENT_PROMPT!"
-        echo.
-        echo   Starting gemini in a new window with prompt injected...
+        echo   Starting gemini in a new window with prompt piped in...
         echo  ===========================================================
         echo.
-        start "" cmd /k "cd /d "%~dp0" && gemini "!AGENT_PROMPT!""
+        :: B2: Pipe the full prompt file to gemini instead of using the truncated variable
+        start "" cmd /k "cd /d "%~dp0" && type "!TEST_DIR!\prompt_local_agent.txt" | gemini"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
@@ -501,12 +525,11 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
         echo            LAUNCHING AGENT: claude CLI
         echo  ===========================================================
         echo.
-        echo   Command: claude "!AGENT_PROMPT!"
-        echo.
-        echo   Starting claude in a new window with prompt injected...
+        echo   Starting claude in a new window with prompt piped in...
         echo  ===========================================================
         echo.
-        start "" cmd /k "cd /d "%~dp0" && claude "!AGENT_PROMPT!""
+        :: B2: Pipe the full prompt file to claude instead of using the truncated variable
+        start "" cmd /k "cd /d "%~dp0" && type "!TEST_DIR!\prompt_local_agent.txt" | claude"
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
@@ -678,7 +701,7 @@ goto :check_questions_exist
 :: ===========================================================================
 :post_process
 echo.
-echo  [Step 5/5] Running automated post-processing...
+echo  [Step 6/6] Running automated post-processing...
 echo  -------------------------------------
 if exist "!TEST_DIR!\questions.json" (
     if !HAS_ANSWERS!==1 (
@@ -755,7 +778,8 @@ if exist "!OUTPUT_FILE!" (
 echo.
 echo   Press any key to return to the main menu...
 pause >nul
-goto :select_test_step
+:: B1: Use exit /b so callers using 'call :build_single' return correctly
+exit /b 0
 
 
 :build_html
@@ -799,6 +823,7 @@ goto :build_single
 
 
 :build_and_serve
+:: B1: call :build_single now properly returns because build_single uses exit /b
 call :build_single
 goto :start_server
 
@@ -809,10 +834,15 @@ echo   Generating test manifest...
 python python_scripts\8_generate_manifest.py
 echo.
 echo   Starting server...
+:: B6: Start server in background first, wait briefly, then open browser
+::     so the port is bound before the browser tries to connect.
 echo   Opening http://localhost:8000/web/index.html
 echo.
+start /b python -m http.server 8000
+timeout /t 2 /nobreak >nul
 start http://localhost:8000/web/index.html
-python -m http.server 8000
+:: Keep the window alive (blocking call) so server stays running
+python -m http.server 8000 >nul 2>&1
 echo.
 echo   Server stopped. Returning to main menu...
 goto :select_test_step

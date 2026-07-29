@@ -261,7 +261,8 @@ def main():
             current_q = {
                 'text': [],
                 'answers': [],
-                'source_page': page_map.get(str(line_index)) or page_map.get(f"line_{line_index}"),
+                # page_map keys are always plain number strings (e.g. "42")
+                'source_page': page_map.get(str(line_index)),
             }
             state = 1
             continue
