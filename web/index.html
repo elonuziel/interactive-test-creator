@@ -17,6 +17,10 @@
     <header class="navbar">
         <div class="logo">מבחן אינטראקטיבי</div>
         <div class="controls">
+            <button id="study-mode-nav-btn" class="secondary-btn nav-study-btn" aria-label="כרטיסיות לימוד">
+                <span>📇 כרטיסיות לימוד</span>
+                <span id="study-due-badge" class="due-badge">0</span>
+            </button>
             <label class="toggle">
                 <span class="toggle-label">משוב מיידי</span>
                 <div class="toggle-wrapper">
@@ -117,7 +121,10 @@
                     </div>
                     <p id="score-text">ענית נכונה על 0 מתוך 0 שאלות.</p>
                 </div>
-                <button id="restart-btn" class="primary-btn">התחל מחדש</button>
+                <div class="results-actions" style="display: flex; gap: 10px; justify-content: center; margin-top: 15px; flex-wrap: wrap;">
+                    <button id="restart-btn" class="primary-btn">התחל מחדש</button>
+                    <button id="practice-missed-btn" class="success-btn">📇 תרגל שאלות שנפסלו</button>
+                </div>
             </div>
 
             <h2 class="review-title">סקירת תשובות</h2>
@@ -131,6 +138,78 @@
 
             <div id="review-container" class="review-list">
                 <!-- Review items injected here -->
+            </div>
+        </div>
+
+        <!-- Study Screen (Flashcards) -->
+        <div id="study-screen" class="screen">
+            <div class="study-header">
+                <div class="study-title-group">
+                    <h2>📇 כרטיסיות לימוד - שאלות לתרגול</h2>
+                    <span id="study-deck-stats" class="badge">שאלה 1 מתוך 0</span>
+                </div>
+                <div class="study-actions-bar">
+                    <button id="study-filter-toggle" class="secondary-btn sm-btn">הצג מבחן נוכחי בלבד</button>
+                    <button id="exit-study-btn" class="secondary-btn sm-btn">חזרה לתפריט</button>
+                </div>
+            </div>
+
+            <!-- Empty Deck State -->
+            <div id="study-empty-state" class="welcome-card hidden">
+                <h2>🎉 כל הכבוד! אין שאלות לתרגול</h2>
+                <p>אין שאלות שנפסלו ברשימת הלימוד שלך. המשך לפתור מבחנים - שאלות שגויות יתווספו לכאן אוטומטית!</p>
+                <button id="study-empty-back-btn" class="primary-btn lg-btn">חזרה ללוח המבחנים</button>
+            </div>
+
+            <!-- Active Flashcard Container -->
+            <div id="flashcard-container" class="flashcard-container">
+                <div id="flashcard" class="flashcard">
+                    <!-- Front Side -->
+                    <div class="card-face card-front">
+                        <div class="card-header-badge">
+                            <span class="card-side-tag">שאלה</span>
+                            <span id="flashcard-test-name" class="test-tag">מבחן</span>
+                        </div>
+                        <div class="question-container">
+                            <h3 id="flashcard-question-text">טוען שאלה...</h3>
+                            <img id="flashcard-question-image" src="" alt="תמונה לשאלה" class="hidden" title="לחץ להגדלה">
+                            <div id="flashcard-options-container" class="options-list" role="listbox">
+                                <!-- Options buttons injected here -->
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <button id="flashcard-reveal-btn" class="primary-btn lg-btn">הצג תשובה והסבר (Space / Enter)</button>
+                        </div>
+                    </div>
+
+                    <!-- Back Side -->
+                    <div class="card-face card-back">
+                        <div class="card-header-badge">
+                            <span class="card-side-tag correct-tag">תשובה נכונה והסבר</span>
+                        </div>
+                        <div class="answer-details-container">
+                            <div class="correct-answer-box">
+                                <strong>תשובה נכונה:</strong>
+                                <div id="flashcard-correct-answer">...</div>
+                            </div>
+                            <div id="flashcard-explanation-box" class="explanation-box">
+                                <strong>הסבר:</strong>
+                                <p id="flashcard-explanation-text">אין הסבר נוסף לשאלה זו.</p>
+                            </div>
+                        </div>
+                        <div class="card-actions-back">
+                            <button id="flashcard-mastered-btn" class="secondary-btn mastered-btn">
+                                <span class="star-icon">⭐</span>
+                                <span id="mastered-btn-text">סימון כנשלט (M)</span>
+                            </button>
+                            <button id="flashcard-next-btn" class="primary-btn lg-btn">שאלה הבאה (←)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="study-keyboard-hints">
+                מקשים: 1–4 לבחירת תשובה · Space / Enter לסיבוב כרטיסייה · M סימון כנשלט · ← / → לניווט
             </div>
         </div>
     </main>

@@ -80,6 +80,78 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(STORAGE_KEY);
     }
 
+    // ── Study Deck Storage Manager ────────────────────────────────────────────
+    const STUDY_DECK_KEY = 'study_deck_v1';
+
+    function getStudyDeck() {
+        try {
+            const raw = localStorage.getItem(STUDY_DECK_KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch(e) {
+            return [];
+        }
+    }
+
+    function saveStudyDeck(deck) {
+        localStorage.setItem(STUDY_DECK_KEY, JSON.stringify(deck));
+        updateStudyBadge();
+    }
+
+    function addMissedQuestionsToDeck(testId, questionsList, answers) {
+        let deck = getStudyDeck();
+        const currentTestTitle = testId || 'מבחן';
+
+        questionsList.forEach((q, i) => {
+            const ans = answers[i];
+            const isCorrect = ans && ans.isCorrect;
+            if (!isCorrect) {
+                const cardId = `${currentTestTitle}::${q.id || i}::${(q.question || '').substring(0, 30)}`;
+                const existingIndex = deck.findIndex(item => item.id === cardId);
+                const correctOption = q.options ? q.options.find(o => o.id === q.correctIndex) : null;
+
+                const cardData = {
+                    id: cardId,
+                    testId: currentTestTitle,
+                    questionText: q.question,
+                    options: q.options || [],
+                    correctIndex: q.correctIndex,
+                    correctText: correctOption ? correctOption.text : '',
+                    explanation: q.explanation || 'אין הסבר נוסף לשאלה זו.',
+                    image: q.image || '',
+                    pageImage: q.pageImage || '',
+                    dateAdded: Date.now(),
+                    mastered: false
+                };
+
+                if (existingIndex >= 0) {
+                    deck[existingIndex] = { ...deck[existingIndex], ...cardData, mastered: false };
+                } else {
+                    deck.push(cardData);
+                }
+            }
+        });
+
+        saveStudyDeck(deck);
+    }
+
+    function toggleCardMasteredStatus(cardId) {
+        let deck = getStudyDeck();
+        const card = deck.find(c => c.id === cardId);
+        if (card) {
+            card.mastered = !card.mastered;
+            saveStudyDeck(deck);
+        }
+        return card ? card.mastered : false;
+    }
+
+    function updateStudyBadge() {
+        const badge = document.getElementById('study-due-badge');
+        if (!badge) return;
+        const deck = getStudyDeck();
+        const dueCount = deck.filter(c => !c.mastered).length;
+        badge.textContent = dueCount;
+    }
+
     // ── Parse URL Parameter ───────────────────────────────────────────────────
     const urlParams = new URLSearchParams(window.location.search);
     const testPath = urlParams.get('test');
@@ -235,6 +307,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!zoomOverlay.classList.contains('hidden')) { closeZoom(); return; }
         }
 
+        // Study Mode Shortcuts
+        if (studyScreen && studyScreen.classList.contains('active')) {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                if (flashcard) flashcard.classList.toggle('flipped');
+                return;
+            }
+            if (['1', '2', '3', '4'].includes(e.key) && flashcardOptions) {
+                const idx = parseInt(e.key) - 1;
+                const opts = flashcardOptions.querySelectorAll('.option');
+                if (opts[idx]) opts[idx].click();
+                return;
+            }
+            if (e.key === 'm' || e.key === 'M') {
+                if (flashcardMasteredBtn) flashcardMasteredBtn.click();
+                return;
+            }
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                if (flashcardNextBtn) flashcardNextBtn.click();
+                return;
+            }
+        }
+
         // Only act when quiz screen is active
         if (!quizScreen.classList.contains('active')) return;
 
@@ -307,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     submitBtn.addEventListener('click', () => {
         clearProgress();
+        addMissedQuestionsToDeck(testPath || 'מבחן', questions, userAnswers);
         switchScreen(quizScreen, resultsScreen);
         renderResults();
     });
@@ -581,5 +677,182 @@ document.addEventListener('DOMContentLoaded', () => {
         
         closeCropper();
     });
+
+    // ── Study Mode UI Controller ──────────────────────────────────────────────
+    const studyScreen           = document.getElementById('study-screen');
+    const studyModeNavBtn       = document.getElementById('study-mode-nav-btn');
+    const practiceMissedBtn     = document.getElementById('practice-missed-btn');
+    const exitStudyBtn          = document.getElementById('exit-study-btn');
+    const studyFilterToggle     = document.getElementById('study-filter-toggle');
+    const studyEmptyState       = document.getElementById('study-empty-state');
+    const studyEmptyBackBtn     = document.getElementById('study-empty-back-btn');
+    const flashcardContainer    = document.getElementById('flashcard-container');
+    const flashcard             = document.getElementById('flashcard');
+    const flashcardQuestionText = document.getElementById('flashcard-question-text');
+    const flashcardQuestionImg  = document.getElementById('flashcard-question-image');
+    const flashcardOptions      = document.getElementById('flashcard-options-container');
+    const flashcardRevealBtn    = document.getElementById('flashcard-reveal-btn');
+    const flashcardCorrectAns   = document.getElementById('flashcard-correct-answer');
+    const flashcardExpText      = document.getElementById('flashcard-explanation-text');
+    const flashcardMasteredBtn  = document.getElementById('flashcard-mastered-btn');
+    const masteredBtnText       = document.getElementById('mastered-btn-text');
+    const flashcardNextBtn      = document.getElementById('flashcard-next-btn');
+    const flashcardTestName     = document.getElementById('flashcard-test-name');
+    const studyDeckStats        = document.getElementById('study-deck-stats');
+
+    let activeStudyCards = [];
+    let currentStudyIndex = 0;
+    let filterCurrentTestOnly = false;
+
+    function openStudyScreen() {
+        const deck = getStudyDeck();
+        const currentTestId = testPath || 'מבחן';
+
+        if (filterCurrentTestOnly) {
+            activeStudyCards = deck.filter(c => !c.mastered && c.testId === currentTestId);
+        } else {
+            activeStudyCards = deck.filter(c => !c.mastered);
+        }
+
+        // Hide other screens
+        [setupScreen, quizScreen, resultsScreen, menuScreen, errorScreen].forEach(s => {
+            if (s) s.classList.remove('active');
+        });
+        if (studyScreen) studyScreen.classList.add('active');
+
+        if (activeStudyCards.length === 0) {
+            if (flashcardContainer) flashcardContainer.classList.add('hidden');
+            if (studyEmptyState) studyEmptyState.classList.remove('hidden');
+            if (studyDeckStats) studyDeckStats.textContent = '0 שאלות לתרגול';
+        } else {
+            if (flashcardContainer) flashcardContainer.classList.remove('hidden');
+            if (studyEmptyState) studyEmptyState.classList.add('hidden');
+            currentStudyIndex = 0;
+            renderFlashcard();
+        }
+    }
+
+    function renderFlashcard() {
+        if (!activeStudyCards.length) return;
+
+        // Reset flip state
+        if (flashcard) flashcard.classList.remove('flipped');
+
+        const card = activeStudyCards[currentStudyIndex];
+        if (studyDeckStats) studyDeckStats.textContent = `כרטיסייה ${currentStudyIndex + 1} מתוך ${activeStudyCards.length}`;
+        if (flashcardTestName) flashcardTestName.textContent = card.testId || 'מבחן';
+        if (flashcardQuestionText) flashcardQuestionText.innerHTML = card.questionText;
+
+        // Image
+        if (flashcardQuestionImg) {
+            if (card.image || card.pageImage) {
+                const imgSrc = card.image || card.pageImage;
+                flashcardQuestionImg.src = imgSrc;
+                flashcardQuestionImg.classList.remove('hidden');
+                flashcardQuestionImg.onclick = () => {
+                    if (zoomImg && zoomOverlay) {
+                        zoomImg.src = imgSrc;
+                        zoomOverlay.classList.remove('hidden');
+                        document.body.style.overflow = 'hidden';
+                    }
+                };
+            } else {
+                flashcardQuestionImg.classList.add('hidden');
+                flashcardQuestionImg.src = '';
+            }
+        }
+
+        // Options
+        if (flashcardOptions) {
+            flashcardOptions.innerHTML = '';
+            (card.options || []).forEach((opt, idx) => {
+                const btn = document.createElement('div');
+                btn.className = 'option';
+                btn.textContent = opt.text;
+                btn.setAttribute('data-key', idx + 1);
+                btn.addEventListener('click', () => {
+                    flashcardOptions.querySelectorAll('.option').forEach(o => o.classList.remove('selected', 'correct', 'incorrect'));
+                    if (opt.id === card.correctIndex) {
+                        btn.classList.add('correct');
+                    } else {
+                        btn.classList.add('incorrect');
+                    }
+                    setTimeout(() => {
+                        if (flashcard) flashcard.classList.add('flipped');
+                    }, 400);
+                });
+                flashcardOptions.appendChild(btn);
+            });
+        }
+
+        // Back Side content
+        if (flashcardCorrectAns) flashcardCorrectAns.textContent = card.correctText;
+        if (flashcardExpText) flashcardExpText.textContent = card.explanation || 'אין הסבר נוסף לשאלה זו.';
+        
+        updateMasteredBtnUI(card.mastered);
+    }
+
+    function updateMasteredBtnUI(isMastered) {
+        if (!flashcardMasteredBtn || !masteredBtnText) return;
+        if (isMastered) {
+            flashcardMasteredBtn.classList.add('active');
+            masteredBtnText.textContent = 'נשלט (M) ✓';
+        } else {
+            flashcardMasteredBtn.classList.remove('active');
+            masteredBtnText.textContent = 'סימון כנשלט (M)';
+        }
+    }
+
+    if (studyModeNavBtn) {
+        studyModeNavBtn.addEventListener('click', openStudyScreen);
+    }
+    if (practiceMissedBtn) {
+        practiceMissedBtn.addEventListener('click', openStudyScreen);
+    }
+    if (exitStudyBtn) {
+        exitStudyBtn.addEventListener('click', () => {
+            if (studyScreen) studyScreen.classList.remove('active');
+            if (questions.length > 0 && setupScreen) setupScreen.classList.add('active');
+            else if (menuScreen) menuScreen.classList.add('active');
+        });
+    }
+    if (studyEmptyBackBtn) {
+        studyEmptyBackBtn.addEventListener('click', () => {
+            if (studyScreen) studyScreen.classList.remove('active');
+            if (menuScreen) menuScreen.classList.add('active');
+            else if (setupScreen) setupScreen.classList.add('active');
+        });
+    }
+    if (studyFilterToggle) {
+        studyFilterToggle.addEventListener('click', () => {
+            filterCurrentTestOnly = !filterCurrentTestOnly;
+            studyFilterToggle.textContent = filterCurrentTestOnly ? 'הצג את כל המבחנים' : 'הצג מבחן נוכחי בלבד';
+            openStudyScreen();
+        });
+    }
+    if (flashcardRevealBtn) {
+        flashcardRevealBtn.addEventListener('click', () => {
+            if (flashcard) flashcard.classList.toggle('flipped');
+        });
+    }
+    if (flashcardMasteredBtn) {
+        flashcardMasteredBtn.addEventListener('click', () => {
+            if (!activeStudyCards.length) return;
+            const card = activeStudyCards[currentStudyIndex];
+            const isMastered = toggleCardMasteredStatus(card.id);
+            card.mastered = isMastered;
+            updateMasteredBtnUI(isMastered);
+        });
+    }
+    if (flashcardNextBtn) {
+        flashcardNextBtn.addEventListener('click', () => {
+            if (!activeStudyCards.length) return;
+            currentStudyIndex = (currentStudyIndex + 1) % activeStudyCards.length;
+            renderFlashcard();
+        });
+    }
+
+    // Initialize study badge counter
+    updateStudyBadge();
 
 });

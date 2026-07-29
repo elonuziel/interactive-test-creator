@@ -778,3 +778,179 @@ input:checked + .slider:before {
     display: flex;
     justify-content: flex-end;
 }
+
+/* =========================================
+   Study Mode (Flashcards) & 3D Flip Card
+========================================= */
+.nav-study-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.9rem;
+    font-weight: 500;
+}
+
+.due-badge {
+    background: var(--primary-color);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.study-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.study-title-group h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.study-actions-bar {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sm-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.875rem;
+}
+
+/* 3D Flip Card Layout */
+.flashcard-container {
+    perspective: 1200px;
+    margin: 1.5rem 0;
+    width: 100%;
+}
+
+.flashcard {
+    position: relative;
+    width: 100%;
+    min-height: 440px;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flashcard.flipped {
+    transform: rotateY(180deg);
+}
+
+.card-face {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    min-height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 1rem;
+    padding: 2rem;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.card-front {
+    z-index: 2;
+    transform: rotateY(0deg);
+}
+
+.card-back {
+    transform: rotateY(180deg);
+}
+
+.card-header-badge {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.card-side-tag {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    background: var(--option-bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.card-side-tag.correct-tag {
+    background: var(--success-bg);
+    color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+.test-tag {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.answer-details-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.correct-answer-box {
+    background: var(--success-bg);
+    border: 1px solid var(--success-color);
+    color: var(--success-color);
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.explanation-box {
+    background: var(--option-bg);
+    border: 1px solid var(--border-color);
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    line-height: 1.6;
+}
+
+.card-actions, .card-actions-back {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.25rem;
+}
+
+.mastered-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.mastered-btn.active {
+    background: #fef3c7;
+    border-color: #f59e0b;
+    color: #b45309;
+}
+
+.study-keyboard-hints {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 1rem;
+}
+
