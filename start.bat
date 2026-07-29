@@ -91,22 +91,25 @@ if not exist "tests" (
     echo.
 )
 
+:select_test_step
 :: List existing test folders
 set "HAS_TESTS=0"
-for /d %%d in (tests\*) do (
-    if exist "%%d\questions.json" (
-        set "HAS_TESTS=1"
-    )
-)
-
-:: Show existing tests if any
+set "HAS_READY_TESTS=0"
 set "TEST_COUNT=0"
+
 echo   Existing test folders:
 for /d %%d in (tests\*) do (
     set /a TEST_COUNT+=1
+    set "TEST_OPT_PATH_!TEST_COUNT!=%%d"
+    set "TEST_OPT_NAME_!TEST_COUNT!=%%~nxd"
+    set "HAS_TESTS=1"
+    
     if exist "%%d\questions.json" (
+        set "TEST_OPT_READY_!TEST_COUNT!=1"
+        set "HAS_READY_TESTS=1"
         echo     !TEST_COUNT!. %%~nxd  [READY - questions.json exists]
     ) else (
+        set "TEST_OPT_READY_!TEST_COUNT!=0"
         echo     !TEST_COUNT!. %%~nxd  [PENDING - needs processing]
     )
 )
@@ -117,21 +120,71 @@ if !TEST_COUNT!==0 (
 
 echo.
 echo   What would you like to do?
+if !TEST_COUNT! GTR 0 (
+    echo     [1-!TEST_COUNT!] Select an existing test folder above
+)
 echo     [N] Create a NEW test folder
-if !HAS_TESTS!==1 (
-    echo     [B] BUILD a single HTML from an existing test
+if !HAS_READY_TESTS!==1 (
+    echo     [B] BUILD a single HTML from a ready test
     echo     [S] START the server with all tests
 )
 echo     [Q] Quit
 echo.
+
+:get_action_choice
+set "ACTION="
 set /p ACTION="   Your choice: "
 
+if "!ACTION!"=="" goto :invalid_choice
 if /i "!ACTION!"=="q" goto :end
+if /i "!ACTION!"=="n" goto :create_test
 if /i "!ACTION!"=="s" goto :start_server
 if /i "!ACTION!"=="b" goto :build_html
-if /i "!ACTION!"=="n" goto :create_test
-:: Default to creating a new test
-goto :create_test
+
+:: Check if user entered a number corresponding to an existing test folder
+set "IS_NUMERIC=1"
+for /f "delims=0123456789" %%i in ("!ACTION!") do set "IS_NUMERIC=0"
+
+if !IS_NUMERIC!==1 (
+    if !ACTION! GEQ 1 if !ACTION! LEQ !TEST_COUNT! (
+        set "TEST_DIR=!TEST_OPT_PATH_%ACTION%!"
+        set "TEST_NAME=!TEST_OPT_NAME_%ACTION%!"
+        set "IS_READY=!TEST_OPT_READY_%ACTION%!"
+        
+        echo.
+        echo   Selected: !TEST_NAME!
+        if !IS_READY!==1 (
+            echo   Status: READY ^(questions.json exists^)
+            echo.
+            echo   What would you like to do with !TEST_NAME!?
+            echo     [1] Build single HTML quiz
+            echo     [2] Re-process with AI agent ^(re-extract^)
+            echo     [B] Back to main menu
+            echo.
+            set /p EXISTING_CHOICE="   Choice (1/2/b): "
+            if "!EXISTING_CHOICE!"=="1" goto :build_single
+            if "!EXISTING_CHOICE!"=="2" goto :drop_files_check
+            if /i "!EXISTING_CHOICE!"=="b" goto :select_test_step
+            goto :build_single
+        ) else (
+            echo   Status: PENDING ^(needs processing^)
+            goto :drop_files_check
+        )
+    )
+)
+
+:invalid_choice
+echo.
+echo  ===========================================================
+echo    ERROR: '!ACTION!' is not a valid choice.
+if !TEST_COUNT! GTR 0 (
+    echo    Please enter a number (1-!TEST_COUNT!), 'N', 'S', or 'Q'.
+) else (
+    echo    Please enter 'N', 'S', or 'Q'.
+)
+echo  ===========================================================
+echo.
+goto :get_action_choice
 
 
 :: ===========================================================================
@@ -171,16 +224,55 @@ if exist "!TEST_DIR!" (
 )
 
 :: ---------------------------------------------------------------------------
-:: STEP 3b: Drop files
+:: STEP 3b: Check or Drop files
 :: ---------------------------------------------------------------------------
+:drop_files_check
+set "HAS_PDF=0"
+set "HAS_ANSWERS=0"
+set "PDF_NAME="
+set "ANSWERS_NAME="
+
+for %%f in ("!TEST_DIR!\*.pdf") do (
+    set "HAS_PDF=1"
+    set "PDF_NAME=%%~nxf"
+)
+for %%f in ("!TEST_DIR!\*.csv") do (
+    set "HAS_ANSWERS=1"
+    set "ANSWERS_NAME=%%~nxf"
+)
+for %%f in ("!TEST_DIR!\*.xlsx") do (
+    set "HAS_ANSWERS=1"
+    set "ANSWERS_NAME=%%~nxf"
+)
+for %%f in ("!TEST_DIR!\*.xls") do (
+    set "HAS_ANSWERS=1"
+    set "ANSWERS_NAME=%%~nxf"
+)
+
+if !HAS_PDF!==1 (
+    echo.
+    echo   OK - Found PDF file: !PDF_NAME!
+    if !HAS_ANSWERS!==1 (
+        echo   OK - Found answer key file: !ANSWERS_NAME!
+    ) else (
+        echo   NOTE: No answer key spreadsheet found (CSV/Excel^).
+    )
+    echo.
+    echo   Proceeding directly to AI agent extraction...
+    echo.
+    goto :agent_extraction_step
+)
+
+:: If NO PDF file is found, prompt user to drop files
 echo.
 echo  ===========================================================
 echo                     DROP YOUR FILES
 echo  ===========================================================
 echo.
-echo   A folder will open in Explorer.
-echo   Please drop these files into it:
+echo   Folder !TEST_DIR!\ does not contain a PDF file yet.
+echo   Opening folder in Explorer...
 echo.
+echo   Please drop these files into it:
 echo     1. exam.pdf    - Your exam PDF file
 echo     2. answers.csv - Answer key (CSV or Excel .xlsx^)
 echo.
@@ -213,6 +305,7 @@ if !HAS_PDF!==1 echo   OK - PDF file found
 if !HAS_ANSWERS!==1 echo   OK - Answer key file found
 echo.
 
+:agent_extraction_step
 :: ---------------------------------------------------------------------------
 :: STEP 4: Launch AI Agent
 :: ---------------------------------------------------------------------------
@@ -230,14 +323,16 @@ if !HAS_ANSWERS!==1 (
     set /p FORM_NUMBER="   Form Number: "
     if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
     echo.
+) else (
+    set "FORM_NUMBER=1"
 )
 
-:: Build the prompt for the agent
-if !HAS_ANSWERS!==1 (
-    set "AGENT_PROMPT=Read LLM_RUNBOOK.md and follow it to process the test in !TEST_DIR!/ -- extract questions from the PDF, parse them into questions.json, and merge the answer key (Form Number: !FORM_NUMBER!). Work through all steps."
-) else (
-    set "AGENT_PROMPT=Read LLM_RUNBOOK.md and follow it to process the test in !TEST_DIR!/ -- extract questions from the PDF and parse them into questions.json. Work through all steps."
-)
+:: Generate prompt files (prompt_local_agent.txt & prompt_web_ai.txt)
+python python_scripts\generate_prompts.py "!TEST_DIR!" "!TEST_NAME!" "!FORM_NUMBER!" "!HAS_ANSWERS!" >nul 2>&1
+
+:: Read AGENT_PROMPT from prompt_local_agent.txt and pre-load into Windows Clipboard
+set /p AGENT_PROMPT=<"!TEST_DIR!\prompt_local_agent.txt"
+type "!TEST_DIR!\prompt_local_agent.txt" | clip
 
 :: Try to detect available agents
 set "AGENT_FOUND=0"
@@ -249,12 +344,24 @@ if not errorlevel 1 (
     set "AGENT_FOUND=1"
     echo   FOUND: agy (Gemini CLI^)
     echo.
-    set /p USE_AGY="   Launch agy to process the test? (Y/n): "
+    set /p USE_AGY="   Launch agy to process the test automatically? (Y/n): "
     if /i not "!USE_AGY!"=="n" (
         echo.
-        echo   Starting agy...
-        echo   -------------------------------------
-        start "" cmd /k "cd /d "%~dp0" && agy "!AGENT_PROMPT!""
+        echo  ===========================================================
+        echo            LAUNCHING AGENT: agy (Gemini CLI^)
+        echo  ===========================================================
+        echo.
+        echo   Auto-injecting prompt into agy...
+        echo   Command: agy -i "!AGENT_PROMPT!"
+        echo.
+        echo   What is happening now:
+        echo     1. agy is starting in a NEW window with prompt auto-injected.
+        echo     2. It will automatically read LLM_RUNBOOK.md and run scripts.
+        echo     3. Check that window if agy asks questions or finishes.
+        echo.
+        echo  ===========================================================
+        echo.
+        start "" cmd /k "cd /d "%~dp0" && agy -i "!AGENT_PROMPT!""
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
@@ -266,10 +373,18 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
     set "AGENT_FOUND=1"
     echo   FOUND: gemini CLI
     echo.
-    set /p USE_GEMINI="   Launch gemini to process the test? (Y/n): "
+    set /p USE_GEMINI="   Launch gemini to process the test automatically? (Y/n): "
     if /i not "!USE_GEMINI!"=="n" (
         echo.
-        echo   Starting gemini...
+        echo  ===========================================================
+        echo            LAUNCHING AGENT: gemini CLI
+        echo  ===========================================================
+        echo.
+        echo   Command: gemini "!AGENT_PROMPT!"
+        echo.
+        echo   Starting gemini in a new window with prompt injected...
+        echo  ===========================================================
+        echo.
         start "" cmd /k "cd /d "%~dp0" && gemini "!AGENT_PROMPT!""
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
@@ -282,57 +397,111 @@ if not errorlevel 1 if !AGENT_LAUNCHED!==0 (
     set "AGENT_FOUND=1"
     echo   FOUND: claude CLI
     echo.
-    set /p USE_CLAUDE="   Launch claude to process the test? (Y/n): "
+    set /p USE_CLAUDE="   Launch claude to process the test automatically? (Y/n): "
     if /i not "!USE_CLAUDE!"=="n" (
         echo.
-        echo   Starting claude...
+        echo  ===========================================================
+        echo            LAUNCHING AGENT: claude CLI
+        echo  ===========================================================
+        echo.
+        echo   Command: claude "!AGENT_PROMPT!"
+        echo.
+        echo   Starting claude in a new window with prompt injected...
+        echo  ===========================================================
+        echo.
         start "" cmd /k "cd /d "%~dp0" && claude "!AGENT_PROMPT!""
         set "AGENT_LAUNCHED=1"
         goto :wait_for_questions
     )
 )
 
-:: Check for VS Code
-where code >nul 2>&1
-if not errorlevel 1 (
-    set "AGENT_FOUND=1"
-    echo   FOUND: VS Code (use Copilot Chat inside^)
-)
-
-:: Check for Cursor
-where cursor >nul 2>&1
-if not errorlevel 1 (
-    set "AGENT_FOUND=1"
-    echo   FOUND: Cursor IDE
-)
-
-:: Show manual instructions
+:: Show interactive prompt selection menu if CLI agent was NOT launched
+:prompt_menu
 echo.
 echo  ===========================================================
-echo               AI AGENT INSTRUCTIONS
+echo                 AI AGENT PROMPT ASSISTANT
 echo  ===========================================================
 echo.
-echo   Open this project in an AI-powered IDE or CLI:
+echo   Prompt files generated:
+echo     - !TEST_DIR!\prompt_local_agent.txt
+echo     - !TEST_DIR!\prompt_web_ai.txt
 echo.
-echo     - agy (Gemini CLI^)
-echo     - gemini CLI
-echo     - claude CLI
-echo     - VS Code with Copilot
-echo     - Cursor IDE
-echo     - Antigravity IDE
-echo     - Google AI Studio
+echo   Local prompt has been pre-copied to clipboard!
 echo.
-echo   Then paste this prompt:
+echo   Which prompt would you like to copy/open?
 echo.
-echo   ---
-echo   %AGENT_PROMPT%
-echo   ---
+echo     [1] LOCAL AGENT PROMPT (agy, gemini, claude, Cursor, VS Code, Antigravity^)
+echo         Copies local prompt to clipboard.
 echo.
+echo     [2] WEB AI PROMPT (ChatGPT, Claude.ai, Gemini Web, AI Studio^)
+echo         Copies web prompt to clipboard ^& offers to open browser.
+echo.
+echo     [3] Display BOTH prompts on screen
+echo     [S] Skip prompt assistant
+echo.
+set /p PROMPT_CHOICE="   Your choice (1/2/3/s): "
 
-:: Copy prompt to clipboard
-echo %AGENT_PROMPT%| clip
-echo   OK - Prompt copied to clipboard!
+if /i "!PROMPT_CHOICE!"=="1" goto :copy_local_prompt
+if /i "!PROMPT_CHOICE!"=="2" goto :copy_web_prompt
+if /i "!PROMPT_CHOICE!"=="3" goto :show_both_prompts
+if /i "!PROMPT_CHOICE!"=="s" goto :wait_for_questions
+:: Default to copy local prompt
+goto :copy_local_prompt
+
+:copy_local_prompt
+type "!TEST_DIR!\prompt_local_agent.txt" | clip
 echo.
+echo   OK - Copied LOCAL AGENT PROMPT to clipboard!
+echo.
+echo   --- PROMPT PREVIEW ---
+type "!TEST_DIR!\prompt_local_agent.txt"
+echo.
+echo   ----------------------
+goto :wait_for_questions
+
+:copy_web_prompt
+type "!TEST_DIR!\prompt_web_ai.txt" | clip
+echo.
+echo   OK - Copied WEB AI PROMPT to clipboard!
+echo.
+echo   --- PROMPT PREVIEW ---
+type "!TEST_DIR!\prompt_web_ai.txt"
+echo.
+echo   ----------------------
+echo.
+echo   Would you like to open a Web AI service in your browser now?
+echo     [1] ChatGPT (chatgpt.com^)
+echo     [2] Gemini Web (gemini.google.com^)
+echo     [3] Claude (claude.ai^)
+echo     [N] No, I will paste manually
+echo.
+set /p WEB_CHOICE="   Your choice (1/2/3/n): "
+if "!WEB_CHOICE!"=="1" start https://chatgpt.com
+if "!WEB_CHOICE!"=="2" start https://gemini.google.com
+if "!WEB_CHOICE!"=="3" start https://claude.ai
+echo.
+echo   INSTRUCTIONS FOR WEB AI:
+echo     1. Upload your PDF (and answer key CSV^) in the opened browser window.
+echo     2. Press Ctrl+V to paste the copied prompt.
+echo     3. Save the generated JSON to !TEST_DIR!\questions.json
+echo.
+goto :wait_for_questions
+
+:show_both_prompts
+echo.
+echo  ===========================================================
+echo  PROMPT 1: LOCAL AI AGENT (agy / gemini / claude / IDEs^)
+echo  ===========================================================
+type "!TEST_DIR!\prompt_local_agent.txt"
+echo.
+echo  ===========================================================
+echo  PROMPT 2: WEB AI (ChatGPT / Claude.ai / Gemini Web^)
+echo  ===========================================================
+type "!TEST_DIR!\prompt_web_ai.txt"
+echo.
+echo  ===========================================================
+echo.
+goto :prompt_menu
 
 :wait_for_questions
 echo   Waiting for the AI agent to create questions.json...
