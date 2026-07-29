@@ -5,9 +5,11 @@ import argparse
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+from pathlib import Path
+
 def main():
     parser = argparse.ArgumentParser(description="QA check for the final questions.json file.")
-    parser.add_argument("json_file", help="Path to the questions.json file")
+    parser.add_argument("json_file", help="Path to the questions.json file or test directory")
     parser.add_argument("--expected-options", type=int, default=None,
                         help="Expected number of options per question (default: 4). "
                              "Questions with a different count will show a WARNING rather than an ERROR.")
@@ -15,8 +17,18 @@ def main():
     args = parser.parse_args()
     expected_opts = args.expected_options if args.expected_options is not None else 4
 
+    p = Path(args.json_file)
+    if p.is_dir():
+        target_file = p / "questions.json"
+    else:
+        target_file = p
+
+    if not target_file.exists():
+        print(f"Questions file not found: {target_file}")
+        return
+
     try:
-        with open(args.json_file, 'r', encoding='utf-8') as f:
+        with open(target_file, 'r', encoding='utf-8') as f:
             qs = json.load(f)
     except Exception as e:
         print(f"Error reading JSON: {e}")
@@ -40,7 +52,7 @@ def main():
                 cleaned_count += 1
 
     if cleaned_count > 0:
-        with open(args.json_file, 'w', encoding='utf-8') as f:
+        with open(target_file, 'w', encoding='utf-8') as f:
             json.dump(qs, f, ensure_ascii=False, indent=2)
         print(f"Cleaned pageImage field from {cleaned_count} text-only question(s).\n")
 

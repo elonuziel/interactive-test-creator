@@ -592,6 +592,7 @@ echo   (Press any key once the agent has finished processing^)
 echo.
 pause
 
+:check_questions_exist
 :: Check if questions.json was created
 if exist "!TEST_DIR!\questions.json" (
     echo.
@@ -600,7 +601,7 @@ if exist "!TEST_DIR!\questions.json" (
 )
 
 :: Check for alternative file names and auto-rename
-for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\gemini-code-*.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
+for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\gemini-code-*" "!TEST_DIR!\gemini_code_*" "!TEST_DIR!\gemini-*" "!TEST_DIR!\gemini_*" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
     if exist "%%~f" (
         echo.
         echo   OK - Found %%~nxf. Auto-renaming to questions.json...
@@ -609,32 +610,50 @@ for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DI
     )
 )
 
-echo.
-echo   WARNING: questions.json not found yet in !TEST_DIR!
-echo   If your AI response was saved under a different name ^(e.g., gemini-code-xxx.json, response.json, output.json^),
-echo   please rename it to 'questions.json' inside !TEST_DIR! before pressing any key.
-echo.
-echo   Options:
-echo     1. Rename/save the file to 'questions.json' and press any key to continue
-echo     2. Press Ctrl+C to exit and run start.bat again later
-echo.
-pause
-
-if exist "!TEST_DIR!\questions.json" goto :post_process
-for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\gemini-code-*.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
-    if exist "%%~f" (
-        echo   OK - Found %%~nxf. Auto-renaming to questions.json...
-        move "%%~f" "!TEST_DIR!\questions.json" >nul
-        goto :post_process
+:: Interactively list any candidate JSON/TXT files found in the test directory
+set "JSON_COUNT=0"
+for %%f in ("!TEST_DIR!\*.json" "!TEST_DIR!\*.txt") do (
+    set "FNAME=%%~nxf"
+    if /i not "!FNAME!"=="answers.json" if /i not "!FNAME!"=="page_map.json" if /i not "!FNAME!"=="questions.json" if /i not "!FNAME!"=="pdf_type_result.txt" if /i not "!FNAME!"=="prompt_local_agent.txt" if /i not "!FNAME!"=="prompt_web_ai.txt" (
+        set /a JSON_COUNT+=1
+        set "JSON_FILE_!JSON_COUNT!=%%~nxf"
+        set "JSON_PATH_!JSON_COUNT!=%%~ff"
     )
 )
 
-echo   ERROR: questions.json still not found. Please ensure the AI output file is renamed
-echo      to 'questions.json' inside !TEST_DIR! and run start.bat again.
+if !JSON_COUNT! GTR 0 (
+    echo.
+    echo   Found !JSON_COUNT! candidate JSON file^(s^) in !TEST_DIR!:
+    for /l %%i in (1,1,!JSON_COUNT!) do (
+        echo     [%%i] !JSON_FILE_%%i!
+    )
+    echo.
+    set "CHOSEN_JSON_INDEX="
+    set /p CHOSEN_JSON_INDEX="   Select JSON file to use as questions.json (1-!JSON_COUNT! or Enter to skip): "
+    if defined CHOSEN_JSON_INDEX set "CHOSEN_JSON_INDEX=!CHOSEN_JSON_INDEX: =!"
+    if not "!CHOSEN_JSON_INDEX!"=="" (
+        for %%a in (!CHOSEN_JSON_INDEX!) do (
+            if defined JSON_PATH_%%a (
+                echo.
+                echo   OK - Selected '!JSON_FILE_%%a!'. Renaming to questions.json...
+                move "!JSON_PATH_%%a!" "!TEST_DIR!\questions.json" >nul
+                goto :post_process
+            )
+        )
+    )
+)
+
 echo.
-echo   Press any key to return to the main menu...
-pause >nul
-goto :select_test_step
+echo   WARNING: questions.json not found yet in !TEST_DIR!
+echo   If your AI response was saved under a different name, please rename it to 'questions.json'
+echo   inside !TEST_DIR! before pressing any key.
+echo.
+echo   Options:
+echo     1. Save/rename the file to 'questions.json' and press any key to re-check
+echo     2. Press Ctrl+C to exit and run start.bat again later
+echo.
+pause
+goto :check_questions_exist
 
 
 :: ===========================================================================
@@ -644,15 +663,19 @@ goto :select_test_step
 echo.
 echo  [Step 5/5] Running automated post-processing...
 echo  -------------------------------------
-if !HAS_ANSWERS!==1 (
+if exist "!TEST_DIR!\questions.json" (
+    if !HAS_ANSWERS!==1 (
+        echo.
+        echo   Merging answers into questions.json...
+        python python_scripts\6_merge_json_answers.py "!TEST_DIR!"
+    )
     echo.
-    echo   Merging answers into questions.json...
-    python python_scripts\6_merge_json_answers.py "!TEST_DIR!"
+    echo   Running QA checks...
+    python python_scripts\7_check_json.py "!TEST_DIR!"
+) else (
+    echo.
+    echo   NOTE: Skipping answer merge and QA checks ^(questions.json not found yet^).
 )
-
-echo.
-echo   Running QA checks...
-python python_scripts\7_check_json.py "!TEST_DIR!"
 
 echo.
 echo   Updating manifest...
