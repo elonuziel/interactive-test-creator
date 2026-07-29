@@ -75,10 +75,6 @@ python 5_parse_questions_md.py "raw_text.md" -o "questions.json" \
 | `--page-map FILE` | JSON file from `2_extract_text_fitz.py --page-map` |
 | `--include-source-page` | Add `sourcePage` field to each question for debugging |
 
-**C. `8_proofread_llm.py` (Optional Post-Processing LLM Pass)**
-Optional pass to fix RTL chunk reversal, scrambled LTR/RTL parentheses (e.g. `(zoea)`), or option boundary artifacts in digital PDF extractions using Gemini 1.5 Flash or GPT-4o-mini.
-**Usage:** `python 8_proofread_llm.py "questions.json" -o "questions_clean.json" --api-key "sk-..."`
-
 ### 3. Scanned PDF Path (if Step 1 is Scanned)
 Use these scripts to render the PDF to images and extract text manually (via Vision LLMs or manual transcription).
 

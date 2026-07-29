@@ -85,25 +85,6 @@ For debugging, add `--include-source-page` to see which PDF page each question c
 
 ---
 
-## Step 2C: Optional Post-Processing Pass (LLM Proofreading)
-
-For digital PDFs where heuristic extraction produces minor text ordering artifacts, an optional LLM proofreader pass can be run on `questions.json` before merging answers:
-
-```bash
-python python_scripts/8_proofread_llm.py "questions.json" -o "questions_clean.json" --api-key "YOUR_GEMINI_API_KEY"
-```
-*(Or in the browser-based builder via `verifyTestWithGemini()`)*
-
-### Problem Addressed
-Heuristic extraction handles ~90–95% of digital Hebrew PDFs clean, but ~5–10% of questions suffer from PyMuPDF chunk reversal (e.g., reversed RTL phrases, scrambled LTR/RTL parentheses like `(zoea)`, or merged table cells).
-
-### Proposed Pipeline Addition
-- **Opt-in, Batch-Mode LLM Pass:** Uses Gemini 1.5 Flash or GPT-4o-mini to clean up extracted questions.
-- **Single-Prompt Processing:** Sends all extracted questions in a single prompt call to repair word order, fix reversed parentheses, and verify option boundaries while retaining strict JSON schema compliance.
-- **Verification:** Verification with `7_check_json.py` ensures data integrity before final quiz generation.
-
----
-
 ## Step 2 Alternative: Extract Questions (Scanned PDF Path)
 If the PDF is scanned (or has heavily complex diagrams that break digital extraction), you must render it to images.
 
@@ -111,8 +92,26 @@ If the PDF is scanned (or has heavily complex diagrams that break digital extrac
 ```bash
 python python_scripts/3_render_pdf_pages.py "path/to/exam.pdf" -o "pages_output"
 ```
-**2B. Manual / LLM Transcription**
-You must read the generated images, extract the questions and options manually (using your vision capabilities), and format them into the `questions.json` structure (see [Schema Reference](#questionsjson-schema-reference) above).
+**2B. Vision LLM / Manual Transcription**
+You must read the generated images, extract the questions and options (using your vision capabilities), and format them into the `questions.json` structure (see [Schema Reference](#questionsjson-schema-reference) above).
+
+---
+
+## Step 2C: Automated LLM Proofreading & Verification Pass (Required for Both Paths)
+
+Whether `questions.json` was generated via **Digital PDF extraction** (Steps 2A-2B) or **Scanned PDF Vision transcription** (Steps 2A-2B Alternative), you as the AI Agent MUST perform a final proofreading audit before proceeding to Step 3.
+
+### Why This Step Is Required
+- **Digital PDFs:** Heuristic PyMuPDF parsing clean-extracts ~90–95% of text, but ~5–10% of questions suffer from visual PDF chunk reversal, scrambled mixed Hebrew/Latin parentheses (e.g. `(zoea)`), or line-initial colons.
+- **Scanned PDFs:** Vision LLM transcriptions can occasionally misread dense Hebrew characters, misalign option letters, or invert parentheses in scientific terms.
+
+### Agent Proofreading Protocol
+Review and audit all questions in `questions.json` using your native LLM capabilities against the following checklist:
+1. **Audit Hebrew Word Order:** Fix any reversed phrases or line-initial colons/punctuation.
+2. **Audit Mixed Language Terms:** Correct reversed parentheses and word ordering in lines with scientific names or English terms.
+3. **Verify Option Boundaries:** Ensure each question has clean, non-truncated option strings.
+4. **Preserve Schema & Array Structure:** Retain exact question indices, 0-based `correctIndex` placeholders, and extra metadata fields (e.g., `"image"` or `"sourcePage"`).
+5. **Run QA Verification:** Execute `python python_scripts/7_check_json.py questions.json` to verify schema integrity.
 
 ---
 
