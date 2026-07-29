@@ -108,3 +108,46 @@ Merges the extracted answers from the CSV with the raw questions JSON and maps 1
 Checks the final JSON file for dropped options, empty questions, duplicate option text, or out-of-bounds `correctIndex` values. Run this before deploying!
 **Usage:** `python 7_check_json.py "final_questions.json"`
 **Options:** `--expected-options N` (default: 4; mismatched counts produce a warning instead of an error)
+
+### 6. Auto-Generate Test Manifest
+
+**`8_generate_manifest.py`**
+Scans the `tests/` directory for subdirectories containing `questions.json` and generates a `manifest.json` file that the web app uses to populate the test selection menu.
+
+**Usage:**
+```bash
+# Default: scan tests/ and write tests/manifest.json
+python 8_generate_manifest.py
+
+# Custom tests directory
+python 8_generate_manifest.py --tests-dir path/to/tests
+
+# Custom output path
+python 8_generate_manifest.py -o custom_manifest.json
+```
+
+> **Note:** This script is automatically run by `run_server.bat` and `run_server.sh` before starting the HTTP server.
+
+### 7. Build Single-File HTML
+
+**`9_build_single_html.py`**
+Builds a **completely self-contained HTML quiz file** that works by double-clicking — no server needed. Inlines CSS, JS, questions, and optionally images (as base64 data URIs) into a single `.html` file.
+
+**Usage:**
+```bash
+# Basic usage
+python 9_build_single_html.py "tests/2019_a" -o "botany_2019a.html"
+
+# Without images (smaller file size)
+python 9_build_single_html.py "tests/2019_a" --no-images
+
+# With custom title
+python 9_build_single_html.py "tests/2019_a" --title "בוטניקה 2019 מועד א"
+```
+
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `-o`, `--output FILE` | Output HTML file path (default: `<test_name>_quiz.html`) |
+| `--no-images` | Skip embedding images (reduces file size) |
+| `--title TEXT` | Custom page title |

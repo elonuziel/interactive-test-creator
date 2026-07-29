@@ -8,6 +8,14 @@ echo "=================================================="
 echo " Starting Interactive Quiz Server on Port $PORT..."
 echo "=================================================="
 
+# Auto-generate manifest.json from available test folders
+echo "Generating test manifest..."
+if command -v python3 >/dev/null 2>&1; then
+    python3 python_scripts/8_generate_manifest.py
+elif command -v python >/dev/null 2>&1; then
+    python python_scripts/8_generate_manifest.py
+fi
+
 # Function to open the browser once the server is starting
 open_browser() {
     # Wait a moment for the server to spin up

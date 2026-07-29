@@ -174,6 +174,36 @@ If everything passes:
 
 ---
 
+## Step 5.5: Generate Test Manifest
+
+After finalizing `questions.json`, regenerate the test manifest so the web app's selection menu picks up the new test:
+```bash
+python python_scripts/8_generate_manifest.py
+```
+This scans `tests/` for subdirectories containing `questions.json` and writes `tests/manifest.json`.
+
+> **Note:** The manifest is also auto-generated when you start the server via `run_server.bat` or `run_server.sh`.
+
+---
+
+## Step 6: Build Single-File HTML (Optional)
+
+To create a **portable, self-contained HTML file** that works by double-clicking (no server needed):
+```bash
+python python_scripts/9_build_single_html.py "tests/test_1" -o "test_1_quiz.html"
+```
+
+This inlines the CSS, JS, questions, and images (as base64 data URIs) into a single `.html` file.
+
+**Options:**
+| Flag | Description |
+|------|-------------|
+| `-o`, `--output FILE` | Output HTML file path (default: `<test_name>_quiz.html`) |
+| `--no-images` | Skip embedding images (reduces file size) |
+| `--title TEXT` | Custom page title |
+
+---
+
 ## Extracting Images from PDFs
 
 To extract embedded images from a digital PDF, use PyMuPDF directly:

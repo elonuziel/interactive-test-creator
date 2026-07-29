@@ -8,8 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered'
     let theme = localStorage.getItem('theme') || 'light';
 
-    const STORAGE_KEY = 'quiz_answers_v1';
-
     // ── DOM Elements ─────────────────────────────────────────────────────────
     const setupScreen   = document.getElementById('setup-screen');
     const quizScreen    = document.getElementById('quiz-screen');
@@ -86,6 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const testPath = urlParams.get('test');
 
+    // ── Scoped Storage Key (per test) ─────────────────────────────────────────
+    const STORAGE_KEY = testPath ? ('quiz_answers_v1_' + testPath) : 'quiz_answers_v1';
+
     const errorScreen      = document.getElementById('error-screen');
     const errorMessageText = document.getElementById('error-message-text');
     const backToMenuBtn    = document.getElementById('back-to-menu-btn');
@@ -133,44 +134,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Fetch Questions ───────────────────────────────────────────────────────
-    const jsonUrl = `../${testPath}/questions.json?v=` + new Date().getTime();
-    fetch(jsonUrl)
-        .then(r => {
-            if (!r.ok) throw new Error("Could not load " + jsonUrl);
-            return r.json();
-        })
-        .then(data => {
-            questions = data.map(q => {
-                const options = q.options.map((text, id) => ({ id, text }));
-                // Fisher-Yates shuffle
-                for (let i = options.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [options[i], options[j]] = [options[j], options[i]];
-                }
-                
-                // Adjust relative image path if present
-                let img = q.image;
-                if (img && !img.startsWith('http')) {
-                    img = `../${testPath}/${img}`;
-                }
-                let pageImg = q.pageImage;
-                if (pageImg && !pageImg.startsWith('http')) {
-                    pageImg = `../${testPath}/${pageImg}`;
-                }
-
-                return { ...q, options, image: img, pageImage: pageImg };
-            });
-
-            // Check for saved progress
-            const saved = loadProgress();
-            if (saved && saved.answers && saved.answers.length === questions.length) {
-                resumeNotice.classList.remove('hidden');
+    function initQuestions(data) {
+        questions = data.map(q => {
+            const options = q.options.map((text, id) => ({ id, text }));
+            // Fisher-Yates shuffle
+            for (let i = options.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [options[i], options[j]] = [options[j], options[i]];
             }
-        })
-        .catch(err => {
-            console.error('Error loading questions:', err);
-            showError('שגיאה בטעינת המבחן. אנא ודא שהנתיב נכון וקיים קובץ questions.json בתיקיית המבחן.');
+
+            // Adjust relative image path if present (skip for data URIs)
+            let img = q.image;
+            if (img && !img.startsWith('http') && !img.startsWith('data:')) {
+                img = `../${testPath}/${img}`;
+            }
+            let pageImg = q.pageImage;
+            if (pageImg && !pageImg.startsWith('http') && !pageImg.startsWith('data:')) {
+                pageImg = `../${testPath}/${pageImg}`;
+            }
+
+            return { ...q, options, image: img, pageImage: pageImg };
         });
+
+        // Check for saved progress
+        const saved = loadProgress();
+        if (saved && saved.answers && saved.answers.length === questions.length) {
+            resumeNotice.classList.remove('hidden');
+        }
+    }
+
+    // Support embedded questions (single-file HTML mode)
+    if (window.__EMBEDDED_QUESTIONS) {
+        initQuestions(window.__EMBEDDED_QUESTIONS);
+    } else {
+        const jsonUrl = `../${testPath}/questions.json?v=` + new Date().getTime();
+        fetch(jsonUrl)
+            .then(r => {
+                if (!r.ok) throw new Error("Could not load " + jsonUrl);
+                return r.json();
+            })
+            .then(data => initQuestions(data))
+            .catch(err => {
+                console.error('Error loading questions:', err);
+                showError('שגיאה בטעינת המבחן. אנא ודא שהנתיב נכון וקיים קובץ questions.json בתיקיית המבחן.');
+            });
+    }
 
     // ── Dynamic Test List ────────────────────────────────────────────────────
     function loadTestList() {
@@ -379,18 +387,26 @@ document.addEventListener('DOMContentLoaded', () => {
         q.options.forEach((option, posIndex) => {
             const btn = document.createElement('div');
             btn.className = 'option';
+            btn.setAttribute('role', 'option');
             btn.textContent = option.text;
             btn.setAttribute('data-key', posIndex + 1); // keyboard shortcut hint
 
             // Restore previous selection
             if (answered) {
-                if (answered.selectedOptionId === option.id) btn.classList.add('selected');
+                if (answered.selectedOptionId === option.id) {
+                    btn.classList.add('selected');
+                    btn.setAttribute('aria-selected', 'true');
+                } else {
+                    btn.setAttribute('aria-selected', 'false');
+                }
 
                 if (isImmediateFeedback) {
                     btn.classList.add('disabled');
                     if (option.id === q.correctIndex) btn.classList.add('correct');
                     else if (answered.selectedOptionId === option.id) btn.classList.add('incorrect');
                 }
+            } else {
+                btn.setAttribute('aria-selected', 'false');
             }
 
             btn.addEventListener('click', () => handleOptionSelect(option.id, btn, q.correctIndex));

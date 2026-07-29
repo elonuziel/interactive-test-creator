@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="אפליקציית מבחן אינטראקטיבית בעברית עם תמיכה מלאה ב-RTL, משוב מיידי, ניווט מקלדת, ומעקב התקדמות. Interactive Hebrew quiz application.">
     <title>מבחן אינטראקטיבי</title>
     <link rel="stylesheet" href="style.css">
     <!-- Cropper.js -->
@@ -89,12 +90,12 @@
                     <h2 id="question-text">טוען שאלה...</h2>
                     <button id="open-cropper-btn" class="secondary-btn hidden" style="margin-bottom: 10px; width: 100%;">חתוך תמונה לנוחותך</button>
                     <img id="question-image" src="" alt="תמונה לשאלה" class="hidden" title="לחץ להגדלה">
-                    <div id="options-container" class="options-list">
+                    <div id="options-container" class="options-list" role="listbox" aria-label="אפשרויות תשובה">
                         <!-- Options injected here -->
                     </div>
                 </div>
 
-                <div id="feedback-message" class="feedback-message hidden">
+                <div id="feedback-message" class="feedback-message hidden" aria-live="polite">
                     <!-- Correct/Incorrect message injected here -->
                 </div>
 
