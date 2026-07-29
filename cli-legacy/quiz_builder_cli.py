@@ -264,6 +264,20 @@ def interactive_wizard():
                 print(f"  Status: {C_YELLOW}PENDING (requires processing){C_RESET}\n")
                 process_workspace(target, test_dir)
 
+def is_pdf_digital(pdf_path):
+    if fitz is None:
+        return False
+    try:
+        doc = fitz.open(pdf_path)
+        pages_checked = min(3, len(doc))
+        if pages_checked == 0:
+            return False
+        total_chars = sum(len(doc[i].get_text().strip()) for i in range(pages_checked))
+        avg = total_chars / pages_checked
+        return avg >= 50
+    except Exception:
+        return False
+
 def process_workspace(test_name, test_dir):
     # Step 3: Check for source files & launch Explorer
     pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
@@ -301,10 +315,12 @@ def process_workspace(test_name, test_dir):
     print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
 
     # PDF Type Detection
+    is_digital = False
     if pdf_files:
         pdf_path = os.path.join(test_dir, pdf_files[0])
         print("  [1/2] Analyzing PDF format (Digital vs Scanned)...")
         run_script('1_detect_pdf_type.py', [pdf_path])
+        is_digital = is_pdf_digital(pdf_path)
 
     # Answer Key Form Setup
     form_number = "1"
@@ -358,13 +374,18 @@ def process_workspace(test_name, test_dir):
         print("  Opening rendered pages output folder in Explorer...\n")
         open_in_explorer(out_pages)
 
-        raw_md = os.path.join(test_dir, 'raw_text.md')
-        img_dir = os.path.join(test_dir, 'images')
-        page_map = os.path.join(test_dir, 'page_map.json')
-        q_out = os.path.join(test_dir, 'questions.json')
+        if is_digital:
+            print(f"  {C_GREEN}[OK] DIGITAL PDF DETECTED: Extracting text automatically...{C_RESET}")
+            raw_md = os.path.join(test_dir, 'raw_text.md')
+            img_dir = os.path.join(test_dir, 'images')
+            page_map = os.path.join(test_dir, 'page_map.json')
+            q_out = os.path.join(test_dir, 'questions.json')
 
-        run_script('2_extract_text_fitz.py', [pdf_path, '-o', raw_md, '--extract-images', img_dir, '--page-map', page_map])
-        run_script('5_parse_questions_md.py', [raw_md, '-o', q_out, '--image-dir', img_dir, '--page-map', page_map])
+            run_script('2_extract_text_fitz.py', [pdf_path, '-o', raw_md, '--extract-images', img_dir, '--page-map', page_map])
+            run_script('5_parse_questions_md.py', [raw_md, '-o', q_out, '--image-dir', img_dir, '--page-map', page_map])
+        else:
+            print(f"  {C_YELLOW}[!] SCANNED PDF DETECTED: Skipping PyMuPDF text parsing.{C_RESET}")
+            print(f"      Rendered page images are ready in pages_output/ for AI agent extraction.\n")
 
     # Step 5: AI Agent & Prompt Assistant
     print(f"\n {C_BOLD}[Step 5/6] AI Agent Question Extraction & Proofreading{C_RESET}")
