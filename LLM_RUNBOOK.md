@@ -39,10 +39,22 @@ Each question object in the JSON array follows this structure:
 
 ---
 
+## Step 0: Create Test Directory & Drop Raw Input Files
+
+Before running the extraction tools:
+1. Create a dedicated folder for your test under `tests/` (e.g., `tests/test_1/`, `tests/test_2/`, `tests/2022_moed_b/`).
+2. Drop your raw input files directly into that folder:
+   - **Exam PDF**: `tests/<test_name>/exam.pdf`
+   - **Answer Key (Excel/CSV)**: `tests/<test_name>/answers.csv` or `answers.xlsx`
+
+> 🔒 **Git Protection Note**: The `.gitignore` file includes `test*/`. All raw PDFs, answer spreadsheets, and intermediate files stored in `tests/` are automatically ignored by Git and will not be pushed to GitHub.
+
+---
+
 ## Step 1: Detect PDF Type
-Run the detector script on the provided PDF:
+Run the detector script on the dropped PDF:
 ```bash
-python python_scripts/1_detect_pdf_type.py "path/to/exam.pdf"
+python python_scripts/1_detect_pdf_type.py "tests/test_1/exam.pdf"
 ```
 It will output whether the PDF is a **Digital PDF** (extractable text) or a **Scanned PDF** (images only).
 

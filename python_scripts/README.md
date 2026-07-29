@@ -9,13 +9,19 @@ pip install pymupdf pandas openpyxl
 
 `pandas` and `openpyxl` are only needed if you plan to read Excel answer keys with `4_extract_csv_answers.py`.
 
+## Drop Folder Location & Input Files
+
+Drop your raw PDFs (e.g. `exam.pdf`) and answer key spreadsheets (e.g. `answers.csv` or `answers.xlsx`) directly into a dedicated folder under `tests/` (e.g., `tests/test_1/`, `tests/test_2/`).
+
+> 🔒 **Git Note**: Files inside `tests/` are matched by `.gitignore` (`test*/`) and will not be uploaded to GitHub.
+
 ## The Workflow
 
 The scripts are numbered in the order you would typically use them.
 
 ### 1. `1_detect_pdf_type.py`
 Determines if a PDF is a Digital PDF (has extractable text) or a Scanned PDF (images only). 
-**Usage:** `python 1_detect_pdf_type.py "exam.pdf"`
+**Usage:** `python 1_detect_pdf_type.py "tests/test_1/exam.pdf"`
 
 ### 2. Digital PDF Path (if Step 1 is Digital)
 Use these scripts to extract text, images, and parse it:
