@@ -63,6 +63,11 @@ def main():
     args = parser.parse_args()
 
     input_path = Path(args.csv_file)
+    if input_path.is_dir():
+        candidates = list(input_path.glob("*.xlsx")) + list(input_path.glob("*.xls")) + list(input_path.glob("*.csv"))
+        if candidates:
+            input_path = candidates[0]
+
     form_str = str(args.form_num).strip().lstrip('0')
     if not form_str:
         form_str = '0'
@@ -89,13 +94,32 @@ def main():
 
             elif header_row_index is not None:
                 target_row = None
+                available_forms = []
                 for row in rows[header_row_index + 1:]:
                     if not row:
                         continue
 
+                    for cell in row[:3]:
+                        cell_val = str(cell).strip()
+                        if cell_val.replace('.', '').isdigit():
+                            val = str(int(float(cell_val))) if '.' in cell_val else cell_val
+                            val = val.lstrip('0')
+                            if not val:
+                                val = '0'
+                            if val not in available_forms and val != '0':
+                                available_forms.append(val)
+
                     if any(str(cell).strip().lstrip('0') == form_str for cell in row[:3]):
                         target_row = row
                         break
+
+                if target_row is None and len(available_forms) == 1:
+                    target_form = available_forms[0]
+                    print(f"NOTE: Form '{args.form_num}' not found in spreadsheet, but file contains a single Form '{target_form}'. Auto-selecting Form {target_form}.")
+                    for row in rows[header_row_index + 1:]:
+                        if any(str(cell).strip().lstrip('0') == target_form for cell in row[:3]):
+                            target_row = row
+                            break
 
                 if target_row is not None:
                     for column_index, header_text in enumerate(headers):
@@ -115,6 +139,13 @@ def main():
                             answers_map[q_num] = parsed_answer
                         elif any(token in str(target_row[column_index]) for token in ("והת", "מבוטל")):
                             answers_map[q_num] = None
+
+                else:
+                    if available_forms:
+                        print(f"No answers found for form '{args.form_num}'. Available form(s) in this file: {', '.join(available_forms)}")
+                    else:
+                        print(f"No answers found for form '{args.form_num}'. Check if the form number exists in the file.")
+                    return 1
 
         except Exception as e:
             print(f"Warning/Error reading answers file: {e}")
