@@ -11,6 +11,12 @@ __pycache__/
 venv/
 env/
 
+# PyInstaller Build Outputs & Binaries
+dist/
+build/
+cli-legacy/dist/
+cli-legacy/build/
+
 # Generated Standalone Quiz Exports
 interactive_quiz*.html
 

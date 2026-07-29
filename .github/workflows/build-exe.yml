@@ -1,0 +1,36 @@
+name: Build Standalone Executable
+
+on:
+  push:
+    branches: [ main, feat/exe-builder ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pymupdf pandas openpyxl pyinstaller
+
+      - name: Build Executable with PyInstaller
+        run: |
+          python cli-legacy/build_exe.py
+
+      - name: Upload Executable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quiz_builder_exe
+          path: cli-legacy/dist/quiz_builder.exe
+          if-no-files-found: error
