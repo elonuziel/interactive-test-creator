@@ -67,10 +67,10 @@ The extraction script now uses **smart position‑based line grouping** (handles
 
 **2A. Extract text, images, and page‑map (single command)**
 ```bash
-python python_scripts/2_extract_text_fitz.py "path/to/exam.pdf" \
-    -o "raw_text.md" \
-    --extract-images "images" \
-    --page-map "page_map.json"
+python python_scripts/2_extract_text_fitz.py "tests/test_1/exam.pdf" \
+    -o "tests/test_1/raw_text.md" \
+    --extract-images "tests/test_1/images" \
+    --page-map "tests/test_1/page_map.json"
 ```
 This produces:
 - `raw_text.md` — extracted text with noise filtered and word order auto‑corrected
@@ -86,10 +86,10 @@ If the script says "auto‑detected VISUAL" and the output looks wrong, re‑run
 
 **2B. Parse to JSON (with image association)**
 ```bash
-python python_scripts/5_parse_questions_md.py "raw_text.md" \
-    -o "questions.json" \
-    --image-dir "images" \
-    --page-map "page_map.json"
+python python_scripts/5_parse_questions_md.py "tests/test_1/raw_text.md" \
+    -o "tests/test_1/questions.json" \
+    --image-dir "tests/test_1/images" \
+    --page-map "tests/test_1/page_map.json"
 ```
 Questions that mention graphs/diagrams (keywords: `גרף`, `תרשים`, `תמונה`, etc.) will automatically get an `image` field pointing to the matching page's embedded image.
 
@@ -102,7 +102,7 @@ If the PDF is scanned (or has heavily complex diagrams that break digital extrac
 
 **2A. Render Pages**
 ```bash
-python python_scripts/3_render_pdf_pages.py "path/to/exam.pdf" -o "pages_output"
+python python_scripts/3_render_pdf_pages.py "tests/test_1/exam.pdf" -o "tests/test_1/pages_output"
 ```
 **2B. Vision LLM / Manual Transcription**
 You must read the generated images, extract the questions and options (using your vision capabilities), and format them into the `questions.json` structure (see [Schema Reference](#questionsjson-schema-reference) above).
@@ -136,7 +136,7 @@ If you do not receive an answer key but the PDF is an exam code `000` master cop
 ### Scenario A: Standard CSV
 If it's a standard CSV, use the provided script:
 ```bash
-python python_scripts/4_extract_csv_answers.py "answers.csv" "FORM_NUMBER" -o "answers.json"
+python python_scripts/4_extract_csv_answers.py "tests/test_1/answers.csv" "FORM_NUMBER" -o "tests/test_1/answers_extracted.json"
 ```
 * **CSV Encoding (`utf-8-sig`):** Recommend `encoding='utf-8-sig'` in Python scripts to properly handle Windows Byte Order Marks (BOM) in Hebrew CSV files.
 
@@ -150,9 +150,9 @@ If the file is an Excel export from Tomamix, it often has the following quirks:
 ---
 
 ## Step 4: Merge Answers
-Merge the extracted `answers.json` into the `questions.json` to populate the `correctIndex` fields:
+Merge the extracted `answers_extracted.json` into the `questions.json` to populate the `correctIndex` fields:
 ```bash
-python python_scripts/6_merge_json_answers.py "questions.json" "answers.json" -o "final_questions.json"
+python python_scripts/6_merge_json_answers.py "tests/test_1/questions.json" "tests/test_1/answers_extracted.json" -o "tests/test_1/final_questions.json"
 ```
 
 ### Index Mapping Clarification
@@ -163,22 +163,14 @@ Convert 1-based CSV correct answer selections (where Option 1 = `1`, Option 2 = 
 ## Step 5: QA & Finalization
 Run the QA script to catch dropped options, empty questions, or out-of-bounds indices:
 ```bash
-python python_scripts/7_check_json.py "final_questions.json"
+python python_scripts/7_check_json.py "tests/test_1/final_questions.json"
 ```
 
 > **Note on option counts:** The QA script flags questions that don't have exactly 4 options. Some exams (such as 000 master copies with combination answers) intentionally have more than 4 options. If the extra options are legitimate combination answers (e.g., `כל התשובות נכונות`), the warning is expected and safe to ignore. Focus on actual errors like empty text, out-of-range `correctIndex`, or truly missing options.
 
 If everything passes:
-1. Create a directory for the exam:
-   ```bash
-   # On Linux/macOS:
-   mkdir -p tests/test_name
-   # On Windows (cmd):
-   mkdir tests\test_name
-   ```
-2. Move `final_questions.json` into the directory and rename it to `questions.json`.
-3. Move any extracted images into `tests/test_name/images/`.
-4. The test is now playable at `http://localhost:8000/web/index.html?test=tests/test_name`!
+1. Rename `tests/test_1/final_questions.json` to `questions.json` within the test folder.
+2. The test is now ready and playable at `http://localhost:8000/web/index.html?test=tests/test_1`!
 
 ---
 
