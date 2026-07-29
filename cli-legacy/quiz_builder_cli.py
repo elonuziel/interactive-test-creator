@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 quiz_builder_cli.py — Complete Interactive Hebrew Quiz Builder & Local Server
-100% faithful Python port of start.bat featuring all wizard steps, AI prompt helpers,
-clipboard integration, script pipelines, QA validation, and single-file HTML exporter.
+100% faithful Python port of start.bat featuring in-process script execution,
+AI agent auto-launchers, Explorer folder opening, ANSI VT colors, and standalone HTML exporting.
 """
 
 import os
@@ -10,6 +10,7 @@ import sys
 import json
 import re
 import glob
+import runpy
 import shutil
 import mimetypes
 import base64
@@ -76,6 +77,8 @@ def copy_to_clipboard(text):
     return False
 
 def open_in_explorer(path):
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
     if sys.platform == 'win32':
         try:
             os.startfile(path)
@@ -119,14 +122,27 @@ def format_size(size_bytes):
         return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 def run_script(script_name, args):
+    """Run a pipeline script in-process to guarantee PyInstaller compatibility."""
     script_path = os.path.join(PYTHON_SCRIPTS_DIR, script_name)
     if not os.path.isfile(script_path):
-        # Fallback search
         script_path = os.path.join(REPO_ROOT, script_name)
     
-    cmd = [sys.executable, script_path] + args
-    res = subprocess.run(cmd)
-    return res.returncode
+    if not os.path.isfile(script_path):
+        print(f"  {C_RED}[!] Error: Script {script_name} not found.{C_RESET}")
+        return 1
+
+    old_argv = sys.argv
+    sys.argv = [script_path] + list(args)
+    try:
+        runpy.run_path(script_path, run_name='__main__')
+        return 0
+    except SystemExit as e:
+        return e.code if isinstance(e.code, int) else 0
+    except Exception as e:
+        print(f"  {C_RED}[!] Error executing {script_name}: {e}{C_RESET}")
+        return 1
+    finally:
+        sys.argv = old_argv
 
 def start_local_server(port=8000):
     os.chdir(REPO_ROOT)
@@ -233,7 +249,7 @@ def interactive_wizard():
                 process_workspace(target, test_dir)
 
 def process_workspace(test_name, test_dir):
-    # Step 3: Check for source files
+    # Step 3: Check for source files & launch Explorer
     pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
     csv_files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
 
@@ -269,11 +285,9 @@ def process_workspace(test_name, test_dir):
     print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
 
     # PDF Type Detection
-    is_digital = False
     if pdf_files:
         pdf_path = os.path.join(test_dir, pdf_files[0])
         print("  [1/2] Analyzing PDF format (Digital vs Scanned)...")
-        res_file = os.path.join(test_dir, 'pdf_type_result.txt')
         run_script('1_detect_pdf_type.py', [pdf_path])
 
     # Answer Key Form Setup
@@ -323,6 +337,10 @@ def process_workspace(test_name, test_dir):
         out_pages = os.path.join(test_dir, 'pages_output')
         clean_pdf = os.path.join(test_dir, f"{test_name}_clean.pdf")
         run_script('3_render_pdf_pages.py', [pdf_path, '-o', out_pages, '--discard-pages', discard_pages, '--merged-pdf', clean_pdf])
+        
+        # Open rendered page output folder in Explorer for visual inspection / AI referencing
+        print("  Opening rendered pages output folder in Explorer...\n")
+        open_in_explorer(out_pages)
 
         raw_md = os.path.join(test_dir, 'raw_text.md')
         img_dir = os.path.join(test_dir, 'images')
@@ -347,6 +365,29 @@ def process_workspace(test_name, test_dir):
             local_prompt_text = f.read()
         copy_to_clipboard(local_prompt_text)
         print(f"  {C_GREEN}[OK] Local prompt has been copied to your Windows Clipboard!{C_RESET}")
+
+    # Check CLI Agents
+    agent_found = None
+    for ag in ['agy', 'gemini', 'claude']:
+        if shutil.which(ag):
+            agent_found = ag
+            break
+
+    if agent_found:
+        print(f"  {C_GREEN}[OK] Detected CLI Agent: {agent_found}{C_RESET}")
+        use_ag = input(f"   [?] Launch {agent_found} automatically? (Y/n) [Default: Y]: ").strip().lower()
+        if use_ag != 'n' and os.path.isfile(local_prompt_path):
+            print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+            print(f"{C_CYAN}{C_BOLD}            LAUNCHING AGENT: {agent_found}{C_RESET}")
+            print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+            print("   1. Opening agent in a new terminal window with prompt piped.")
+            print("   2. The agent will output/update questions.json automatically.")
+            print("   3. Once finished, return here and press Enter to continue.")
+            print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
+            if sys.platform == 'win32':
+                cmd_str = f'type "{local_prompt_path}" | {agent_found}'
+                subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', cmd_str], shell=True)
+            input("   Press Enter after the AI agent completes...")
 
     print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}                 AI PROMPT ASSISTANT{C_RESET}")
