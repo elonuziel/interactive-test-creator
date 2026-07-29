@@ -235,6 +235,7 @@ set "ANSWERS_NAME="
 for %%f in ("!TEST_DIR!\*.pdf") do (
     set "HAS_PDF=1"
     set "PDF_NAME=%%~nxf"
+    set "PDF_FULL_PATH=%%~sf"
 )
 for %%f in ("!TEST_DIR!\*.csv") do (
     set "HAS_ANSWERS=1"
@@ -258,9 +259,9 @@ if !HAS_PDF!==1 (
         echo   NOTE: No answer key spreadsheet found (CSV/Excel^).
     )
     echo.
-    echo   Proceeding directly to AI agent extraction...
+    echo   Proceeding directly to pre-processing...
     echo.
-    goto :agent_extraction_step
+    goto :pre_processing_step
 )
 
 :: If NO PDF file is found, prompt user to drop files
@@ -288,7 +289,10 @@ pause
 :: Verify files were dropped
 set "HAS_PDF=0"
 set "HAS_ANSWERS=0"
-for %%f in ("!TEST_DIR!\*.pdf") do set "HAS_PDF=1"
+for %%f in ("!TEST_DIR!\*.pdf") do (
+    set "HAS_PDF=1"
+    set "PDF_FULL_PATH=%%~sf"
+)
 for %%f in ("!TEST_DIR!\*.csv") do set "HAS_ANSWERS=1"
 for %%f in ("!TEST_DIR!\*.xlsx") do set "HAS_ANSWERS=1"
 for %%f in ("!TEST_DIR!\*.xls") do set "HAS_ANSWERS=1"
@@ -305,6 +309,7 @@ if !HAS_PDF!==1 echo   OK - PDF file found
 if !HAS_ANSWERS!==1 echo   OK - Answer key file found
 echo.
 
+:pre_processing_step
 :: ---------------------------------------------------------------------------
 :: STEP 3: PRE-PROCESSING (Automated)
 :: ---------------------------------------------------------------------------
@@ -313,7 +318,7 @@ echo  -------------------------------------
 echo.
 if !HAS_PDF!==1 (
     echo   Detecting PDF type...
-    python python_scripts\1_detect_pdf_type.py "!TEST_DIR!\exam.pdf" > "!TEST_DIR!\pdf_type_result.txt"
+    python python_scripts\1_detect_pdf_type.py "!PDF_FULL_PATH!" > "!TEST_DIR!\pdf_type_result.txt"
     type "!TEST_DIR!\pdf_type_result.txt"
     
     set "IS_DIGITAL=0"
@@ -322,12 +327,12 @@ if !HAS_PDF!==1 (
     
     echo.
     echo   Rendering PDF pages...
-    python python_scripts\3_render_pdf_pages.py "!TEST_DIR!"
+    python python_scripts\3_render_pdf_pages.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\pages_output"
     
     if !IS_DIGITAL!==1 (
         echo.
         echo   DIGITAL PDF detected! Automating text extraction...
-        python python_scripts\2_extract_text_fitz.py "!TEST_DIR!\exam.pdf" -o "!TEST_DIR!\raw_text.md" --extract-images "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
+        python python_scripts\2_extract_text_fitz.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\raw_text.md" --extract-images "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
         python python_scripts\5_parse_questions_md.py "!TEST_DIR!\raw_text.md" -o "!TEST_DIR!\questions.json" --image-dir "!TEST_DIR!\images" --page-map "!TEST_DIR!\page_map.json"
         echo   Automated extraction complete!
     )
@@ -641,7 +646,7 @@ goto :build_single
 :build_single
 echo.
 echo   Building single-file HTML...
-set "OUTPUT_FILE=!TEST_NAME!_quiz.html"
+set "OUTPUT_FILE=!TEST_DIR!\!TEST_NAME!_quiz.html"
 python python_scripts\9_build_single_html.py "!TEST_DIR!" -o "!OUTPUT_FILE!"
 
 if exist "!OUTPUT_FILE!" (

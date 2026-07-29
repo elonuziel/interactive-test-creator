@@ -261,7 +261,7 @@ def main():
             current_q = {
                 'text': [],
                 'answers': [],
-                'source_page': page_map.get(f"line_{line_index}", None),
+                'source_page': page_map.get(str(line_index)) or page_map.get(f"line_{line_index}"),
             }
             state = 1
             continue
@@ -335,13 +335,21 @@ def main():
                 if imgs:
                     obj['image'] = f"images/{imgs[0]}"
 
-        # ── Page image for cropper fallback ────────────────────────────────
-        if args.image_dir:
+        # ── Page image for cropper fallback (only if question has diagram keywords or embedded image) ──
+        if IMAGE_KEYWORDS.search(question_text) or obj.get('image'):
             page = q.get('source_page')
             if page:
-                page_png = os.path.join(args.image_dir, f"page{page}.png")
+                test_dir = os.path.dirname(args.md_file)
+                page_png = os.path.join(test_dir, "pages_output", f"page_{page}.png")
+                if not os.path.isfile(page_png):
+                    page_png = os.path.join(test_dir, "pages_output", f"page{page}.png")
+                
                 if os.path.isfile(page_png):
-                    obj['pageImage'] = f"images/page{page}.png"
+                    obj['pageImage'] = f"pages_output/{os.path.basename(page_png)}"
+                elif args.image_dir:
+                    page_png = os.path.join(args.image_dir, f"page{page}.png")
+                    if os.path.isfile(page_png):
+                        obj['pageImage'] = f"images/page{page}.png"
 
         # ── Debug: include source page ─────────────────────────────────────
         if args.include_source_page and q.get('source_page') is not None:

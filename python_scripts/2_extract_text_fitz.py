@@ -251,8 +251,8 @@ def main():
 
     # ── Write page‑map (Step 1.5) ──────────────────────────────────────────
     if args.page_map:
-        # Map: line_{i} → page_number
-        pm = {f"line_{i}": line_page_map[i] for i in range(len(line_page_map)) if all_lines[i].strip()}
+        # Map: line number (1-based string) → page_number
+        pm = {str(i + 1): line_page_map[i] for i in range(len(line_page_map))}
         with open(args.page_map, 'w', encoding='utf-8') as f:
             json.dump(pm, f, ensure_ascii=False, indent=2)
         print(f"Page map written to {args.page_map}")
