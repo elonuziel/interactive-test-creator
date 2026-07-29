@@ -223,6 +223,8 @@ for page_num in range(len(doc)):
 
 Associate extracted images with their questions by setting the `"image"` field in `questions.json` (see [Schema Reference](#questionsjson-schema-reference)).
 
+> 💡 **Fast Image Reference Rule**: For scanned PDFs or exams with complex diagrams, do **NOT** waste time trying to manually crop sub-images or write custom cropping scripts. Simply set `"image": "pages_output/page_X.png"` (or the whole page image scan). This allows the user to see the full page context where the question originates and crop what they need.
+
 ---
 
 ## Troubleshooting

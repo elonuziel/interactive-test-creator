@@ -6,9 +6,9 @@ def generate_prompts(test_dir, test_name, form_number="1", has_answers=True):
     
     # 1. Local Agent Prompt (for agy, gemini, claude, Cursor, VS Code, Antigravity)
     if has_answers:
-        local_prompt = f"Read LLM_RUNBOOK.md and follow it to process the test in {test_dir}/ -- extract questions from the PDF, parse them into questions.json, and merge the answer key (Form Number: {form_number}). Work through all steps."
+        local_prompt = f"Follow LLM_RUNBOOK.md to process {test_dir}/: 1) Detect PDF type (1_detect_pdf_type.py). If scanned, render pages (3_render_pdf_pages.py) & transcribe. 2) For questions with diagrams, point 'image' to the page image (e.g. pages_output/page_7.png) — do not get stuck trying to crop sub-images. 3) Parse questions to questions.json with all options. 4) Extract Form {form_number} answers (4_extract_csv_answers.py) & merge (6_merge_json_answers.py). 5) Run QA (7_check_json.py), update manifest (8_generate_manifest.py), build single HTML (9_build_single_html.py), and clean up temp files."
     else:
-        local_prompt = f"Read LLM_RUNBOOK.md and follow it to process the test in {test_dir}/ -- extract questions from the PDF and parse them into questions.json. Work through all steps."
+        local_prompt = f"Follow LLM_RUNBOOK.md to process {test_dir}/: 1) Detect PDF type (1_detect_pdf_type.py). If scanned, render pages (3_render_pdf_pages.py) & transcribe. 2) For questions with diagrams, point 'image' to the page image (e.g. pages_output/page_7.png) — do not get stuck trying to crop sub-images. 3) Parse questions to questions.json with all options and set correctIndex (or 0 if master key). 4) Run QA (7_check_json.py), update manifest (8_generate_manifest.py), build single HTML (9_build_single_html.py), and clean up temp files."
 
     local_path = os.path.join(test_dir, "prompt_local_agent.txt")
     with open(local_path, "w", encoding="utf-8") as f:
@@ -25,7 +25,7 @@ Requirements:
 1. Extract every question with its full text in correct Hebrew reading order (do not reverse words or punctuation).
 2. Extract all options (usually 4 options: א, ב, ג, ד) for each question.
 3. Determine correctIndex (0-based integer: Option 1 = 0, Option 2 = 1, Option 3 = 2, Option 4 = 3) matching Form {form_number} from the answer key.
-4. If a question references a diagram or image, include an "image": "images/qX.png" field.
+4. If a question references a diagram or image, set "image": "pages_output/page_X.png" pointing to the page image where it appears (do not spend time cropping sub-images).
 5. Return ONLY a valid JSON array matching this exact schema:
 
 [
@@ -52,7 +52,7 @@ Requirements:
 1. Extract every question with its full text in correct Hebrew reading order (do not reverse words or punctuation).
 2. Extract all options (usually 4 options: א, ב, ג, ד) for each question.
 3. If an answer key or master key is embedded in the PDF (e.g. Option 1 / א is correct), set correctIndex (0-based: Option 1 = 0, Option 2 = 1, Option 3 = 2, Option 4 = 3). Otherwise set correctIndex to 0.
-4. If a question references a diagram or image, include an "image": "images/qX.png" field.
+4. If a question references a diagram or image, set "image": "pages_output/page_X.png" pointing to the page image where it appears (do not spend time cropping sub-images).
 5. Return ONLY a valid JSON array matching this exact schema:
 
 [
