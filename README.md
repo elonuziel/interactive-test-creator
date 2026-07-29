@@ -8,7 +8,7 @@ Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading di
 
 ## 🎯 Quiz Generator (`quiz_generator.html`)
 
-**`quiz_generator.html`** + **`generator.js`** — The in-browser builder & OCR engine.
+**`quiz_generator.html`** + **`generator.js`** — the builder UI.
 
 ### Workflow
 1. **Upload PDF**: Select a digital or scanned exam PDF.
@@ -62,7 +62,7 @@ interactive-test-creator/
 ├── .github/workflows/    # GitHub Pages deployment workflow
 ├── cli-legacy/           # Legacy Python scripts & batch wizard
 ├── deal-with-later/      # Preserved research guides, scripts & proposals
-└── tests/                # Sample test PDFs & answer key fixtures
+
 ```
 
 ---
