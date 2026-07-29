@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: ══════════════════════════════════════════════════════════════════════════════
+:: ===========================================================================
 :: start.bat - Interactive Quiz Builder Wizard
 :: Walks users through the entire workflow: setup, extraction, and building.
-:: ══════════════════════════════════════════════════════════════════════════════
+:: ===========================================================================
 
 :: Navigate to repo root (in case script is double-clicked from Explorer)
 cd /d "%~dp0"
@@ -83,7 +83,7 @@ echo  [Step 2/5] Test folder setup
 echo  -------------------------------------
 echo.
 
-:: Check if tests/ exists, create if not
+:: Check if tests\ exists, create if not
 if not exist "tests" (
     echo   Creating tests\ directory...
     mkdir "tests"
