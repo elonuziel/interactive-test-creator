@@ -325,6 +325,11 @@ echo.
 echo  [Step 3/5] Running automated pre-processing steps...
 echo  -------------------------------------
 echo.
+set "SKIP_STEP3="
+set /p SKIP_STEP3="   Press Enter to run pre-processing, or type 's' to skip to Step 4: "
+if /i "!SKIP_STEP3!"=="s" goto :agent_extraction_step
+
+echo.
 if !HAS_PDF!==1 (
     echo   Detecting PDF type...
     python python_scripts\1_detect_pdf_type.py "!PDF_FULL_PATH!" > "!TEST_DIR!\pdf_type_result.txt"
@@ -365,7 +370,7 @@ if !HAS_ANSWERS!==1 (
     if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
     echo.
     echo   Extracting answers from CSV...
-    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!\!ANSWERS_NAME!" "!FORM_NUMBER!"
+    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!\!ANSWERS_NAME!" "!FORM_NUMBER!" -o "!TEST_DIR!\answers.json"
 ) else (
     set "FORM_NUMBER=1"
 )
@@ -379,6 +384,10 @@ echo.
 :: ---------------------------------------------------------------------------
 echo  [Step 4/5] Launching AI agent for extraction
 echo  -------------------------------------
+echo.
+set "SKIP_STEP4="
+set /p SKIP_STEP4="   Press Enter to proceed with AI extraction, or type 's' to skip to Step 5: "
+if /i "!SKIP_STEP4!"=="s" goto :post_process
 echo.
 if exist "!TEST_DIR!\questions.json" (
     echo   We auto-extracted questions from your digital PDF!
@@ -591,7 +600,7 @@ if exist "!TEST_DIR!\questions.json" (
 )
 
 :: Check for alternative file names and auto-rename
-for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
+for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\gemini-code-*.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
     if exist "%%~f" (
         echo.
         echo   OK - Found %%~nxf. Auto-renaming to questions.json...
@@ -602,7 +611,7 @@ for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DI
 
 echo.
 echo   WARNING: questions.json not found yet in !TEST_DIR!
-echo   If your AI response was saved under a different name ^(e.g., response.json, output.json, questions.txt^),
+echo   If your AI response was saved under a different name ^(e.g., gemini-code-xxx.json, response.json, output.json^),
 echo   please rename it to 'questions.json' inside !TEST_DIR! before pressing any key.
 echo.
 echo   Options:
@@ -612,7 +621,7 @@ echo.
 pause
 
 if exist "!TEST_DIR!\questions.json" goto :post_process
-for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
+for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\gemini-code-*.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
     if exist "%%~f" (
         echo   OK - Found %%~nxf. Auto-renaming to questions.json...
         move "%%~f" "!TEST_DIR!\questions.json" >nul
@@ -622,7 +631,10 @@ for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DI
 
 echo   ERROR: questions.json still not found. Please ensure the AI output file is renamed
 echo      to 'questions.json' inside !TEST_DIR! and run start.bat again.
-goto :end
+echo.
+echo   Press any key to return to the main menu...
+pause >nul
+goto :select_test_step
 
 
 :: ===========================================================================
@@ -663,12 +675,14 @@ echo.
 echo   [H] Build a SINGLE HTML file (double-click to open, no server^)
 echo   [S] Start the SERVER (opens all tests in browser^)
 echo   [B] Do BOTH
+echo   [M] Return to MAIN MENU
 echo   [Q] Quit
 echo.
 set /p POST_CHOICE="   Your choice: "
 
 if /i "!POST_CHOICE!"=="s" goto :start_server
 if /i "!POST_CHOICE!"=="b" goto :build_and_serve
+if /i "!POST_CHOICE!"=="m" goto :select_test_step
 if /i "!POST_CHOICE!"=="q" goto :end
 :: Default to build single
 goto :build_single
