@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Change to repo root (parent of servers/)
+cd "$(dirname "$0")/.."
+
 # Port to run the server on
 PORT=8000
 URL="http://localhost:$PORT/web/index.html"
