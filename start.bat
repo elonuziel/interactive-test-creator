@@ -235,7 +235,7 @@ set "ANSWERS_NAME="
 for %%f in ("!TEST_DIR!\*.pdf") do (
     set "HAS_PDF=1"
     set "PDF_NAME=%%~nxf"
-    set "PDF_FULL_PATH=%%~sf"
+    set "PDF_FULL_PATH=%%~ff"
 )
 for %%f in ("!TEST_DIR!\*.csv") do (
     set "HAS_ANSWERS=1"
@@ -291,7 +291,7 @@ set "HAS_PDF=0"
 set "HAS_ANSWERS=0"
 for %%f in ("!TEST_DIR!\*.pdf") do (
     set "HAS_PDF=1"
-    set "PDF_FULL_PATH=%%~sf"
+    set "PDF_FULL_PATH=%%~ff"
 )
 for %%f in ("!TEST_DIR!\*.csv") do set "HAS_ANSWERS=1"
 for %%f in ("!TEST_DIR!\*.xlsx") do set "HAS_ANSWERS=1"
@@ -326,8 +326,8 @@ if !HAS_PDF!==1 (
     if not errorlevel 1 set "IS_DIGITAL=1"
     
     echo.
-    echo   Rendering PDF pages...
-    python python_scripts\3_render_pdf_pages.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\pages_output"
+    echo   Rendering PDF pages (auto-discarding blank pages & creating clean merged PDF)...
+    python python_scripts\3_render_pdf_pages.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\pages_output" --merged-pdf "!TEST_DIR!\!TEST_NAME!_clean.pdf"
     
     if !IS_DIGITAL!==1 (
         echo.
@@ -382,8 +382,10 @@ echo.
 python python_scripts\generate_prompts.py "!TEST_DIR!" "!TEST_NAME!" "!FORM_NUMBER!" "!HAS_ANSWERS!" >nul 2>&1
 
 :: Read AGENT_PROMPT from prompt_local_agent.txt and pre-load into Windows Clipboard
-set /p AGENT_PROMPT=<"!TEST_DIR!\prompt_local_agent.txt"
-type "!TEST_DIR!\prompt_local_agent.txt" | clip
+if exist "!TEST_DIR!\prompt_local_agent.txt" (
+    set /p AGENT_PROMPT=<"!TEST_DIR!\prompt_local_agent.txt"
+    type "!TEST_DIR!\prompt_local_agent.txt" | clip
+)
 
 :: Try to detect available agents
 set "AGENT_FOUND=0"
