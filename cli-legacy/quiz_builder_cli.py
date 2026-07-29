@@ -57,14 +57,19 @@ C_GRAY = "\033[90m"
 # Path setup: Resolve actual directory where the .exe or script is executed
 if getattr(sys, 'frozen', False):
     REPO_ROOT = os.path.dirname(os.path.abspath(sys.executable))
+    MEI_DIR = getattr(sys, '_MEIPASS', REPO_ROOT)
+    PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'python_scripts')
+    if not os.path.isdir(PYTHON_SCRIPTS_DIR):
+        PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'cli-legacy', 'python_scripts')
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     REPO_ROOT = os.path.dirname(BASE_DIR) if os.path.basename(BASE_DIR) == 'cli-legacy' else BASE_DIR
+    MEI_DIR = BASE_DIR
+    PYTHON_SCRIPTS_DIR = os.path.join(REPO_ROOT, 'cli-legacy', 'python_scripts')
+    if not os.path.isdir(PYTHON_SCRIPTS_DIR):
+        PYTHON_SCRIPTS_DIR = os.path.join(REPO_ROOT, 'python_scripts')
 
 TESTS_DIR = os.path.join(REPO_ROOT, 'tests')
-PYTHON_SCRIPTS_DIR = os.path.join(REPO_ROOT, 'cli-legacy', 'python_scripts')
-if not os.path.isdir(PYTHON_SCRIPTS_DIR):
-    PYTHON_SCRIPTS_DIR = os.path.join(REPO_ROOT, 'python_scripts')
 
 def copy_to_clipboard(text):
     if sys.platform == 'win32':
@@ -123,12 +128,23 @@ def format_size(size_bytes):
 
 def run_script(script_name, args):
     """Run a pipeline script in-process to guarantee PyInstaller compatibility."""
-    script_path = os.path.join(PYTHON_SCRIPTS_DIR, script_name)
-    if not os.path.isfile(script_path):
-        script_path = os.path.join(REPO_ROOT, script_name)
-    
-    if not os.path.isfile(script_path):
-        print(f"  {C_RED}[!] Error: Script {script_name} not found.{C_RESET}")
+    candidate_paths = [
+        os.path.join(PYTHON_SCRIPTS_DIR, script_name),
+        os.path.join(MEI_DIR, 'python_scripts', script_name),
+        os.path.join(MEI_DIR, 'cli-legacy', 'python_scripts', script_name),
+        os.path.join(REPO_ROOT, 'cli-legacy', 'python_scripts', script_name),
+        os.path.join(REPO_ROOT, 'python_scripts', script_name),
+        os.path.join(REPO_ROOT, script_name),
+    ]
+
+    script_path = None
+    for cand in candidate_paths:
+        if os.path.isfile(cand):
+            script_path = cand
+            break
+
+    if not script_path:
+        print(f"  {C_RED}[!] Error: Script {script_name} not found in bundle or disk.{C_RESET}")
         return 1
 
     old_argv = sys.argv

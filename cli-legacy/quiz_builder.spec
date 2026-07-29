@@ -8,11 +8,20 @@ block_cipher = None
 spec_dir = SPECPATH
 repo_root = os.path.dirname(spec_dir)
 
+python_scripts_src = os.path.join(spec_dir, 'python_scripts')
+if not os.path.isdir(python_scripts_src):
+    python_scripts_src = os.path.join(repo_root, 'python_scripts')
+
+datas = [
+    (python_scripts_src, 'python_scripts'),
+    (python_scripts_src, 'cli-legacy/python_scripts'),
+]
+
 a = Analysis(
     [os.path.join(spec_dir, 'quiz_builder_cli.py')],
     pathex=[repo_root, spec_dir],
     binaries=[],
-    datas=[],
+    datas=datas,
     hiddenimports=[
         'fitz',
         'pandas',
@@ -24,6 +33,7 @@ a = Analysis(
         'mimetypes',
         'base64',
         're',
+        'runpy',
     ],
     hookspath=[],
     hooksconfig={},
