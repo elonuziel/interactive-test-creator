@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-build_exe.py — Build quiz_builder.exe using PyInstaller with automatic version bumping
+build_exe.py — Build quiz_builder.exe using PyInstaller with automatic version bumping and Authenticode Code Signing
 """
 
 import subprocess
@@ -83,8 +83,26 @@ def update_version_info_file(info_file, ver_tuple):
         f.write(content)
     return ver_str
 
+def sign_executable(exe_path):
+    if sys.platform != 'win32':
+        return
+    print(f"Signing executable {os.path.basename(exe_path)} with Publisher 'Elon Uziel'...")
+    ps_cmd = (
+        f"$cert = Get-ChildItem Cert:\\CurrentUser\\My -CodeSigningCert | Where-Object {{ $_.Subject -match 'Elon Uziel' }} | Select-Object -First 1; "
+        f"if (-not $cert) {{ $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Elon Uziel, O=Elon Uziel' -CertStoreLocation 'Cert:\\CurrentUser\\My' }}; "
+        f"Set-AuthenticodeSignature -FilePath '{exe_path}' -Certificate $cert -HashAlgorithm SHA256"
+    )
+    try:
+        res = subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True, text=True)
+        if res.returncode == 0:
+            print(f"  [OK] Successfully signed {os.path.basename(exe_path)} (Publisher: Elon Uziel)")
+        else:
+            print(f"  [!] Notice: Code signing returned: {res.stderr.strip()}")
+    except Exception as e:
+        print(f"  [!] Notice: Code signing skipped: {e}")
+
 def main():
-    parser = argparse.ArgumentParser(description="Build quiz_builder.exe with automatic version bumping")
+    parser = argparse.ArgumentParser(description="Build quiz_builder.exe with automatic version bumping and code signing")
     parser.add_argument('-v', '--version', help="Specify version string (e.g. 1.0.1 or v1.0.1). If omitted, increments build number.")
     args = parser.parse_args()
 
@@ -117,6 +135,7 @@ def main():
     if res.returncode == 0:
         dist_exe = os.path.join(dist_dir, 'quiz_builder.exe')
         print(f"\n[OK] Build successful! Executable v{ver_str} generated at:\n  {dist_exe}")
+        sign_executable(dist_exe)
     else:
         print(f"\n[X] Build failed with exit code {res.returncode}")
         sys.exit(res.returncode)

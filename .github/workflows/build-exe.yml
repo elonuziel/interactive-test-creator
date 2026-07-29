@@ -54,6 +54,12 @@ jobs:
         run: |
           python cli-legacy/build_exe.py --version ${{ steps.tag_name.outputs.TAG_NAME }}
 
+      - name: Code Sign Executable (Publisher: Elon Uziel)
+        shell: powershell
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Elon Uziel, O=Elon Uziel" -CertStoreLocation "Cert:\CurrentUser\My"
+          Set-AuthenticodeSignature -FilePath "cli-legacy/dist/quiz_builder.exe" -Certificate $cert -HashAlgorithm SHA256
+
       - name: Upload Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -71,6 +77,7 @@ jobs:
             
             Download `quiz_builder.exe` below to run the Quiz Builder and Local HTTP Server offline on Windows with **zero dependencies**.
             
+            - **Signed Publisher**: Elon Uziel
             - **No Python required**
             - **Automatic local server & default browser launching**
             - **Full PDF extraction & standalone HTML quiz exporting**
