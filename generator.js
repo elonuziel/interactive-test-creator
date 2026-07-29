@@ -1231,6 +1231,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 delBtn.title = 'הסר תשובה';
                 delBtn.style.cssText = 'width:26px;height:26px;border-radius:50%;border:1px solid var(--border-color);background:var(--input-bg);color:var(--danger);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;';
                 delBtn.addEventListener('click', () => {
+                    if (state.questions[index].options.length <= 2) {
+                        alert('שאלה חייבת להכיל לפחות 2 תשובות.');
+                        return;
+                    }
                     state.questions[index].options.splice(optIndex, 1);
                     if (state.questions[index].correctIndex >= state.questions[index].options.length) {
                         state.questions[index].correctIndex = Math.max(0, state.questions[index].options.length - 1);
@@ -1275,14 +1279,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return state.templateCache;
         }
 
-        const [indexHtml, styleCss, appJs] = await Promise.all([
-            fetch('index.html').then((response) => response.text()),
-            fetch('style.css').then((response) => response.text()),
-            fetch('app.js').then((response) => response.text())
-        ]);
+        try {
+            const [indexHtml, styleCss, appJs] = await Promise.all([
+                fetch('index.html').then((response) => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.text();
+                }),
+                fetch('style.css').then((response) => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.text();
+                }),
+                fetch('app.js').then((response) => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.text();
+                })
+            ]);
 
-        state.templateCache = { indexHtml, styleCss, appJs };
-        return state.templateCache;
+            state.templateCache = { indexHtml, styleCss, appJs };
+            return state.templateCache;
+        } catch (err) {
+            if (window.location.protocol === 'file:') {
+                throw new Error('לא ניתן ליצור קובץ מבחן בעת הרצה ישירה מקובץ מקומי (file://). דפדפנים חוסמים טעינת תבניות מסיבות אבטחה. הפעל שרת מקומי (כגון Live Server או npx serve) ונסה שוב.');
+            }
+            throw new Error(`טעינת תבניות המבחן נכשלה (${err.message}). ודא שהקבצים index.html, style.css, app.js קיימים בתיקייה.`);
+        }
     }
 
     async function createStandaloneQuizHtml() {

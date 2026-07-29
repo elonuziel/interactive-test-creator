@@ -64,9 +64,30 @@ document.addEventListener('DOMContentLoaded', () => {
     themeToggle.addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
     feedbackToggle.addEventListener('change', e => { isImmediateFeedback = e.target.checked; });
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     // ── localStorage Persistence ──────────────────────────────────────────────
+    function getStorageKey() {
+        if (!questions || !questions.length) return 'quiz_answers_v1';
+        let hash = 0;
+        const sampleText = (questions[0].question || '') + questions.length;
+        for (let i = 0; i < sampleText.length; i++) {
+            hash = ((hash << 5) - hash) + sampleText.charCodeAt(i);
+            hash |= 0;
+        }
+        return `quiz_answers_${Math.abs(hash)}`;
+    }
+
     function saveProgress() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        localStorage.setItem(getStorageKey(), JSON.stringify({
             answers: userAnswers,
             index: currentQuestionIndex
         }));
@@ -74,13 +95,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadProgress() {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const raw = localStorage.getItem(getStorageKey());
             return raw ? JSON.parse(raw) : null;
         } catch(e) { return null; }
     }
 
     function clearProgress() {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(getStorageKey());
     }
 
     // ── Fetch Questions ───────────────────────────────────────────────────────
@@ -295,7 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const answered = userAnswers[currentQuestionIndex];
 
         questionCounter.textContent = `שאלה ${currentQuestionIndex + 1} מתוך ${questions.length}`;
-        questionText.innerHTML = q.question;
+        questionText.textContent = q.question;
 
         // Image
         if (q.image) {
@@ -462,13 +483,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const div = document.createElement('div');
             div.className = 'review-item';
 
-            let html = `<div class="review-question">${i + 1}. ${q.question}</div>`;
+            let html = `<div class="review-question">${i + 1}. ${escapeHtml(q.question)}</div>`;
 
             q.options.forEach(opt => {
                 let cls = 'review-option';
                 if (opt.id === q.correctIndex)                              cls += ' correct';
                 else if (answer && answer.selectedOptionId === opt.id)      cls += ' incorrect';
-                html += `<div class="${cls}">${opt.text}</div>`;
+                html += `<div class="${cls}">${escapeHtml(opt.text)}</div>`;
             });
 
             if (isUnanswered) {
@@ -519,12 +540,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await loadCropperLib();
 
-        cropperImage.src = fullSrc;
         cropperModal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
 
-        // Initialize Cropper when image is loaded
-        cropperImage.onload = () => {
+        const initCropper = () => {
             if (cropperInstance) cropperInstance.destroy();
             cropperInstance = new Cropper(cropperImage, {
                 viewMode: 1,
@@ -539,6 +558,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleDragModeOnDblclick: false,
             });
         };
+
+        cropperImage.onload = initCropper;
+        cropperImage.src = fullSrc;
+        if (cropperImage.complete) {
+            initCropper();
+        }
     });
 
 
