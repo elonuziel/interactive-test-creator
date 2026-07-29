@@ -223,8 +223,21 @@ echo   The extraction pipeline needs an AI agent to read the PDF
 echo   and run the steps in LLM_RUNBOOK.md.
 echo.
 
+if !HAS_ANSWERS!==1 (
+    echo   Please enter the Form Number for the answer key ^(e.g., 076, 76, 1^).
+    echo   This is required to extract the correct answers from the CSV/Excel.
+    echo.
+    set /p FORM_NUMBER="   Form Number: "
+    if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
+    echo.
+)
+
 :: Build the prompt for the agent
-set "AGENT_PROMPT=Read LLM_RUNBOOK.md and follow it to process the test in !TEST_DIR!/ -- extract questions from the PDF, parse them into questions.json, and merge the answer key. Work through all steps."
+if !HAS_ANSWERS!==1 (
+    set "AGENT_PROMPT=Read LLM_RUNBOOK.md and follow it to process the test in !TEST_DIR!/ -- extract questions from the PDF, parse them into questions.json, and merge the answer key (Form Number: !FORM_NUMBER!). Work through all steps."
+) else (
+    set "AGENT_PROMPT=Read LLM_RUNBOOK.md and follow it to process the test in !TEST_DIR!/ -- extract questions from the PDF and parse them into questions.json. Work through all steps."
+)
 
 :: Try to detect available agents
 set "AGENT_FOUND=0"
