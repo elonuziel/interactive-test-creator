@@ -554,9 +554,10 @@ if "!WEB_CHOICE!"=="3" start https://claude.ai
 if "!WEB_CHOICE!"=="4" start https://aistudio.google.com
 echo.
 echo   INSTRUCTIONS FOR WEB AI / AI STUDIO:
-echo     1. Upload your exam PDF (or rendered images in !TEST_DIR!\pages_output\^).
-echo     2. Press Ctrl+V to paste the copied prompt.
-echo     3. Save the generated JSON response directly to: !TEST_DIR!\questions.json
+echo     1. Upload the clean PDF file: !TEST_DIR!\!TEST_NAME!_clean.pdf
+echo     2. Upload or paste prompt_web_ai.txt ^(already copied to your clipboard!^).
+echo     3. Save or rename the AI output file to: !TEST_DIR!\questions.json
+echo        ^(If downloaded as output.json, response.json, etc., rename it to questions.json^)
 echo.
 goto :wait_for_questions
 
@@ -589,30 +590,38 @@ if exist "!TEST_DIR!\questions.json" (
     goto :post_process
 )
 
-:: Also check for final_questions.json
-if exist "!TEST_DIR!\final_questions.json" (
-    echo.
-    echo   OK - final_questions.json found. Renaming to questions.json...
-    move "!TEST_DIR!\final_questions.json" "!TEST_DIR!\questions.json" >nul
-    goto :post_process
+:: Check for alternative file names and auto-rename
+for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
+    if exist "%%~f" (
+        echo.
+        echo   OK - Found %%~nxf. Auto-renaming to questions.json...
+        move "%%~f" "!TEST_DIR!\questions.json" >nul
+        goto :post_process
+    )
 )
 
 echo.
 echo   WARNING: questions.json not found yet in !TEST_DIR!
-echo   The agent may still be working. You can:
-echo     1. Wait and press any key when the agent is done
+echo   If your AI response was saved under a different name ^(e.g., response.json, output.json, questions.txt^),
+echo   please rename it to 'questions.json' inside !TEST_DIR! before pressing any key.
+echo.
+echo   Options:
+echo     1. Rename/save the file to 'questions.json' and press any key to continue
 echo     2. Press Ctrl+C to exit and run start.bat again later
 echo.
 pause
 
 if exist "!TEST_DIR!\questions.json" goto :post_process
-if exist "!TEST_DIR!\final_questions.json" (
-    move "!TEST_DIR!\final_questions.json" "!TEST_DIR!\questions.json" >nul
-    goto :post_process
+for %%f in ("!TEST_DIR!\final_questions.json" "!TEST_DIR!\output.json" "!TEST_DIR!\response.json" "!TEST_DIR!\questions.txt" "!TEST_DIR!\questions.json.txt" "!TEST_DIR!\data.json") do (
+    if exist "%%~f" (
+        echo   OK - Found %%~nxf. Auto-renaming to questions.json...
+        move "%%~f" "!TEST_DIR!\questions.json" >nul
+        goto :post_process
+    )
 )
 
-echo   ERROR: questions.json still not found. Please run start.bat again
-echo      after the agent completes processing.
+echo   ERROR: questions.json still not found. Please ensure the AI output file is renamed
+echo      to 'questions.json' inside !TEST_DIR! and run start.bat again.
 goto :end
 
 

@@ -37,16 +37,15 @@ Return ONLY the corrected JSON array ready to save as {test_dir}/questions.json.
         )
 
         # 2. Web AI Prompt (Extraction)
-        web_prompt = f"""I am uploading the rendered pages for test "{test_name}".
-{"Form Number for answer key: " + form_number + "." if has_answers else ""}
+        web_prompt = f"""I am uploading the clean PDF file for test "{test_name}".
 
 Please extract all multiple-choice questions into a structured questions.json format for a Hebrew quiz app.
 
-Requirements:
+Instructions:
 1. Extract every question with its full text in correct Hebrew reading order (do not reverse words or punctuation).
 2. Extract all options (usually 4 options: א, ב, ג, ד) for each question.
-3. Determine correctIndex (0-based integer) matching Form {form_number} from the answer key (if uploaded).
-4. For questions referencing or containing a diagram, graph, image, or table: set "pageImage": "pages_output/page_X.png" (replace X with the 1-based page number where the question appears, e.g., "pages_output/page_3.png"). Do NOT attempt to crop sub-images. Omit "pageImage" for text-only questions.
+3. Keep the output as lightweight as possible: set "correctIndex": null for all questions (the answer key will be merged automatically later).
+4. For questions referencing or containing a diagram, graph, image, or table: set "pageImage": "pages_output/page_X.png" (replace X with the 1-based page number where the question appears in the PDF, e.g., "pages_output/page_3.png"). Omit "pageImage" for text-only questions.
 5. Return ONLY a valid JSON array matching this exact schema:
 
 [
@@ -58,12 +57,12 @@ Requirements:
       "תשובה 3",
       "תשובה 4"
     ],
-    "correctIndex": 0,
+    "correctIndex": null,
     "pageImage": "pages_output/page_3.png"
   }}
 ]
 
-Output the complete JSON ready to save as {test_dir}/questions.json.
+Output ONLY the complete raw JSON array without markdown wrapping or conversational commentary.
 """
 
     local_path = os.path.join(test_dir, "prompt_local_agent.txt")
