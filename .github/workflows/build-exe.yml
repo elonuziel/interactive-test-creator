@@ -54,7 +54,7 @@ jobs:
         run: |
           python cli-legacy/build_exe.py --version ${{ steps.tag_name.outputs.TAG_NAME }}
 
-      - name: Code Sign Executable (Publisher: Elon Uziel)
+      - name: "Code Sign Executable (Publisher: Elon Uziel)"
         shell: powershell
         run: |
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Elon Uziel, O=Elon Uziel" -CertStoreLocation "Cert:\CurrentUser\My"
