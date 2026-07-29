@@ -24,60 +24,51 @@ def is_noise_line(line):
             return True
     return False
 
-def is_blank_page(page, dpi=150, max_dark_pixels=300, max_dark_ratio=0.0005):
+def parse_page_ranges(pages_str, total_pages=0):
     """
-    Determine whether a PyMuPDF page is blank without using AI.
-    Combines text/drawing/image analysis with pixmap pixel darkness counts.
+    Parses a string like '1-4,6,8,10' or 'std'/'standard' into a set of 1-indexed integers.
+    Standard cleaning ('std'): discards pages 1-4, then every even page (6, 8, 10...) up to total_pages.
     """
-    text = page.get_text().strip()
-    non_noise_text = []
-    if text:
-        for line in text.splitlines():
-            if not is_noise_line(line):
-                non_noise_text.append(line)
-    
-    meaningful_text = "".join(non_noise_text).strip()
-    images = page.get_images()
-    drawings = page.get_drawings()
-    
-    # 1. Digital PDF with meaningful text -> NOT blank
-    if len(meaningful_text) > 0:
-        return False
+    if not pages_str:
+        return set()
 
-    # 2. Digital PDF with no text, no images, and no drawings -> BLANK
-    if len(images) == 0 and len(drawings) == 0:
-        return True
+    clean_str = pages_str.strip().lower()
 
-    # 3. Scanned or vector page (has images/drawings but no text) -> evaluate pixel darkness
-    pix = page.get_pixmap(dpi=dpi)
-    if pix.n != 1:
-        pix_gray = fitz.Pixmap(fitz.csGRAY, pix)
-    else:
-        pix_gray = pix
-    
-    samples = pix_gray.samples
-    total_pixels = len(samples)
-    if total_pixels == 0:
-        return True
-    
-    near_white_count = sum(samples.count(b) for b in range(235, 256))
-    dark_pixel_count = total_pixels - near_white_count
-    dark_ratio = dark_pixel_count / total_pixels
-    
-    if dark_pixel_count <= max_dark_pixels or dark_ratio <= max_dark_ratio:
-        return True
+    if clean_str in {"std", "standard", "default"}:
+        discard_set = {1, 2, 3, 4}
+        if total_pages >= 6:
+            discard_set.update(range(6, total_pages + 1, 2))
+        return discard_set
 
-    return False
+    if clean_str in {"none", "n", "off"}:
+        return set()
+
+    discard_set = set()
+    parts = pages_str.split(',')
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        if '-' in part:
+            try:
+                start, end = map(int, part.split('-'))
+                discard_set.update(range(start, end + 1))
+            except ValueError:
+                print(f"Warning: Could not parse page range '{part}'")
+        else:
+            try:
+                discard_set.add(int(part))
+            except ValueError:
+                print(f"Warning: Could not parse page number '{part}'")
+    return discard_set
 
 def main():
     parser = argparse.ArgumentParser(description="Render PDF pages as images (useful for Scanned PDFs).")
     parser.add_argument("pdf_file", help="Path to the PDF file")
     parser.add_argument("-o", "--outdir", help="Output directory for images", default="pages")
     parser.add_argument("--dpi", type=int, default=150, help="DPI for the rendered images")
-    parser.add_argument("--discard-blank", action="store_true", default=True,
-                        help="Automatically discard blank pages without AI (default: True)")
-    parser.add_argument("--keep-blank", dest="discard_blank", action="store_false",
-                        help="Keep all pages including blank ones")
+    parser.add_argument("--discard-pages", type=str, default="",
+                        help="Comma-separated list of 1-indexed pages/ranges ('1-4,6,8'), 'std' for standard cleaning, or 'none'")
     parser.add_argument("--merged-pdf", help="Optional path to output a merged PDF containing only non-blank pages", default=None)
     
     args = parser.parse_args()
@@ -92,20 +83,16 @@ def main():
     
     clean_doc = fitz.open() if args.merged_pdf else None
 
+    pages_to_discard = parse_page_ranges(args.discard_pages, total_pages=len(doc))
+
     rendered_count = 0
     skipped_count = 0
 
     for i, page in enumerate(doc):
-        filename = os.path.join(args.outdir, f"page_{i+1}.png")
-        is_blank = False
-        if args.discard_blank:
-            try:
-                is_blank = is_blank_page(page, dpi=args.dpi)
-            except Exception as err:
-                print(f"Warning: Failed to evaluate blank status for page {i+1}: {err}. Retaining page.")
-                is_blank = False
-
-        if is_blank:
+        page_num = i + 1
+        filename = os.path.join(args.outdir, f"page_{page_num}.png")
+        
+        if page_num in pages_to_discard:
             print(f"Skipped blank page {i+1} ({filename})")
             skipped_count += 1
             continue

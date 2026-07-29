@@ -1,9 +1,8 @@
-"""Tests for automatic blank page detection and discarding in 3_render_pdf_pages.py."""
+"""Tests for manual page discarding in 3_render_pdf_pages.py."""
 
 import os
 import sys
 import subprocess
-import pytest
 import fitz
 
 SCRIPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'python_scripts')
@@ -11,57 +10,38 @@ sys.path.insert(0, SCRIPTS_DIR)
 
 from importlib import import_module
 render_module = import_module("3_render_pdf_pages")
-is_blank_page = render_module.is_blank_page
+parse_page_ranges = render_module.parse_page_ranges
 
+class TestDiscardPages:
+    def test_parse_page_ranges_empty(self):
+        assert parse_page_ranges("") == set()
 
-class TestDiscardBlankPages:
-    def test_empty_page_is_blank(self, tmp_path):
-        """A completely empty PDF page should be identified as blank."""
-        doc = fitz.open()
-        page = doc.new_page(width=595, height=842)
-        assert is_blank_page(page) is True
-        doc.close()
+    def test_parse_page_ranges_single_pages(self):
+        assert parse_page_ranges("1, 3, 5") == {1, 3, 5}
 
-    def test_noise_only_page_is_blank(self, tmp_path):
-        """A page containing only page number or test code noise should be identified as blank."""
-        doc = fitz.open()
-        page = doc.new_page(width=595, height=842)
-        page.insert_text((50, 50), "Page 1 of 10", fontsize=12)
-        page.insert_text((50, 800), "Exam Code: 12345", fontsize=12)
-        assert is_blank_page(page) is True
-        doc.close()
+    def test_parse_page_ranges_mixed(self):
+        assert parse_page_ranges("1-4, 6, 8-10") == {1, 2, 3, 4, 6, 8, 9, 10}
 
-    def test_question_content_page_is_not_blank(self, tmp_path):
-        """A page containing actual test question text should NOT be identified as blank."""
-        doc = fitz.open()
-        page = doc.new_page(width=595, height=842)
-        page.insert_text((50, 100), "Question 1: What is the primary function of chlorophyll in photosynthesis?", fontsize=14)
-        assert is_blank_page(page) is False
-        doc.close()
+    def test_parse_page_ranges_standard(self):
+        assert parse_page_ranges("std", total_pages=10) == {1, 2, 3, 4, 6, 8, 10}
+        assert parse_page_ranges("standard", total_pages=5) == {1, 2, 3, 4}
+        assert parse_page_ranges("none", total_pages=10) == set()
 
-    def test_render_pdf_pages_cli_discards_blank(self, tmp_path):
-        """CLI rendering should skip saving blank pages when --discard-blank (default) is enabled."""
+    def test_render_pdf_pages_cli_discards_pages(self, tmp_path):
+        """CLI rendering should skip saving pages specified in --discard-pages."""
         pdf_path = os.path.join(tmp_path, "sample_test.pdf")
         out_dir = os.path.join(tmp_path, "pages_output")
 
         doc = fitz.open()
-        # Page 1: content
         p1 = doc.new_page(width=595, height=842)
-        p1.insert_text((50, 100), "Question 1: Which of the following is a greenhouse gas?", fontsize=14)
-
-        # Page 2: blank
         p2 = doc.new_page(width=595, height=842)
-
-        # Page 3: content
         p3 = doc.new_page(width=595, height=842)
-        p3.insert_text((50, 100), "Question 2: Which organ filters blood in the human body?", fontsize=14)
-
+        p4 = doc.new_page(width=595, height=842)
         doc.save(pdf_path)
         doc.close()
 
-        # Run 3_render_pdf_pages.py
         result = subprocess.run(
-            [sys.executable, os.path.join(SCRIPTS_DIR, "3_render_pdf_pages.py"), pdf_path, "-o", out_dir],
+            [sys.executable, os.path.join(SCRIPTS_DIR, "3_render_pdf_pages.py"), pdf_path, "-o", out_dir, "--discard-pages", "2, 4"],
             capture_output=True, text=True, encoding="utf-8"
         )
 
@@ -69,46 +49,24 @@ class TestDiscardBlankPages:
         assert os.path.exists(os.path.join(out_dir, "page_1.png"))
         assert not os.path.exists(os.path.join(out_dir, "page_2.png"))
         assert os.path.exists(os.path.join(out_dir, "page_3.png"))
+        assert not os.path.exists(os.path.join(out_dir, "page_4.png"))
         assert "Skipped blank page 2" in result.stdout
 
-    def test_render_pdf_pages_cli_keep_blank(self, tmp_path):
-        """CLI rendering should keep blank pages when --keep-blank is passed."""
-        pdf_path = os.path.join(tmp_path, "sample_test.pdf")
-        out_dir = os.path.join(tmp_path, "pages_output")
-
-        doc = fitz.open()
-        p1 = doc.new_page(width=595, height=842)
-        p1.insert_text((50, 100), "Question 1: Which of the following is a greenhouse gas?", fontsize=14)
-        p2 = doc.new_page(width=595, height=842)
-        doc.save(pdf_path)
-        doc.close()
-
-        result = subprocess.run(
-            [sys.executable, os.path.join(SCRIPTS_DIR, "3_render_pdf_pages.py"), pdf_path, "-o", out_dir, "--keep-blank"],
-            capture_output=True, text=True, encoding="utf-8"
-        )
-
-        assert result.returncode == 0
-        assert os.path.exists(os.path.join(out_dir, "page_1.png"))
-        assert os.path.exists(os.path.join(out_dir, "page_2.png"))
-
     def test_render_pdf_pages_cli_creates_merged_pdf(self, tmp_path):
-        """CLI rendering should save a merged PDF containing only non-blank pages when --merged-pdf is specified."""
+        """CLI rendering should save a merged PDF containing only non-discarded pages."""
         pdf_path = os.path.join(tmp_path, "sample_test.pdf")
         out_dir = os.path.join(tmp_path, "pages_output")
         merged_pdf_path = os.path.join(tmp_path, "clean_test.pdf")
 
         doc = fitz.open()
-        p1 = doc.new_page(width=595, height=842)
-        p1.insert_text((50, 100), "Question 1: Which element has atomic number 1?", fontsize=14)
-        p2 = doc.new_page(width=595, height=842) # blank
-        p3 = doc.new_page(width=595, height=842)
-        p3.insert_text((50, 100), "Question 2: What is the speed of light?", fontsize=14)
+        doc.new_page(width=595, height=842)
+        doc.new_page(width=595, height=842)
+        doc.new_page(width=595, height=842)
         doc.save(pdf_path)
         doc.close()
 
         result = subprocess.run(
-            [sys.executable, os.path.join(SCRIPTS_DIR, "3_render_pdf_pages.py"), pdf_path, "-o", out_dir, "--merged-pdf", merged_pdf_path],
+            [sys.executable, os.path.join(SCRIPTS_DIR, "3_render_pdf_pages.py"), pdf_path, "-o", out_dir, "--discard-pages", "1-2", "--merged-pdf", merged_pdf_path],
             capture_output=True, text=True, encoding="utf-8"
         )
 
@@ -116,6 +74,6 @@ class TestDiscardBlankPages:
         assert os.path.exists(merged_pdf_path)
         
         merged_doc = fitz.open(merged_pdf_path)
-        assert len(merged_doc) == 2  # Only 2 non-blank pages
+        assert len(merged_doc) == 1  # Only 1 page left
         merged_doc.close()
 

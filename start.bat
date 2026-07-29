@@ -136,6 +136,10 @@ set "ACTION="
 set /p ACTION="   Your choice: "
 
 if "!ACTION!"=="" goto :invalid_choice
+
+:: Clean input spaces
+set "ACTION=!ACTION: =!"
+
 if /i "!ACTION!"=="q" goto :end
 if /i "!ACTION!"=="n" goto :create_test
 if /i "!ACTION!"=="s" goto :start_server
@@ -147,9 +151,12 @@ for /f "delims=0123456789" %%i in ("!ACTION!") do set "IS_NUMERIC=0"
 
 if !IS_NUMERIC!==1 (
     if !ACTION! GEQ 1 if !ACTION! LEQ !TEST_COUNT! (
-        set "TEST_DIR=!TEST_OPT_PATH_%ACTION%!"
-        set "TEST_NAME=!TEST_OPT_NAME_%ACTION%!"
-        set "IS_READY=!TEST_OPT_READY_%ACTION%!"
+        :: Safe dynamic variable lookup
+        for %%a in (!ACTION!) do (
+            set "TEST_DIR=!TEST_OPT_PATH_%%a!"
+            set "TEST_NAME=!TEST_OPT_NAME_%%a!"
+            set "IS_READY=!TEST_OPT_READY_%%a!"
+        )
         
         echo.
         echo   Selected: !TEST_NAME!
@@ -161,7 +168,9 @@ if !IS_NUMERIC!==1 (
             echo     [2] Re-process with AI agent ^(re-extract^)
             echo     [B] Back to main menu
             echo.
+            set "EXISTING_CHOICE="
             set /p EXISTING_CHOICE="   Choice (1/2/b): "
+            if defined EXISTING_CHOICE set "EXISTING_CHOICE=!EXISTING_CHOICE: =!"
             if "!EXISTING_CHOICE!"=="1" goto :build_single
             if "!EXISTING_CHOICE!"=="2" goto :drop_files_check
             if /i "!EXISTING_CHOICE!"=="b" goto :select_test_step
@@ -178,7 +187,7 @@ echo.
 echo  ===========================================================
 echo    ERROR: '!ACTION!' is not a valid choice.
 if !TEST_COUNT! GTR 0 (
-    echo    Please enter a number (1-!TEST_COUNT!), 'N', 'S', or 'Q'.
+    echo    Please enter a number ^(1-!TEST_COUNT!^), 'N', 'S', or 'Q'.
 ) else (
     echo    Please enter 'N', 'S', or 'Q'.
 )
@@ -256,7 +265,7 @@ if !HAS_PDF!==1 (
     if !HAS_ANSWERS!==1 (
         echo   OK - Found answer key file: !ANSWERS_NAME!
     ) else (
-        echo   NOTE: No answer key spreadsheet found (CSV/Excel^).
+        echo   NOTE: No answer key spreadsheet found ^(CSV/Excel^).
     )
     echo.
     echo   Proceeding directly to pre-processing...
@@ -302,7 +311,7 @@ if !HAS_PDF!==0 (
     echo     The AI agent will still try to process the folder.
 )
 if !HAS_ANSWERS!==0 (
-    echo   NOTE: No answer key file found (CSV/Excel^).
+    echo   NOTE: No answer key file found ^(CSV/Excel^).
     echo     The agent can still extract questions without answers.
 )
 if !HAS_PDF!==1 echo   OK - PDF file found
@@ -326,8 +335,17 @@ if !HAS_PDF!==1 (
     if not errorlevel 1 set "IS_DIGITAL=1"
     
     echo.
-    echo   Rendering PDF pages (auto-discarding blank pages & creating clean merged PDF)...
-    python python_scripts\3_render_pdf_pages.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\pages_output" --merged-pdf "!TEST_DIR!\!TEST_NAME!_clean.pdf"
+    echo   Page cleaning / page removal:
+    echo     - Press Enter for Standard cleaning ^(pages 1-4, then 6,8,10... until end^)
+    echo     - Type custom pages to discard ^(e.g., '1-3, 5'^)
+    echo     - Type 'none' to keep all pages
+    set "DISCARD_PAGES="
+    set /p DISCARD_PAGES="   Pages to discard [DEFAULT: standard]: "
+    if "!DISCARD_PAGES!"=="" set "DISCARD_PAGES=std"
+    
+    echo.
+    echo   Rendering PDF pages ^(creating clean merged PDF^)...
+    python python_scripts\3_render_pdf_pages.py "!PDF_FULL_PATH!" -o "!TEST_DIR!\pages_output" --discard-pages "!DISCARD_PAGES!" --merged-pdf "!TEST_DIR!\!TEST_NAME!_clean.pdf"
     
     if !IS_DIGITAL!==1 (
         echo.
@@ -347,7 +365,7 @@ if !HAS_ANSWERS!==1 (
     if "!FORM_NUMBER!"=="" set "FORM_NUMBER=1"
     echo.
     echo   Extracting answers from CSV...
-    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!" "!FORM_NUMBER!"
+    python python_scripts\4_extract_csv_answers.py "!TEST_DIR!\!ANSWERS_NAME!" "!FORM_NUMBER!"
 ) else (
     set "FORM_NUMBER=1"
 )
@@ -699,8 +717,14 @@ if !IDX!==0 (
 )
 echo.
 set /p BUILD_CHOICE="   Enter number: "
-set "TEST_DIR=!TEST_OPTION_%BUILD_CHOICE%!"
-set "TEST_NAME=!TEST_OPTNAME_%BUILD_CHOICE%!"
+
+:: Safe dynamic variable lookup
+set "TEST_DIR="
+set "TEST_NAME="
+for %%a in (!BUILD_CHOICE!) do (
+    set "TEST_DIR=!TEST_OPTION_%%a!"
+    set "TEST_NAME=!TEST_OPTNAME_%%a!"
+)
 if "!TEST_DIR!"=="" (
     echo   ERROR: Invalid selection.
     echo.
