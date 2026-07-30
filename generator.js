@@ -1922,7 +1922,7 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
         const file = elements.jsonFile.files?.[0];
         if (!file) return;
         try {
-            setStatus('מעבד קובץ questions.json...');
+            setStatus(`מעבד קובץ ${file.name}...`);
             const text = await file.text();
             const rawData = JSON.parse(text);
             const normalizedQuestions = normalizeQuestionsJson(rawData);
@@ -1930,12 +1930,12 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
             state.questions = normalizedQuestions;
             renderPreview();
             disableOutputActions(false);
-            setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ JSON!`, false, true);
+            setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ ${file.name}!`, false, true);
 
             await tryMergeAnswersFromCsv();
         } catch (error) {
-            console.error('Error loading questions.json:', error);
-            setStatus(error.message || 'נכשלה טעינת קובץ questions.json.', true);
+            console.error('Error loading JSON file:', error);
+            setStatus(error.message || `נכשלה טעינת קובץ ${file.name}.`, true);
         }
     });
 
