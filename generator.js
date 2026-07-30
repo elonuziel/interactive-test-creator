@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
         builderLayout: document.getElementById('builder-layout'),
         pageCountBadge: document.getElementById('page-count-badge'),
         presetStdBtn: document.getElementById('preset-std-btn'),
+        presetEvenOddBtn: document.getElementById('preset-even-odd-btn') || document.getElementById('preset-blank-btn'),
         presetBlankBtn: document.getElementById('preset-blank-btn'),
         presetSelectAllBtn: document.getElementById('preset-select-all-btn'),
         presetDeselectAllBtn: document.getElementById('preset-deselect-all-btn'),
@@ -1722,11 +1723,29 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSidebarThumbnails();
     }
 
-    function applyBlankFilter() {
+    function toggleEvenOddFilter() {
         if (!state.pdfPagesState || !state.pdfPagesState.length) return;
-        state.pdfPagesState.forEach(p => {
-            if (p.isBlank) p.keep = false;
-        });
+
+        if (!state.evenOddMode || state.evenOddMode === 'odd') {
+            // Select EVEN pages (2, 4, 6, ...)
+            state.evenOddMode = 'even';
+            state.pdfPagesState.forEach(p => {
+                p.keep = (p.pageNum % 2 === 0);
+            });
+            const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
+            if (btn) btn.textContent = '📄 עמודים אי-זוגיים';
+            showToast('נבחרו עמודים זוגיים (2, 4, 6...)', 'info', 2000);
+        } else {
+            // Select ODD pages (1, 3, 5, ...)
+            state.evenOddMode = 'odd';
+            state.pdfPagesState.forEach(p => {
+                p.keep = (p.pageNum % 2 !== 0);
+            });
+            const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
+            if (btn) btn.textContent = '📄 עמודים זוגיים';
+            showToast('נבחרו עמודים אי-זוגיים (1, 3, 5...)', 'info', 2000);
+        }
+
         renderSidebarThumbnails();
     }
 
@@ -1853,7 +1872,8 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
     // Preset buttons & Clean PDF download listeners
     elements.presetStdBtn?.addEventListener('click', applyStandardFilter);
     elements.presetStdBtnMain?.addEventListener('click', applyStandardFilter);
-    elements.presetBlankBtn?.addEventListener('click', applyBlankFilter);
+    elements.presetEvenOddBtn?.addEventListener('click', toggleEvenOddFilter);
+    elements.presetBlankBtn?.addEventListener('click', toggleEvenOddFilter);
     elements.presetSelectAllBtn?.addEventListener('click', () => selectAllPages(true));
     elements.presetDeselectAllBtn?.addEventListener('click', () => selectAllPages(false));
     elements.downloadCleanPdf?.addEventListener('click', downloadCleanPdf);
