@@ -9,28 +9,33 @@ echo   Interactive Hebrew Test Creator - Server & Test Suite
 echo ===============================================================
 echo.
 
-:: Detect Python or Node/Npx
-where python >nul 2>nul
+:: Check if port 8080 is already listening
+netstat -aon | findstr :8080 | findstr LISTENING >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [INFO] Detected Python. Starting local server on http://localhost:8080 ...
-    start /b "" python -m http.server 8080 >nul 2>&1
+    echo [INFO] Local server is already running on http://localhost:8080
     set SERVER_STARTED=1
 ) else (
-    where npx >nul 2>nul
+    :: Detect Python or Node/Npx
+    where python >nul 2>nul
     if !errorlevel! equ 0 (
-        echo [INFO] Detected Node/npx. Starting serve on http://localhost:8080 ...
-        start /b "" npx serve -p 8080 . >nul 2>&1
+        echo [INFO] Detected Python. Starting local server on http://localhost:8080 ...
+        start /b "" python -m http.server 8080 >nul 2>&1
         set SERVER_STARTED=1
     ) else (
-        echo [WARNING] Neither Python nor Node/npx was found on PATH.
-        echo Opening local files directly in default browser...
+        where npx >nul 2>nul
+        if !errorlevel! equ 0 (
+            echo [INFO] Detected Node/npx. Starting serve on http://localhost:8080 ...
+            start /b "" npx serve -p 8080 . >nul 2>&1
+            set SERVER_STARTED=1
+        ) else (
+            echo [WARNING] Neither Python nor Node/npx was found on PATH.
+            echo Opening local files directly in default browser...
+        )
     )
+    timeout /t 2 /nobreak >nul
 )
 
-:: Wait 1.5s for server startup
-timeout /t 2 /nobreak >nul
-
-:: Open Test Runner in default browser
+:: Open Test Runner in default browser on first launch
 echo [INFO] Opening Component Test Runner in browser...
 start http://localhost:8080/test-suite/test_runner.html
 
@@ -45,7 +50,7 @@ echo.
 echo   [1] Open In-Browser Component Test Runner (test_runner.html)
 echo   [2] Open Quiz Builder (index.html)
 echo   [3] Open Quiz Player (quiz_player.html)
-echo   [4] Re-open Test Runner
+echo   [4] Run Local CLI Test Suite (run_local_tests.py)
 echo   [Q] Stop Server & Quit
 echo.
 echo ===============================================================
@@ -64,13 +69,18 @@ if /i "%CHOICE%"=="3" (
     goto MENU
 )
 if /i "%CHOICE%"=="4" (
-    start http://localhost:8080/test-suite/test_runner.html
+    echo.
+    echo ---------------------------------------------------------------
+    echo Running Local CLI Test Suite...
+    echo ---------------------------------------------------------------
+    python test-suite\run_local_tests.py
+    echo.
+    pause
     goto MENU
 )
 if /i "%CHOICE%"=="Q" (
     echo.
     echo Stopping local server...
-    taskkill /FI "WINDOWTITLE eq Interactive Test Creator*" /F >nul 2>&1
     for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING') do (
         taskkill /PID %%a /F >nul 2>&1
     )
