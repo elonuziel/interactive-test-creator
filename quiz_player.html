@@ -100,7 +100,31 @@
                     <button id="retry-incorrect-btn" class="warning-btn hidden">🔄 נסה שוב שאלות שגויות/שלא נענו (<span id="incorrect-count-badge">0</span>)</button>
                     <button id="retry-flagged-btn" class="secondary-btn hidden" style="border-color: #f59e0b; color: #d97706;">⭐ תרגל שאלות מסומנות (<span id="flagged-count-badge-action">0</span>)</button>
                 </div>
-                <button id="review-back-btn" class="secondary-btn" style="margin-top:8px;">חזרה לשאלות</button>
+
+                <div id="custom-practice-panel" class="custom-practice-card" style="margin-top: 16px; padding: 16px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; text-align: right;">
+                    <h3 style="margin: 0 0 10px; font-size: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 6px;">
+                        🎯 הרכבת תרגול מותאם אישית (Mix & Match)
+                    </h3>
+                    <div class="custom-options-grid" style="display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; justify-content: flex-start;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.88rem; cursor: pointer;">
+                            <input type="checkbox" id="chk-mix-wrong" style="accent-color: var(--primary-color);">
+                            <span>❌ שאלות שגויות (<span id="cnt-mix-wrong">0</span>)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.88rem; cursor: pointer;">
+                            <input type="checkbox" id="chk-mix-unanswered" style="accent-color: var(--primary-color);">
+                            <span>❓ שלא נענו (<span id="cnt-mix-unanswered">0</span>)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.88rem; cursor: pointer;">
+                            <input type="checkbox" id="chk-mix-flagged" style="accent-color: var(--primary-color);">
+                            <span>⭐ מסומנות (<span id="cnt-mix-flagged">0</span>)</span>
+                        </label>
+                    </div>
+                    <button id="start-custom-practice-btn" class="success-btn" style="width: 100%; font-weight: 600;" disabled>
+                        🚀 התחל תרגול מותאם אישית (<span id="custom-selected-count">0</span> שאלות)
+                    </button>
+                </div>
+
+                <button id="review-back-btn" class="secondary-btn" style="margin-top:12px;">חזרה לשאלות</button>
             </div>
 
             <h2 class="review-title">סקירת תשובות</h2>

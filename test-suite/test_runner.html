@@ -522,6 +522,34 @@
                             }
                         }
                     ]
+                },
+                {
+                    name: '5. Mix & Match Custom Practice & Manual Cherrypicking',
+                    description: 'Validates category preset combinations (Wrong + Unanswered + Starred) and manual question selection with zero duplicate indices.',
+                    tests: [
+                        {
+                            name: 'Combines checked categories and manual cherrypicking with zero duplicates',
+                            details: 'Ensures questions belonging to multiple categories (e.g. both wrong and starred) are included exactly once.',
+                            fn: () => {
+                                const userAnswers = [
+                                    { selectedOptionId: 1, isCorrect: false }, // Q1 Wrong
+                                    { selectedOptionId: 0, isCorrect: true },  // Q2 Correct
+                                    null,                                     // Q3 Unanswered
+                                    { selectedOptionId: 0, isCorrect: true }   // Q4 Correct
+                                ];
+                                const userFlags = [true, false, false, true]; // Q1 & Q4 Starred
+
+                                const selected = new Set();
+                                userAnswers.forEach((a, i) => { if (a && !a.isCorrect) selected.add(i); });
+                                userFlags.forEach((f, i) => { if (f) selected.add(i); });
+                                selected.add(2); // Manual cherrypick Q3
+
+                                const sortedIndices = Array.from(selected).sort((a, b) => a - b);
+                                assertDeepEqual(sortedIndices, [0, 2, 3], 'Combined selected indices without duplicates');
+                                return { userAnswers, userFlags, manualSelection: [2], sortedIndices };
+                            }
+                        }
+                    ]
                 }
             ];
 

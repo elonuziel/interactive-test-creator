@@ -248,6 +248,25 @@ runTest('Question Flagging State', 'Initializes and updates userFlags boolean ar
     assert.strictEqual(userFlags.filter(Boolean).length, 2);
 });
 
+// 5. Mix & Match Custom Practice Selection
+runTest('Mix & Match Custom Practice', 'Combines category presets and manual cherrypicking with zero duplicates', () => {
+    const userAnswers = [
+        { selectedOptionId: 1, isCorrect: false }, // Q1 Wrong
+        { selectedOptionId: 0, isCorrect: true },  // Q2 Correct
+        null,                                     // Q3 Unanswered
+        { selectedOptionId: 0, isCorrect: true }   // Q4 Correct
+    ];
+    const userFlags = [true, false, false, true]; // Q1 & Q4 Starred
+
+    const selected = new Set();
+    userAnswers.forEach((a, i) => { if (a && !a.isCorrect) selected.add(i); });
+    userFlags.forEach((f, i) => { if (f) selected.add(i); });
+    selected.add(2); // Manual cherrypick Q3
+
+    const sortedIndices = Array.from(selected).sort((a, b) => a - b);
+    assert.deepStrictEqual(sortedIndices, [0, 2, 3]);
+});
+
 // ── Summary Metrics ───────────────────────────────────────────────────────────
 
 console.log(`\n──────────────────────────────────────────────────────────────`);

@@ -783,10 +783,37 @@ input:checked + .slider:before {
     border: 1px solid var(--border-color);
 }
 
+.review-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 0.75rem;
+}
+
+.review-card-select-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: var(--input-bg);
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.review-card-select-label:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
 .review-question {
     font-weight: 700;
     font-size: 1.125rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 .review-option {

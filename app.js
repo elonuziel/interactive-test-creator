@@ -33,6 +33,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const flaggedCountBadgeAction = document.getElementById('flagged-count-badge-action');
     const flaggedCountBadgeFilter = document.getElementById('flagged-count-badge-filter');
 
+    const chkMixWrong            = document.getElementById('chk-mix-wrong');
+    const chkMixUnanswered       = document.getElementById('chk-mix-unanswered');
+    const chkMixFlagged          = document.getElementById('chk-mix-flagged');
+    const cntMixWrong            = document.getElementById('cnt-mix-wrong');
+    const cntMixUnanswered       = document.getElementById('cnt-mix-unanswered');
+    const cntMixFlagged          = document.getElementById('cnt-mix-flagged');
+    const startCustomPracticeBtn = document.getElementById('start-custom-practice-btn');
+    const customSelectedCount    = document.getElementById('custom-selected-count');
+
+    let manualSelectedIndices = new Set();
+
     const questionCounter   = document.getElementById('question-counter');
     const questionText      = document.getElementById('question-text');
     const questionImage     = document.getElementById('question-image');
@@ -303,6 +314,72 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ── Custom Practice Mix & Match ───────────────────────────────────────────
+    function getCustomSelectedIndices() {
+        const selected = new Set();
+
+        questions.forEach((q, i) => {
+            const answer = userAnswers[i];
+            const isCorrect = answer && answer.isCorrect;
+            const isUnanswered = !answer;
+
+            if (chkMixWrong && chkMixWrong.checked && !isCorrect && !isUnanswered) {
+                selected.add(i);
+            }
+            if (chkMixUnanswered && chkMixUnanswered.checked && isUnanswered) {
+                selected.add(i);
+            }
+            if (chkMixFlagged && chkMixFlagged.checked && userFlags[i]) {
+                selected.add(i);
+            }
+        });
+
+        manualSelectedIndices.forEach(idx => {
+            if (idx >= 0 && idx < questions.length) {
+                selected.add(idx);
+            }
+        });
+
+        return Array.from(selected).sort((a, b) => a - b);
+    }
+
+    function updateCustomPracticeSelection() {
+        const selectedIndices = getCustomSelectedIndices();
+        const count = selectedIndices.length;
+        if (customSelectedCount) customSelectedCount.textContent = count;
+        if (startCustomPracticeBtn) {
+            startCustomPracticeBtn.disabled = (count === 0);
+        }
+    }
+
+    [chkMixWrong, chkMixUnanswered, chkMixFlagged].forEach(chk => {
+        chk?.addEventListener('change', updateCustomPracticeSelection);
+    });
+
+    if (startCustomPracticeBtn) {
+        startCustomPracticeBtn.addEventListener('click', () => {
+            const selectedIndices = getCustomSelectedIndices();
+            if (!selectedIndices.length) return;
+
+            const customSubList = selectedIndices.map(i => questions[i]);
+            const newFlags = selectedIndices.map(i => userFlags[i]);
+
+            questions = customSubList;
+            userAnswers = new Array(questions.length).fill(null);
+            userFlags = newFlags;
+            manualSelectedIndices.clear();
+            currentQuestionIndex = 0;
+            isReviewMode = false;
+            reviewFilter = 'all';
+            filterBtns.forEach(b => {
+                b.classList.toggle('active', b.dataset.filter === 'all');
+            });
+            clearProgress();
+            switchScreen(resultsScreen, quizScreen);
+            renderQuestion();
+        });
+    }
+
     if (reviewBackBtn) {
         reviewBackBtn.addEventListener('click', () => {
             isReviewMode = true;
@@ -529,7 +606,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        const wrongCount = userAnswers.filter(a => a && !a.isCorrect).length;
+        const unansweredCount = userAnswers.filter(a => !a).length;
         const flaggedCount = userFlags.filter(Boolean).length;
+
+        if (cntMixWrong) cntMixWrong.textContent = wrongCount;
+        if (cntMixUnanswered) cntMixUnanswered.textContent = unansweredCount;
+        if (cntMixFlagged) cntMixFlagged.textContent = flaggedCount;
+
         if (retryFlaggedBtn) {
             if (flaggedCount > 0) {
                 retryFlaggedBtn.classList.remove('hidden');
@@ -539,6 +623,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         if (flaggedCountBadgeFilter) flaggedCountBadgeFilter.textContent = flaggedCount;
+
+        updateCustomPracticeSelection();
 
         const circle = document.querySelector('.score-circle');
         const scoreEl = document.getElementById('final-score');
@@ -583,7 +669,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const div = document.createElement('div');
             div.className = 'review-item';
 
-            let html = `<div class="review-question">${i + 1}. ${escapeHtml(q.question)}</div>`;
+            const isManuallySelected = manualSelectedIndices.has(i);
+
+            let html = `
+                <div class="review-item-header">
+                    <div class="review-question" style="margin:0;">${i + 1}. ${escapeHtml(q.question)}</div>
+                    <label class="review-card-select-label" onclick="event.stopPropagation();">
+                        <input type="checkbox" class="review-card-checkbox" data-index="${i}" ${isManuallySelected ? 'checked' : ''} style="accent-color:var(--primary-color);">
+                        <span>בחירה לתרגול</span>
+                    </label>
+                </div>
+            `;
 
             q.options.forEach(opt => {
                 let cls = 'review-option';
@@ -599,6 +695,21 @@ document.addEventListener('DOMContentLoaded', () => {
             div.innerHTML = html;
             div.style.cursor = 'pointer';
             div.title = 'לחץ למעבר לשאלה';
+
+            const chk = div.querySelector('.review-card-checkbox');
+            if (chk) {
+                chk.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(chk.dataset.index, 10);
+                    if (chk.checked) {
+                        manualSelectedIndices.add(idx);
+                    } else {
+                        manualSelectedIndices.delete(idx);
+                    }
+                    updateCustomPracticeSelection();
+                });
+            }
+
             div.addEventListener('click', () => {
                 isReviewMode = true;
                 currentQuestionIndex = i;
