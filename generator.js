@@ -1559,6 +1559,7 @@ document.addEventListener('DOMContentLoaded', () => {
         disableOutputActions(true);
         elements.preview.innerHTML = '';
         state.proofPageImages = [];
+        let apiKey = '';
 
         const pdf = elements.pdfFile.files?.[0];
         const csv = elements.csvFile.files?.[0];
@@ -1698,9 +1699,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Additional AI Verification step (if explicitly enabled by user toggle)
         const enableVerification = elements.enableLlmVerification ? elements.enableLlmVerification.checked : false;
-        if (apiKey && enableVerification) {
-            setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
-            state.questions = await verifyTestWithGemini(state.questions, apiKey);
+        if (enableVerification) {
+            if (!apiKey) {
+                apiKey = await resolveGeminiApiKey(true);
+            }
+            if (apiKey) {
+                setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
+                state.questions = await verifyTestWithGemini(state.questions, apiKey);
+            }
         }
 
         renderPreview();
