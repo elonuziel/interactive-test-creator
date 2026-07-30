@@ -414,6 +414,35 @@ def process_workspace(test_name, test_dir):
     print(f"\n {C_BOLD}[Step 5/6] AI Agent Question Extraction & Proofreading{C_RESET}")
     print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
 
+    q_exists = os.path.exists(os.path.join(test_dir, 'questions.json'))
+    if q_exists:
+        print(f"  {C_CYAN}[i] Automated text extraction is complete!{C_RESET}")
+        print("      Hebrew text extraction may benefit from an AI proofreading pass to fix reversed words.")
+        proof_choice = input("\n   [?] Run AI proofreading pass on questions.json? (Y/n) [Default: Y]: ").strip().lower()
+        if proof_choice == 'n':
+            print(f"  {C_CYAN}[i] Skipping AI proofreading pass. Proceeding to post-processing...{C_RESET}")
+            q_final = os.path.join(test_dir, 'questions.json')
+            # Jump directly to Step 6
+            print(f"\n {C_BOLD}[Step 6/6] Automated Post-Processing & Validation{C_RESET}")
+            print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
+            if os.path.exists(q_final):
+                print(f"  {C_CYAN}[i] Merging answer key into questions.json...{C_RESET}")
+                run_script('6_merge_json_answers.py', [test_dir])
+                print(f"\n  {C_CYAN}[i] Running QA schema validation...{C_RESET}")
+                run_script('7_check_json.py', [q_final])
+                print(f"\n  {C_CYAN}[i] Updating test manifest...{C_RESET}")
+                run_script('8_generate_manifest.py', [])
+                cleanup_workspace_folder(test_dir)
+                print(f"\n  {C_GREEN}[OK] All processing steps finished!{C_RESET}\n")
+                build_opt = input("   [?] Build standalone HTML quiz now? (Y/n) [Default: Y]: ").strip().lower()
+                if build_opt != 'n':
+                    run_script('9_build_single_html.py', [test_dir])
+            return
+        else:
+            print(f"\n  {C_CYAN}[i] Preparing AI proofreading prompt...{C_RESET}")
+    else:
+        print(f"  {C_CYAN}[i] AI Agent pass needed to extract questions from rendered pages into questions.json.{C_RESET}")
+
     has_answers_flag = "1" if os.path.isfile(os.path.join(test_dir, 'answers.json')) else "0"
     local_prompt_path = os.path.join(test_dir, 'prompt_local_agent.txt')
     web_prompt_path = os.path.join(test_dir, 'prompt_web_ai.txt')
@@ -444,8 +473,9 @@ def process_workspace(test_name, test_dir):
                     subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', cmd_str], shell=True)
                 input("   Press Enter after the AI agent completes...")
 
+    mode_title = "PROOFREADING ASSISTANT" if q_exists else "EXTRACTION ASSISTANT"
     print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}                 AI PROMPT ASSISTANT{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}                 AI {mode_title}{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
     print("  Select a prompt helper option:")
     print("    [1] LOCAL AGENT (agy, gemini, claude, Cursor, Antigravity, VS Code)")
