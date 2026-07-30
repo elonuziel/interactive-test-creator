@@ -328,9 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (i === currentQuestionIndex) {
                 btn.classList.add('current');
                 btn.setAttribute('aria-current', 'step');
-                setTimeout(() => {
-                    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                }, 0);
             }
 
             btn.addEventListener('click', () => {
