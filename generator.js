@@ -577,6 +577,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return discovered;
     }
 
+    function sortGeminiModelCandidates(candidates) {
+        const priority = [
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-2.0-flash-lite',
+            'gemini-2.5-flash-lite'
+        ];
+
+        return [...candidates].sort((a, b) => {
+            const idxA = priority.indexOf(a.model);
+            const idxB = priority.indexOf(b.model);
+
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+
+            const isExpA = a.model.includes('3.5') || a.model.includes('3.6') || a.model.includes('experimental') || a.model.includes('preview');
+            const isExpB = b.model.includes('3.5') || b.model.includes('3.6') || b.model.includes('experimental') || b.model.includes('preview');
+
+            if (isExpA && !isExpB) return 1;
+            if (!isExpA && isExpB) return -1;
+
+            if (a.version !== b.version) return a.version === 'v1beta' ? -1 : 1;
+            return a.model.localeCompare(b.model);
+        });
+    }
+
     function getGeminiErrorInfo(status, errorText) {
         const raw = String(errorText || '');
         let parsedMessage = '';
@@ -602,8 +630,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (status === 429) {
             return {
                 code: 'quota',
-                retryNextModel: false,
-                userMessage: 'חריגה ממכסה או קצב בקשות Gemini (429). נסה שוב מאוחר יותר.'
+                retryNextModel: true,
+                userMessage: 'חריגה ממכסה או קצב בקשות Gemini (429). מנסה מודל חלופי...'
             };
         }
 
@@ -621,17 +649,17 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        if (status >= 500) {
+        if (status >= 500 || status === 503) {
             return {
                 code: 'server',
                 retryNextModel: true,
-                userMessage: 'שגיאת שרת זמנית של Gemini. מנסה מודל חלופי...'
+                userMessage: 'שגיאת שרת זמנית של Gemini (500/503). מנסה מודל חלופי...'
             };
         }
 
         return {
             code: 'unknown',
-            retryNextModel: false,
+            retryNextModel: true,
             userMessage: message || `Gemini request failed (${status}).`
         };
     }
@@ -686,8 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
             parts.push({ inlineData: { mimeType: 'image/png', data } });
         }
 
-        // Prefer pro model for complex OCR
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model)); // pro before flash
+        const sortedCandidates = sortGeminiModelCandidates(candidates);
 
         for (const candidate of sortedCandidates) {
             const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
@@ -803,8 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const attemptErrors = [];
         const candidates = await discoverGeminiModelCandidates(apiKey);
-        // Prefer pro model for complex PDF Native processing
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model));
+        const sortedCandidates = sortGeminiModelCandidates(candidates);
         let extractedPages = null;
 
         for (const candidate of sortedCandidates) {
@@ -905,45 +931,41 @@ document.addEventListener('DOMContentLoaded', () => {
         ].join('\n');
 
         const candidates = await discoverGeminiModelCandidates(apiKey);
-        const sortedCandidates = [...candidates].sort((a, b) => b.model.localeCompare(a.model));
-        const candidate = sortedCandidates[0]; // Pro model preferred
-        const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
+        const sortedCandidates = sortGeminiModelCandidates(candidates);
 
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.1,
-                    topP: 0.8,
-                    maxOutputTokens: 8192
+        for (const candidate of sortedCandidates) {
+            const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            topP: 0.8,
+                            maxOutputTokens: 8192
+                        }
+                    })
+                });
+
+                if (!response.ok) continue;
+
+                const payload = await response.json();
+                const responseParts = payload.candidates?.[0]?.content?.parts || [];
+                let text = responseParts.map((part) => part.text || '').join('\n').trim();
+
+                text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+
+                const verified = JSON.parse(text);
+                if (Array.isArray(verified) && verified.length > 0 && verified[0].question) {
+                    return verified;
                 }
-            })
-        });
-
-        if (!response.ok) {
-            console.warn('Gemini verification failed, using original parsed questions.');
-            return parsedQuestions;
-        }
-
-        const payload = await response.json();
-        const responseParts = payload.candidates?.[0]?.content?.parts || [];
-        let text = responseParts.map((part) => part.text || '').join('\n').trim();
-
-        // Remove markdown formatting if Gemini included it despite instructions
-        text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-
-        try {
-            const verified = JSON.parse(text);
-            if (Array.isArray(verified) && verified.length > 0 && verified[0].question) {
-                return verified;
+            } catch (e) {
+                console.warn(`Gemini verification failed for model ${candidate.model}:`, e);
             }
-        } catch (e) {
-            console.error('Failed to parse Gemini verification JSON:', e);
         }
 
-        // Fallback to original if parsing failed
         return parsedQuestions;
     }
 
