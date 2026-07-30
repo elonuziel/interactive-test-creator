@@ -87,6 +87,55 @@ body {
     z-index: 100;
 }
 
+.navbar-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.guide-welcome-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 22px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, var(--primary-color), #2563eb);
+    color: #ffffff !important;
+    font-size: 0.95rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    animation: gentlePulse 3s infinite ease-in-out;
+}
+
+.guide-welcome-btn:hover {
+    transform: translateX(0) scale(1.04);
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.5);
+    filter: brightness(1.08);
+}
+
+@keyframes gentlePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+
+@media (max-width: 768px) {
+    .navbar-center {
+        position: static;
+        transform: none;
+        margin: 8px 0;
+        width: 100%;
+    }
+    .navbar {
+        flex-wrap: wrap;
+    }
+}
+
 .logo {
     font-size: 1.25rem;
     font-weight: 700;
