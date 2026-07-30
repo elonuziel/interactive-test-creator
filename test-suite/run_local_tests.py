@@ -22,6 +22,7 @@ def strip_exam_footer_artifacts(value):
     if not value:
         return ""
     text = str(value)
+    text = re.sub(r'\[cite:\s*\d+\]', '', text, flags=re.IGNORECASE)
     text = re.sub(r'עמוד\s+\d+\s+מתוך\s+\d+', '', text, flags=re.IGNORECASE)
     text = re.sub(r'-+\s*סוף\s+המבחן\s*-+', '', text, flags=re.IGNORECASE)
     return text.strip()
@@ -216,6 +217,18 @@ def run_all_tests():
         assert len(parsed_gemini_md) == 33, f"Expected 33 questions from gemini.md, got {len(parsed_gemini_md)}"
         assert parsed_gemini_md[0]['options'][0].startswith("בחינה של שמורת")
         print(" [PASS] Test 7: Markdown Gemini Output (33 Questions & Bullet Options)")
+        passed += 1
+
+    # Test 8: Gemini Markdown Output with [cite: N] Web Search Citation Artifacts
+    total += 1
+    gemini_cite_path = os.path.join("tests", "2022_litoral", "gemini-code-1785449968097.md")
+    if os.path.exists(gemini_cite_path):
+        with open(gemini_cite_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        parsed_cite_md = parse_questions_from_markdown(content)
+        assert len(parsed_cite_md) == 33, f"Expected 33 questions from gemini-cite.md, got {len(parsed_cite_md)}"
+        assert "[cite:" not in parsed_cite_md[0]['options'][0], "[cite:] tags must be stripped"
+        print(" [PASS] Test 8: Gemini Citation Tag Cleanup ([cite: N] Stripped)")
         passed += 1
 
     print("=" * 65)

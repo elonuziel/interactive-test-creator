@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const elements = {
         pdfFile: document.getElementById('pdf-file'),
+        pdfTypeNote: document.getElementById('pdf-type-note'),
         jsonFile: document.getElementById('json-file'),
         csvFile: document.getElementById('csv-file'),
         formNumber: document.getElementById('form-number'),
@@ -338,7 +339,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function stripExamFooterArtifacts(value) {
-        return value.replace(/-+\s*סוף\s+המבחן\s*-+/g, ' ');
+        if (!value) return '';
+        return value
+            .replace(/\[cite:\s*\d+\]/gi, '')
+            .replace(/-+\s*סוף\s+המבחן\s*-+/g, ' ');
     }
 
     function fixHebrewWordOrder(text) {
@@ -1029,16 +1033,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function parseQuestionsFromText(text, rawPages, pageImages) {
         if (!text) return [];
 
-        let trimmedText = text.trim();
-        if (trimmedText.startsWith('```json')) {
-            trimmedText = trimmedText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
-        } else if (trimmedText.startsWith('```')) {
-            trimmedText = trimmedText.replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
-        }
+        let cleanText = text.trim();
+        cleanText = cleanText.replace(/^```(?:markdown|md|json|txt)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
-        if (trimmedText.startsWith('[') || trimmedText.startsWith('{')) {
+        if (cleanText.startsWith('[') || cleanText.startsWith('{')) {
             try {
-                const parsed = JSON.parse(trimmedText);
+                const parsed = JSON.parse(cleanText);
                 const questionsArray = Array.isArray(parsed) ? parsed : (parsed.questions || parsed.data);
                 if (Array.isArray(questionsArray) && questionsArray.length > 0) {
                     return normalizeQuestionsJson(questionsArray);
@@ -1048,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        const lines = cleanText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
         // Build linePageMap from the same processed text that lines[] comes from.
         // We apply fixHebrewWordOrder per page and count non-empty lines to match the filter(Boolean).
         const filteredLinePageMap = [];
@@ -1063,9 +1063,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        const qPattern = /(?:^#*\s*שאלה\s+(?:מספר\s*)?:?\s*\d+\s*:?|^#*\s*\d+\s*:?\s*מספר\s+שאלה|^\.?\s*\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/;
-        // Matches: '- א. text', '* א. text', 'א. text', 'א . text', '.א text'
-        const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^(?:[-\*\+\u2022]\s*)?([אבגדהוזחטי1-9])[\)]\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/;
+        const qPattern = /(?:^#*\s*(?:\*\*)?שאלה\s+(?:מספר\s*)?:?\s*\d+\s*:?|^#*\s*(?:\*\*)?\d+\s*:?\s*מספר\s+שאלה|^\.?\s*#*\s*(?:\*\*)?\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*#*\s*(?:\*\*)?\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/i;
+        // Matches: '- א. text', '- **א.** text', '* א. text', '(א) text', 'א. text', '1. text'
+        const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?(?:\*\*)?[\(\[]?([אבגדהוזחטיa-e1-9])[\)\]\.]\s*(?:\*\*)?\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/i;
         // Matches: 'text א.' or 'text .א' at end of line
         const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$|^(.*)\s+[\.]\s*([אבגדהוזחטי])$/;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
@@ -2351,7 +2351,7 @@ STRICT EXTRACTION & PROOFREADING RULES:
 1. HEBREW READING ORDER & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve scientific terms and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
 2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: - א., - ב., - ג., - ד., - ה., etc. Extract all options for each question (questions may have 4, 5, 6 or more choices).
 3. PAGE NUMBER TRACKING: Always end each question header with the exact 1-based PDF source page number in parentheses: (עמוד X), e.g. (עמוד 1), (עמוד 5). This is CRITICAL for matching questions referencing graphs, diagrams, figures, or tables.
-4. NO CONVERSATIONAL FILLER: Return ONLY the clean Markdown text or a downloadable questions.md file. Do NOT include conversational explanations, introductions, or extra code blocks.`;
+4. DELIVERABLE FORMAT (CODE BOX & FILE DOWNLOAD): Provide your entire response inside a single, copyable Markdown code block (wrapped in \`\`\`markdown ... \`\`\`) OR as a downloadable \`questions.md\` file. Do NOT include conversational explanations, intros, or commentary outside the code box.`;
 
     if (elements.llmPromptBox) {
         elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;

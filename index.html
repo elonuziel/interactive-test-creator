@@ -713,37 +713,31 @@
                                 הסר</button>
                         </div>
                         <div id="pdf-type-note" class="field-note-block hidden"></div>
-                        <div id="digital-actions-box" class="field-note-block is-digital hidden" style="margin-top: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 10px 12px; border-radius: 8px;">
+                        <div id="digital-actions-box" class="field-note-block is-digital hidden" style="margin-top: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 12px; border-radius: 8px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
                                 <div>
                                     <strong style="color: #047857; font-size: .88rem;">📄 זוהה PDF דיגיטלי!</strong>
-                                    <span style="display: block; font-size: .82rem; color: var(--text-secondary); margin-top: 2px;">ניתן לחלץ את כל השאלות מקומית בלחיצת כפתור (ללא LLM), או להעתיק פקודת חילוץ ל-ChatGPT/Claude:</span>
+                                    <span style="display: block; font-size: .82rem; color: var(--text-secondary); margin-top: 2px;">ניתן לחלץ את השאלות מקומית בלחיצת כפתור, או להעתיק את הפרומפט המומלץ ל-ChatGPT/Claude/Gemini:</span>
                                 </div>
                                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                                     <button id="run-digital-local-btn" type="button" class="success-btn sm-btn" style="white-space: nowrap; font-weight: 700; padding: 8px 14px; font-size: .83rem;">⚡ חלץ שאלות מקומית כעת</button>
-                                    <button id="show-digital-prompt-btn" type="button" class="secondary-btn sm-btn" style="white-space: nowrap; padding: 8px 12px; font-size: .83rem;">📋 הצג פרומפט ל-AI חיצוני</button>
+                                    <button id="copy-digital-prompt-btn" type="button" class="secondary-btn sm-btn" style="white-space: nowrap; font-weight: 700; padding: 8px 12px; font-size: .83rem;">📋 העתק פרומפט ל-AI</button>
                                 </div>
                             </div>
-                            <div id="digital-prompt-expandable" class="hidden" style="margin-top: 10px; border-top: 1px dashed rgba(16, 185, 129, 0.3); padding-top: 8px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; flex-wrap: wrap;">
-                                    <label for="digital-llm-prompt-box" style="font-weight: 600; font-size: .82rem; color: #047857;">📋 פרומפט לחילוץ דרך ChatGPT / Claude:</label>
-                                    <button id="copy-digital-prompt-btn" type="button" class="secondary-btn sm-btn">📋 העתק ללוח</button>
-                                </div>
+                            <div id="digital-prompt-expandable" style="margin-top: 10px; border-top: 1px dashed rgba(16, 185, 129, 0.3); padding-top: 8px;">
                                 <textarea id="digital-llm-prompt-box" readonly rows="5" style="font-family: monospace; font-size: .8rem; width: 100%; resize: vertical; direction: rtl; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px;"></textarea>
                             </div>
                         </div>
-                        <div id="scanned-actions-box" class="field-note-block is-scanned hidden"
-                            style="margin-top: 8px;">
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; flex-wrap: wrap;">
-                                <label for="llm-prompt-box" style="font-weight: 600; font-size: .83rem;">🔍 זוהה PDF
-                                    סרוק — העתק את הפרומפט ושלח בצירוף ה-PDF הנקי (מהסרגל מימין)
-                                    ל-ChatGPT/Claude:</label>
-                                <button id="copy-prompt-btn" type="button" class="secondary-btn sm-btn">📋 העתק
-                                    ללוח</button>
+
+                        <div id="scanned-actions-box" class="field-note-block is-scanned hidden" style="margin-top: 8px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); padding: 12px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; flex-wrap: wrap;">
+                                <div>
+                                    <strong style="color: #b45309; font-size: .88rem;">📷 זוהה PDF סרוק (תמונה)!</strong>
+                                    <span style="display: block; font-size: .82rem; color: var(--text-secondary); margin-top: 2px;">העתק את הפרומפט והעלה אותו עם ה-PDF (או ה-PDF הנקי מהסרגל) ל-ChatGPT / Claude / Gemini:</span>
+                                </div>
+                                <button id="copy-prompt-btn" type="button" class="primary-btn sm-btn" style="white-space: nowrap; font-weight: 700; padding: 8px 14px; font-size: .83rem; background: #d97706; border: none;">📋 העתק פרומפט ל-AI</button>
                             </div>
-                            <textarea id="llm-prompt-box" readonly rows="6"
-                                style="font-family: monospace; font-size: .8rem; width: 100%; resize: vertical; direction: rtl; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px;"></textarea>
+                            <textarea id="llm-prompt-box" readonly rows="6" style="font-family: monospace; font-size: .8rem; width: 100%; resize: vertical; direction: rtl; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; margin-top: 6px;"></textarea>
                         </div>
                     </div>
 

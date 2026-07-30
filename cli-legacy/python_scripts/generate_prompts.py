@@ -128,7 +128,7 @@ STRICT EXTRACTION & PROOFREADING RULES:
 1. HEBREW READING ORDER & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve scientific terms and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
 2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: - א., - ב., - ג., - ד., - ה., etc. Extract all options for each question (questions may have 4, 5, 6 or more choices).
 3. PAGE NUMBER TRACKING: Always end each question header with the exact 1-based PDF source page number in parentheses: (עמוד X), e.g. (עמוד 1), (עמוד 5). This is CRITICAL for matching questions referencing graphs, diagrams, figures, or tables.
-4. NO CONVERSATIONAL FILLER: Return ONLY the clean Markdown text or a downloadable questions.md file. Do NOT include conversational explanations, introductions, or extra code blocks.
+4. DELIVERABLE FORMAT (CODE BOX & FILE DOWNLOAD): Provide your entire response inside a single, copyable Markdown code block (wrapped in ```markdown ... ```) OR as a downloadable `questions.md` file. Do NOT include conversational explanations, intros, or commentary outside the code box.
 """
 
     if target in ["local", "all"]:
