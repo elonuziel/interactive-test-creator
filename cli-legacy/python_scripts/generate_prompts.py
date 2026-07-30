@@ -53,7 +53,7 @@ Your Instructions:
 2. Extract EVERY multiple-choice question in the exam.
 3. For each question:
    - `question`: Full question statement in correct Hebrew reading order (left-to-right sentences, right-to-left Hebrew words).
-   - `options`: Array of all 4 choice strings (strip prefixes like 'א.', 'ב.', '1.', '2.').
+   - `options`: Array of all choice strings (questions can have 4, 5, 6 or more options; strip prefixes like 'א.', 'ב.', '1.', '2.').
    - `correctIndex`: Set to `null` (answer key will be merged automatically by quiz_builder).
    - `pageImage`: Set to `"pages_output/page_X.png"` (where X is the 1-based page number) ONLY IF the question contains or references a diagram, figure, chart, table, image, or mathematical formula. Omit `pageImage` if the question is purely text.
 4. Save the complete output as valid JSON directly to `{test_dir}/questions.json`.
@@ -88,7 +88,7 @@ Please perform a thorough AI proofreading pass according to these guidelines:
    - Ensure questions end with proper Hebrew punctuation.
 
 2. OPTIONS CLEANUP:
-   - Ensure each question has a clean `options` array containing all 4 choices.
+   - Ensure each question has a clean `options` array containing all choices (e.g. 4, 5, 6+ choices).
    - Remove redundant option labels (e.g., strip 'א.', 'ב.', 'ג.', 'ד.' or '1.', '2.' from the start of option strings).
 
 3. SCHEMA PRESERVATION:
@@ -113,7 +113,7 @@ EXTRACTION RULES:
    - Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
 
 2. OPTIONS FORMATTING:
-   - Extract all 4 choices into the `options` array.
+   - Extract all choices into the `options` array (questions can have 4, 5, 6 or more choices).
    - Remove option letter prefixes (e.g. convert "א. תגובה מהירה" to "תגובה מהירה").
 
 3. DIAGRAM & IMAGE REFERENCES (`pageImage`):

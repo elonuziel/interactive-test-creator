@@ -20,22 +20,22 @@ Q_PATTERN = re.compile(
 
 # Step 2.2: dual answer patterns
 ANS_START_PATTERN = re.compile(
-    r'^([אבגד1-4])\s*[\.\)]\s*(.*)$'           # א. text  /  1) text
+    r'^([א-ט1-9])\s*[\.\)]\s*(.*)$'           # א. text  /  1) text
 )
 ANS_START_DOT_FIRST = re.compile(
-    r'^[\.\)]\s*([אבגד1-4])\s+(.*)$'            # .א text  (LTR-grouped Hebrew)
+    r'^[\.\)]\s*([א-ט1-9])\s+(.*)$'            # .א text  (LTR-grouped Hebrew)
 )
 ANS_END_PATTERN = re.compile(
-    r'^(.*)\s+([אבגד1-4])\s*[\.\)]$'           # text א.  /  text א)
+    r'^(.*)\s+([א-ט1-9])\s*[\.\)]$'           # text א.  /  text א)
 )
 ANS_END_DOT_FIRST = re.compile(
-    r'^(.*)\s+[\.\)]\s*([אבגד1-4])$'           # text .א  (LTR-grouped Hebrew)
+    r'^(.*)\s+[\.\)]\s*([א-ט1-9])$'           # text .א  (LTR-grouped Hebrew)
 )
 
 # Mid‑line answer: letter+period/paren anywhere in the line (not at start)
 ANS_MIDLINE_RE = re.compile(
     r'(?:^|.+)'                                 # optional leading text
-    r'([אבגד1-4])\s*[\.\)]\s+'                  # א.  /  1)  with trailing space
+    r'([א-ט1-9])\s*[\.\)]\s+'                  # א.  /  1)  with trailing space
 )
 
 # Step 2.3: noise filtering
@@ -66,7 +66,7 @@ def clean_option_text(text):
     """
     text = normalize_whitespace(text)
     # Strip leading stray dots
-    text = re.sub(r'^\.(?!\s*[אבגד1-4]\s)', '', text)
+    text = re.sub(r'^\.(?!\s*[א-ט1-9]\s)', '', text)
     # Strip trailing hyphens
     text = re.sub(r'-\s*$', '', text)
     # Split merged Hebrew+digit / digit+Hebrew
@@ -87,11 +87,11 @@ def clean_question_text(text):
     """
     text = normalize_whitespace(text)
     # Strip leading stray dots that aren't part of an answer marker
-    text = re.sub(r'^\.(?!\s*[אבגד1-4]\s)', '', text)
+    text = re.sub(r'^\.(?!\s*[א-ט1-9]\s)', '', text)
     # Strip trailing hyphens (line‑break artifacts)
     text = re.sub(r'-\s*$', '', text)
     # Fix dot‑letter sequences: '.א ' → 'א. ' (LTR artifact)
-    text = re.sub(r'\.([אבגד1-4])\s', r'\1. ', text)
+    text = re.sub(r'\.([א-ט1-9])\s', r'\1. ', text)
     # Split merged Hebrew‑letter + digit: 'הן6' → 'הן 6'
     text = re.sub(r'([א-ת])(\d)', r'\1 \2', text)
     # Split merged digit + Hebrew: '6מיליון' → '6 מיליון'
@@ -195,7 +195,7 @@ def try_split_midline_answer(line, has_question_text=False):
     before = before.strip()
     after = line[start:].strip()
     # Strip the letter+separator from the answer text
-    answer_text = re.sub(r'^[אבגד1-4]\s*[\.\)]\s*', '', after).strip()
+    answer_text = re.sub(r'^[א-ט1-9]\s*[\.\)]\s*', '', after).strip()
 
     # Heuristic: if we already have question text and the fragment looks like
     # answer content (not ending with : or ?), it's likely a multi‑line option
