@@ -279,11 +279,13 @@ def is_pdf_digital(pdf_path):
         return False
 
 def cleanup_workspace_folder(test_dir):
-    """Clean up intermediate scratch files from workspace folder, keeping only relevant final files."""
+    """Clean up scratch files, prompt txt files, and unused page renders, preserving all assets needed for server/HTML recreation."""
     scratch_files = [
         'raw_text.md',
         'pdf_type_result.txt',
         'page_map.json',
+        'prompt_local_agent.txt',
+        'prompt_web_ai.txt',
         'final_questions.json',
         'output.json',
         'response.json',
@@ -298,8 +300,53 @@ def cleanup_workspace_folder(test_dir):
                 cleaned += 1
             except Exception:
                 pass
-    if cleaned > 0:
-        print(f"  {C_GRAY}[i] Cleaned up {cleaned} intermediate scratch file(s).{C_RESET}")
+
+    # Check which page images / embedded images are referenced in questions.json
+    q_file = os.path.join(test_dir, 'questions.json')
+    referenced_images = set()
+    if os.path.isfile(q_file):
+        try:
+            with open(q_file, 'r', encoding='utf-8') as f:
+                qs = json.load(f)
+            for q in qs:
+                if isinstance(q, dict):
+                    if q.get('pageImage'):
+                        referenced_images.add(os.path.normpath(q['pageImage']))
+                    if q.get('image'):
+                        referenced_images.add(os.path.normpath(q['image']))
+        except Exception:
+            pass
+
+    # Smart clean pages_output/ — keep ONLY page PNGs referenced in questions.json
+    pages_dir = os.path.join(test_dir, 'pages_output')
+    deleted_pages = 0
+    kept_pages = 0
+    if os.path.isdir(pages_dir):
+        page_files = os.listdir(pages_dir)
+        for pf in page_files:
+            full_path = os.path.join(pages_dir, pf)
+            if os.path.isfile(full_path):
+                rel_path = os.path.normpath(os.path.join('pages_output', pf))
+                if rel_path in referenced_images or any(ref.endswith(pf) for ref in referenced_images):
+                    kept_pages += 1
+                else:
+                    try:
+                        os.remove(full_path)
+                        deleted_pages += 1
+                    except Exception:
+                        pass
+
+        # If no page images were referenced and folder is now empty, remove folder
+        if kept_pages == 0 and len(os.listdir(pages_dir)) == 0:
+            try:
+                os.rmdir(pages_dir)
+            except Exception:
+                pass
+        else:
+            print(f"  {C_GRAY}[i] Preserved {kept_pages} page image(s) with diagrams/tables in pages_output/{C_RESET}")
+
+    if cleaned > 0 or deleted_pages > 0:
+        print(f"  {C_GRAY}[i] Cleanup complete: Removed {cleaned} scratch file(s) and {deleted_pages} unused page render(s).{C_RESET}")
 
 def process_workspace(test_name, test_dir):
     # Step 3: Check for source files & launch Explorer
