@@ -573,6 +573,21 @@ def process_workspace(test_name, test_dir):
         run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
         print(f"\n  {C_GREEN}[OK] Created {local_prompt_path}{C_RESET}")
 
+    if p_choice != 's':
+        print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+        print(f"{C_CYAN}{C_BOLD}          NEXT STEPS: QUESTION EXTRACTION / PROOFREADING{C_RESET}")
+        print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+        print("   1. Open the generated prompt file:")
+        print(f"      • Local: {local_prompt_path}")
+        print(f"      • Web:   {web_prompt_path}")
+        print("   2. Copy the prompt text and paste it into your AI assistant.")
+        print("   3. (If using Web AI for Scanned PDF) Upload page images from pages_output/.")
+        print(f"   4. Save the AI's returned JSON array as 'questions.json' into:")
+        print(f"      📁 {test_dir}")
+        print("   5. Once 'questions.json' is ready, return here and press Enter.")
+        print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
+        input("   [?] Press Enter when questions.json is ready in test folder...")
+
     # Check for candidate JSON files
     q_final = os.path.join(test_dir, 'questions.json')
     if not os.path.exists(q_final):
