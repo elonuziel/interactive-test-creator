@@ -72,7 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
         preview: document.getElementById('preview'),
         proofModeToggle: document.getElementById('proof-mode-toggle'),
         useCleanPdfForApi: document.getElementById('use-clean-pdf-for-api'),
-        skipLlmVerification: document.getElementById('skip-llm-verification'),
+        enableLlmVerification: document.getElementById('enable-llm-verification'),
+        verificationWarningBox: document.getElementById('verification-warning-box'),
+        verificationBadge: document.getElementById('verification-badge'),
         themeToggle: document.getElementById('theme-toggle'),
         themeIcon: document.getElementById('theme-icon')
     };
@@ -98,6 +100,31 @@ document.addEventListener('DOMContentLoaded', () => {
             state.proofMode = !!elements.proofModeToggle.checked;
             renderPreview();
         });
+    }
+    function updateVerificationUI() {
+        if (!elements.enableLlmVerification) return;
+        const isChecked = elements.enableLlmVerification.checked;
+        if (elements.verificationWarningBox) {
+            elements.verificationWarningBox.classList.toggle('hidden', !isChecked);
+        }
+        if (elements.verificationBadge) {
+            if (isChecked) {
+                elements.verificationBadge.textContent = '🔍 2 קריאות API';
+                elements.verificationBadge.style.background = 'rgba(217, 119, 6, 0.15)';
+                elements.verificationBadge.style.color = '#d97706';
+                elements.verificationBadge.style.borderColor = 'rgba(217, 119, 6, 0.35)';
+            } else {
+                elements.verificationBadge.textContent = '⚡ קריאה 1 (מהיר)';
+                elements.verificationBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+                elements.verificationBadge.style.color = '#059669';
+                elements.verificationBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            }
+        }
+    }
+
+    if (elements.enableLlmVerification) {
+        updateVerificationUI();
+        elements.enableLlmVerification.addEventListener('change', updateVerificationUI);
     }
 
     function showToast(message, type = 'success', duration = 4000) {
@@ -1663,13 +1690,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         }
 
-        // Verification step using Gemini
-        const shouldSkipVerification = elements.skipLlmVerification ? elements.skipLlmVerification.checked : false;
-        if (llmPolicy === 'force_llm' && apiKey && !shouldSkipVerification) {
+        // Additional AI Verification step (if explicitly enabled by user toggle)
+        const enableVerification = elements.enableLlmVerification ? elements.enableLlmVerification.checked : false;
+        if (apiKey && enableVerification) {
             setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
             state.questions = await verifyTestWithGemini(state.questions, apiKey);
-        } else if (shouldSkipVerification) {
-            setStatus('מדלג על הגהת AI (דילוג על קריאת API משנית למען מהירות קלה)...');
         }
 
         renderPreview();

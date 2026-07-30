@@ -798,19 +798,31 @@
                                     בעברית הדיוק נמוך בהרבה מ-Gemini.
                                 </div>
                             </div>
+                            <div class="verification-toggle-box" style="margin-top: 12px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; transition: all 0.2s ease;">
+                                <label style="display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; user-select: none;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="checkbox" id="enable-llm-verification" style="width: 16px; height: 16px; accent-color: var(--primary-color); cursor: pointer;">
+                                        <span style="font-size: .83rem; font-weight: 600; color: var(--text-primary);">🔍 הגהת AI משנית (Verification Pass)</span>
+                                    </div>
+                                    <span id="verification-badge" style="font-size: .74rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3);">⚡ קריאה 1 (מהיר)</span>
+                                </label>
+                                <div id="verification-warning-box" class="field-note-block hidden" style="margin-top: 8px; font-size: .78rem; color: #b45309; background: rgba(217, 119, 6, 0.1); border: 1px solid rgba(217, 119, 6, 0.25); padding: 8px 10px; border-radius: 6px; line-height: 1.4;">
+                                    ⚠️ <strong>שימו לב:</strong> הפעלת הגהה נוספת תבצע קריאת API משנית מול Gemini לבדיקת ניתוח הטקסטים והתשובות. העיבוד ייקח מעט יותר זמן.
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Card 2: API Credentials -->
                         <div id="llm-auth-section" class="auth-section"
                             style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
                             <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">2. 🔑&nbsp; אימות
-                                Gemini API</p>
+                                AQ / Gemini API</p>
                             <div class="field">
                                 <label for="api-key">API Key <span dir="ltr"
-                                        style="font-size: .8rem; opacity: .8;"></span> <button id="api-help-btn"
+                                        style="font-size: .8rem; opacity: .8;">(AQ...)</span> <button id="api-help-btn"
                                         class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
                                 <div class="password-wrap">
-                                    <input id="api-key" type="password" placeholder="AQ...">
+                                    <input id="api-key" type="password" placeholder="AQ... הזן API Key">
                                     <button class="eye-btn" type="button" data-target="api-key"
                                         aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
                                 </div>
@@ -823,22 +835,6 @@
                                     <button class="eye-btn" type="button" data-target="passcode"
                                         aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Card 3: Performance & Options -->
-                        <div
-                            style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
-                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">3. ⚡ אפשרויות ביצועים
-                            </p>
-                            <div class="field" style="margin-top: 4px;">
-                                <label
-                                    style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);"
-                                    title="כאשר מסומן, המערכת תדלג על שלב הגהת השאלות הנוסף מול Gemini כדי לחסוך קריאות API ולהאיץ את העיבוד">
-                                    <input type="checkbox" id="skip-llm-verification" checked
-                                        style="accent-color: var(--primary-color);">
-                                    <span>⚡ דילוג על הגהת LLM (עיבוד קל ומהיר יותר — 1 קריאת API בלבד)</span>
-                                </label>
                             </div>
                         </div>
 

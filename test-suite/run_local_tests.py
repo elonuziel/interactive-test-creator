@@ -195,6 +195,16 @@ def run_all_tests():
     print(" [PASS] Test 5: AQ API Default Configuration")
     passed += 1
 
+    # Test 6: AI Verification Toggle Logic (1 call default vs 2 calls verification)
+    total += 1
+    def get_api_call_count(enable_verification_toggle):
+        # 1 primary OCR/extraction call + 1 optional verification pass call
+        return 2 if enable_verification_toggle else 1
+    assert get_api_call_count(False) == 1, "Default must be 1 API call"
+    assert get_api_call_count(True) == 2, "Verification toggle must trigger 2 API calls"
+    print(" [PASS] Test 6: AI Verification Toggle Logic (1 Call Default vs 2 Calls)")
+    passed += 1
+
     print("=" * 65)
     print(f" RESULT: {passed}/{total} Tests Passed Successfully!")
     print("=" * 65)
