@@ -416,9 +416,7 @@
 
             <div class="actions">
                 <button id="run-parse" class="primary-btn">הפעל ניתוח</button>
-                <button id="download-quiz" class="success-btn" disabled>הורד מבחן HTML עצמאי</button>
-                <button id="download-json" class="secondary-btn" disabled>📥 הורד questions.json</button>
-                <button id="copy-json" class="secondary-btn" disabled>📋 העתק JSON</button>
+                <button id="download-quiz" class="success-btn" disabled>הורד מבחן עצמאי</button>
                 <button id="take-quiz" class="secondary-btn" disabled>פתור מבחן כעת</button>
             </div>
             <div class="proof-row">
@@ -433,18 +431,6 @@
             <h2>תצוגה מקדימה ועריכה</h2>
             <p class="muted">לאחר הפעלת הניתוח ניתן לערוך טקסט/תשובות לפני ייצוא.</p>
             <div id="preview" class="preview-list"></div>
-        </section>
-
-        <section class="builder-card" style="margin-top: 16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-                <h2 style="margin:0;">📄 פלט JSON המלא (questions.json)</h2>
-                <div class="json-actions" style="display:flex; gap:8px;">
-                    <button id="copy-json-box" class="secondary-btn" style="padding:6px 12px; font-size:.84rem;" disabled>📋 העתק ללוח</button>
-                    <button id="download-json-box" class="secondary-btn" style="padding:6px 12px; font-size:.84rem;" disabled>📥 הורד questions.json</button>
-                </div>
-            </div>
-            <p class="muted" style="margin-top:0; margin-bottom:8px; font-size:.84rem;">העתק את קוד ה-JSON המעודכן או הורד ישירות כקובץ <code>questions.json</code> לשימוש מקומי.</p>
-            <textarea id="json-output" readonly placeholder="תוכן ה-JSON יופיע כאן אוטומטית לאחר הרצת הניתוח..." style="width:100%; height:200px; font-family:Consolas, Monaco, monospace; font-size:.85rem; background:var(--input-bg); color:var(--text-primary); border:1px solid var(--border-color); border-radius:10px; padding:12px; direction:ltr; resize:vertical; box-sizing:border-box;"></textarea>
         </section>
     </div>
 </main>
