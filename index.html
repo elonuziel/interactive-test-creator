@@ -484,6 +484,9 @@
 <header class="navbar">
     <div class="logo">יוצר מבחן אינטראקטיבי</div>
     <div class="controls">
+        <button id="full-guide-btn" type="button" class="secondary-btn sm-btn" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+            ❓ מדריך מקיף וסיוע
+        </button>
         <a href="quiz_player.html" class="nav-link" title="נגן מבחן">נגן מבחן ←</a>
         <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
             <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
@@ -714,7 +717,87 @@
     </div>
 </div>
 
+<div id="full-guide-popup" class="help-popup">
+    <div class="help-popup-content guide-popup-content" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+            <h2 style="margin: 0; font-size: 1.2rem; color: var(--primary-color); display: flex; align-items: center; gap: 8px;">
+                📖 מדריך מקיף וסיוע: יצירת מבחן אינטראקטיבי
+            </h2>
+            <button id="full-guide-close-top" type="button" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+        </div>
+
+        <div style="display: grid; gap: 14px;">
+            <!-- Section 1 -->
+            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">1. טעינת קובץ PDF (PDF דיגיטלי vs סרוק) 📄</h4>
+                <p style="margin: 0; font-size: .86rem; line-height: 1.6; color: var(--text-secondary);">
+                    • <strong>PDF דיגיטלי (עם טקסט להעתקה):</strong> מעובד מקומית בחינם במחשב שלך ללא צורך בחיבור לאינטרנט או ב-API Key.<br>
+                    • <strong>PDF סרוק (תמונה/צילום):</strong> דורש פענוח OCR. מומלץ להשתמש בשיטת ה-LLM המפורטת בשלבים הבאים.
+                </p>
+            </div>
+
+            <!-- Section 2 -->
+            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">2. ניקוי עמודים (הורד PDF נקי) 🧹</h4>
+                <p style="margin: 0; font-size: .86rem; line-height: 1.6; color: var(--text-secondary);">
+                    בסרגל הצידי מימין (<strong>📑 עמודי PDF</strong>) תוכל לבטל עמודי שער, דפי הוראות או עמודים סרוקים מיותרים ע"י לחיצה על התמונות הממוזערות או כפתור <strong>"🧹 ניקוי סטנדרטי"</strong>.<br>
+                    לחיצה על <strong>"📥 הורד PDF נקי"</strong> תפיק PDF ממוקד המבטיח <strong>איכות ודיוק מקסימליים</strong> בחילוץ השאלות על ידי מודל השפה.
+                </p>
+            </div>
+
+            <!-- Section 3 -->
+            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">3. חילוץ שאלות עם ChatGPT / Claude 🤖</h4>
+                <p style="margin: 0; font-size: .86rem; line-height: 1.6; color: var(--text-secondary);">
+                    1. לחץ על <strong>"📋 העתק ללוח"</strong> בשדה PDF סרוק כדי להעתיק את פרומפט ה-JSON המובנה באנגלית.<br>
+                    2. פתח את ChatGPT או Claude, צרף את קובץ ה-<strong>PDF הנקי</strong> שהורדת והדבק את הפרומפט.<br>
+                    3. שמור את קובץ התשובה כ-<code>questions.json</code>.
+                </p>
+            </div>
+
+            <!-- Section 4 -->
+            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">4. טעינת questions.json ומיזוג מפתח תשובות 🔗</h4>
+                <p style="margin: 0; font-size: .86rem; line-height: 1.6; color: var(--text-secondary);">
+                    • העלה את קובץ ה-<code>questions.json</code> בשדה **קובץ שאלות JSON** והשאלות יופיעו בתצוגה המקדימה!<br>
+                    • <strong>מיזוג תשובות מפתרון:</strong> אם יש לך קובץ תשובות רשמי (CSV/XLS), העלה אותו בשדה <strong>קובץ תשובות</strong>, הזן את <strong>מספר השאלון</strong> (למשל: 32) ולחץ על <strong>"🔗 מזג תשובות נכונות לשאלות"</strong> כדי לעדכן אוטומטית את התשובות הנכונות.
+                </p>
+            </div>
+
+            <!-- Section 5 -->
+            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">5. תצוגה מקדימה, עריכה וייצוא מבחן עצמאי 🚀</h4>
+                <p style="margin: 0; font-size: .86rem; line-height: 1.6; color: var(--text-secondary);">
+                    • בתצוגה המקדימה ניתן לערוך במידת הצורך את נתוני השאלה, האפשרויות והתשובות הנכונות.<br>
+                    • לחץ על <strong>"📥 הורד מבחן עצמאי (HTML)"</strong> לקבלת קובץ HTML מלא שעובד ללא חיבור לאינטרנט בכל דפדפן/טלפון, או לחץ <strong>"▶ פתור מבחן כעת"</strong> לפתרון ישיר בדפדפן!
+                </p>
+            </div>
+
+            <!-- Section 6 -->
+            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">6. מצב מתקדם: Gemini API ⚙️</h4>
+                <p style="margin: 0; font-size: .86rem; line-height: 1.6; color: var(--text-secondary);">
+                    משתמשים מתקדמים שברשותם <strong>Gemini API Key</strong> מ-Google AI Studio יכולים להרחיב בתחתית הטופס את <strong>⚙️ הגדרות עיבוד מתקדמות (Gemini API)</strong>, להזין מפתח, ולפענח PDF סרוק ישירות בלחיצת כפתור אחת.
+                </p>
+            </div>
+        </div>
+
+        <div style="margin-top: 18px; text-align: center;">
+            <button id="full-guide-close" class="primary-btn" type="button" style="padding: 8px 30px;">הבנתי, תודה!</button>
+        </div>
+    </div>
+</div>
+
 <script>
+document.getElementById('full-guide-btn')?.addEventListener('click', () => {
+    document.getElementById('full-guide-popup').classList.add('show');
+});
+document.getElementById('full-guide-close')?.addEventListener('click', () => {
+    document.getElementById('full-guide-popup').classList.remove('show');
+});
+document.getElementById('full-guide-close-top')?.addEventListener('click', () => {
+    document.getElementById('full-guide-popup').classList.remove('show');
+});
 document.getElementById('api-help-btn').addEventListener('click', () => {
     document.getElementById('api-help-popup').classList.add('show');
 });
@@ -741,6 +824,9 @@ document.getElementById('credential-popup').addEventListener('click', (e) => {
 });
 document.getElementById('clean-pdf-help-popup')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('clean-pdf-help-popup').classList.remove('show');
+});
+document.getElementById('full-guide-popup')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) document.getElementById('full-guide-popup').classList.remove('show');
 });
 document.querySelectorAll('.file-clear').forEach(btn => {
     const input = document.getElementById(btn.dataset.target);
