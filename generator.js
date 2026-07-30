@@ -337,12 +337,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return canvas.toDataURL('image/png');
     }
 
-    async function extractPdfText(arrayBuffer) {
+    async function extractPdfText(inputBuffer) {
         if (!window.pdfjsLib?.getDocument) {
             throw new Error('PDF.js לא נטען. רענן את העמוד ונסה שוב.');
         }
 
-        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+        const freshData = new Uint8Array(inputBuffer);
+        const loadingTask = window.pdfjsLib.getDocument({ data: freshData });
         const pdf = await loadingTask.promise;
         const pages = [];
         const pageImages = []; // index = pageNumber-1, value = base64 data URL or null
@@ -377,12 +378,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    async function detectPdfType(arrayBuffer) {
+    async function detectPdfType(inputBuffer) {
         if (!window.pdfjsLib?.getDocument) {
             throw new Error('PDF.js לא נטען. רענן את העמוד ונסה שוב.');
         }
 
-        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+        const freshData = new Uint8Array(inputBuffer);
+        const loadingTask = window.pdfjsLib.getDocument({ data: freshData });
         const pdf = await loadingTask.promise;
         let nonWhitespaceChars = 0;
 
@@ -1559,7 +1561,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return {
                 id: item.id || (index + 1),
                 question: rawQuestion,
-                options: options.map((optText, optId) => ({ id: optId, text: optText })),
+                options: options,
                 correctIndex: correctIndex,
                 image: item.image || item.pageImage || null,
                 sourcePage: item.sourcePage || item.page || (index + 1),
@@ -1569,15 +1571,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── PDF Page Sidebar & Thumbnail Generator ─────────────────────────────────
-    async function loadPdfSidebar(pdfBuffer) {
-        state.pdfArrayBuffer = pdfBuffer;
+    async function loadPdfSidebar(pdfBytesInput) {
+        if (pdfBytesInput) {
+            state.pdfBytes = new Uint8Array(pdfBytesInput);
+        }
         state.pdfPagesState = [];
         if (elements.pageThumbnailsContainer) elements.pageThumbnailsContainer.innerHTML = '';
 
-        if (!pdfBuffer || !window.pdfjsLib) return;
+        if (!state.pdfBytes || state.pdfBytes.length === 0 || !window.pdfjsLib) return;
 
         try {
-            const loadingTask = window.pdfjsLib.getDocument({ data: pdfBuffer.slice(0) });
+            const freshCopy = new Uint8Array(state.pdfBytes);
+            const loadingTask = window.pdfjsLib.getDocument({ data: freshCopy });
             const pdfDoc = await loadingTask.promise;
             const numPages = pdfDoc.numPages;
 
@@ -1673,6 +1678,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyStandardFilter() {
+        if (!state.pdfPagesState || !state.pdfPagesState.length) return;
         state.pdfPagesState.forEach(p => {
             if (p.pageNum <= 4) p.keep = false;
             else if (p.pageNum >= 6 && p.pageNum % 2 === 0) p.keep = false;
@@ -1682,6 +1688,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyBlankFilter() {
+        if (!state.pdfPagesState || !state.pdfPagesState.length) return;
         state.pdfPagesState.forEach(p => {
             if (p.isBlank) p.keep = false;
         });
@@ -1689,6 +1696,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function selectAllPages(keepState) {
+        if (!state.pdfPagesState || !state.pdfPagesState.length) return;
         state.pdfPagesState.forEach(p => {
             p.keep = keepState;
         });
@@ -1696,57 +1704,112 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function downloadCleanPdf() {
-        if (!state.pdfArrayBuffer || !window.PDFLib) {
-            setStatus('PDFLib אינו זמין ליצוא קובץ נקי.', true);
+        if (!window.PDFLib) {
+            alert('ספריית PDFLib אינה זמינה בדפדפן. יש לוודא חיבור לאינטרנט או לרענן את העמוד.');
             return;
         }
 
         try {
-            setStatus('מייצר PDF נקי...');
-            const srcDoc = await window.PDFLib.PDFDocument.load(state.pdfArrayBuffer);
+            setStatus('מכין קובץ PDF נקי להורדה...');
+
+            let bytes = state.pdfBytes;
+            // Fallback: If state.pdfBytes is missing or detached (0 byteLength), re-read directly from the file input
+            if (!bytes || bytes.length === 0 || bytes.buffer.byteLength === 0) {
+                const file = elements.pdfFile?.files?.[0];
+                if (!file) {
+                    alert('אנא בחר קובץ PDF ראשית.');
+                    return;
+                }
+                const buffer = await file.arrayBuffer();
+                state.pdfBytes = new Uint8Array(buffer);
+                bytes = state.pdfBytes;
+            }
+
+            const freshCopy = new Uint8Array(bytes);
+            const srcDoc = await window.PDFLib.PDFDocument.load(freshCopy);
             const newDoc = await window.PDFLib.PDFDocument.create();
 
-            const keptIndices = state.pdfPagesState
-                .filter(p => p.keep)
-                .map(p => p.pageNum - 1);
+            let keptIndices = [];
+            if (state.pdfPagesState && state.pdfPagesState.length > 0) {
+                keptIndices = state.pdfPagesState
+                    .filter(p => p.keep)
+                    .map(p => p.pageNum - 1);
+            }
 
+            // Fallback: If no pages are checked or state.pdfPagesState not yet populated, keep all pages
             if (keptIndices.length === 0) {
-                throw new Error('לא נבחרו עמודים להכללה ב-PDF הנקי.');
+                const totalPages = srcDoc.getPageCount();
+                for (let i = 0; i < totalPages; i++) {
+                    keptIndices.push(i);
+                }
             }
 
             const copiedPages = await newDoc.copyPages(srcDoc, keptIndices);
             copiedPages.forEach(page => newDoc.addPage(page));
 
-            const pdfBytes = await newDoc.save();
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
+            const pdfDataUri = await newDoc.saveAsBase64({ dataUri: true });
 
             const anchor = document.createElement('a');
-            anchor.href = url;
+            anchor.href = pdfDataUri;
             anchor.download = 'cleaned_test.pdf';
+            document.body.appendChild(anchor);
             anchor.click();
+            document.body.removeChild(anchor);
 
-            URL.revokeObjectURL(url);
             setStatus(`PDF נקי נוצר בהצלחה עם ${keptIndices.length} עמודים וההורדה התחילה.`);
         } catch (err) {
             console.error('Failed to export clean PDF:', err);
+            alert(`שגיאה ביצירת PDF נקי: ${err.message || err}`);
             setStatus(err.message || 'שגיאה ביצירת PDF נקי.', true);
         }
     }
 
-    const DEFAULT_LLM_PROMPT = `חבר קובץ questions.json בעברית מתוך שאלות המבחן המצורף.
-פורמט הפלט הנדרש (JSON array בלבד):
+    const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions into a clean \`questions.json\` array for an interactive quiz app.
+
+---------------------------------------------------------------------------
+EXTRACTION & PROOFREADING RULES:
+---------------------------------------------------------------------------
+1. HEBREW TEXT ORDER:
+   - Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left).
+   - Do NOT reverse word order or letters.
+   - Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
+
+2. OPTIONS FORMATTING:
+   - Extract all choices into the \`options\` array (questions can have 4, 5, 6 or more choices).
+   - Remove option letter prefixes (e.g. convert "א. תגובה מהירה" to "תגובה מהירה").
+
+3. DIAGRAM & IMAGE REFERENCES (\`pageImage\`):
+   - If a question includes or references a visual element (diagram, chart, graph, illustration), set \`"pageImage": "pages_output/page_X.png"\` where X is the page number (e.g., \`"pages_output/page_4.png"\`).
+   - If the question is purely text-based, DO NOT include the \`pageImage\` key.
+
+4. ANSWER KEY (\`correctIndex\`):
+   - Set \`"correctIndex": 0\` by default if unknown.
+
+5. SELF-PROOFREADING PASS:
+   - Once extraction is complete, perform a self-proofreading pass to verify Hebrew word order, punctuation, and JSON formatting before outputting.
+
+---------------------------------------------------------------------------
+REQUIRED JSON SCHEMA:
+---------------------------------------------------------------------------
 [
   {
-    "question": "נוסח השאלה",
-    "options": ["תשובה 1", "תשובה 2", "תשובה 3", "תשובה 4"],
+    "question": "שאלה לדוגמה בעברית...",
+    "options": [
+      "תשובה ראשונה",
+      "תשובה שנייה",
+      "תשובה שלישית",
+      "תשובה רביעית"
+    ],
     "correctIndex": 0,
     "sourcePage": 1
   }
 ]
-הנחיות:
-1. correctIndex הוא אינדקס 0-מבוסס של התשובה הנכונה (0 עבור א', 1 עבור ב', 2 עבור ג', 3 עבור ד').
-2. החזר אך ורק קוד JSON תקין בתוך קוד בלוק clean JSON.`;
+
+---------------------------------------------------------------------------
+OUTPUT & DELIVERABLE REQUIREMENTS:
+---------------------------------------------------------------------------
+1. Provide your final response either as a downloadable \`questions.json\` file OR as a single clean code block formatted for easy copy-pasting into \`questions.json\`.
+2. Do NOT include conversational commentary or explanation text. Output raw, valid JSON only.`;
 
     if (elements.llmPromptBox) {
         elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
@@ -1847,7 +1910,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             setPdfTypeNote('מזהה את סוג ה-PDF...', 'loading');
             const pdfBuffer = await file.arrayBuffer();
-            const detection = await detectPdfType(pdfBuffer);
+            state.pdfArrayBuffer = pdfBuffer.slice(0);
+
+            const detection = await detectPdfType(state.pdfArrayBuffer.slice(0));
             setPdfTypeNote(
                 `${detection.pdfTypeLabel}: ${detection.recommendation}`,
                 detection.isScanned ? 'scanned' : 'digital'
@@ -1858,7 +1923,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Load sidebar thumbnails & page selection state
-            await loadPdfSidebar(pdfBuffer);
+            await loadPdfSidebar(state.pdfArrayBuffer.slice(0));
         } catch (error) {
             setPdfTypeNote(error.message || 'לא ניתן היה לזהות את סוג ה-PDF.', 'error');
         }
