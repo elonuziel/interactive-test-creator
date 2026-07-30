@@ -25,3 +25,7 @@ desktop.ini
 # Temporary & Log Files
 *.log
 *.tmp
+
+#build directory
+build/
+dist/
