@@ -105,61 +105,30 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
     else:
         web_prompt = f"""I am uploading the exam document for Hebrew test "{test_name}".
 
-Please extract all multiple-choice questions into a clean `questions.md` or `questions.json` for an interactive quiz app.
+Please extract all multiple-choice questions into a clean Markdown file (`questions.md`) for an interactive Hebrew quiz system.
 
 ---------------------------------------------------------------------------
-EXTRACTION & PROOFREADING RULES:
+REQUIRED MARKDOWN FORMAT (questions.md):
 ---------------------------------------------------------------------------
-1. HEBREW TEXT ORDER:
-   - Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left).
-   - Do NOT reverse word order or letters.
-   - Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
-
-2. OPTIONS FORMATTING:
-   - Extract all choices into the options list (questions can have 4, 5, 6 or more choices).
-
-3. DIAGRAM & IMAGE REFERENCES:
-   - If a question includes or references a visual element (diagram, chart, graph, illustration, or complex chemical formula), reference the page image (e.g., `"pages_output/page_4.png"`).
-
-4. SELF-PROOFREADING PASS:
-   - Once extraction is complete, perform a self-proofreading pass to verify Hebrew word order and punctuation before outputting.
-
----------------------------------------------------------------------------
-OUTPUT & DELIVERABLE FORMATS (MARKDOWN OR JSON):
----------------------------------------------------------------------------
-You may provide your response either as Markdown (questions.md) OR valid JSON (questions.json).
-
-OPTION A: MARKDOWN (questions.md) - RECOMMENDED
-### שאלה 1: מהו התפקיד העיקרי של המיטוכונדריה בתא?
+### שאלה 1: מהו התפקיד העיקרי של המיטוכונדריה בתא? (עמוד 1)
 - א. ייצור אנרגיה (ATP)
 - ב. סינתזת חלבונים
 - ג. אחסון החומר התורשתי
 - ד. פירוק רעלים בתא
 
-### שאלה 2: איזה איבר אחראי על סינון דם בגוף?
+### שאלה 2: איזה איבר אחראי על סינון דם בגוף? (עמוד 2)
 - א. כבד
 - ב. כליות
 - ג. לב
 - ד. ריאות
 
-OPTION B: JSON (questions.json)
-[
-  {{
-    "question": "מהו התפקיד העיקרי של המיטוכונדריה בתא?",
-    "options": [
-      "ייצור אנרגיה (ATP)",
-      "סינתזת חלבונים",
-      "אחסון החומר התורשתי",
-      "פירוק רעלים בתא"
-    ],
-    "correctIndex": null
-  }}
-]
-
 ---------------------------------------------------------------------------
-DELIVERABLE INSTRUCTIONS:
+EXTRACTION & PROOFREADING RULES:
 ---------------------------------------------------------------------------
-Save or paste the result into `{test_dir}/questions.md` or `{test_dir}/questions.json`.
+1. HEBREW READING ORDER: Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left). Do NOT reverse words or letter order. Ensure mixed Hebrew, numbers, and scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
+2. OPTIONS FORMATTING: Extract all choices into the options list (questions can have 4, 5, 6 or more choices; strip option prefixes like 'א.', 'ב.', '1.', '2.').
+3. PAGE NUMBER TRACKING: Always include the 1-based PDF source page number at the end of each question header in parentheses, e.g. (עמוד 3), especially for questions referencing figures, diagrams, charts, graphs, or tables (e.g. Q25, Q33).
+4. DELIVERABLE: Provide your response as a clean downloadable `questions.md` file or in a single clean code block ready for one-click copy-pasting. Do NOT include conversational explanations or introductory commentary.
 """
 
     if target in ["local", "all"]:

@@ -1096,7 +1096,34 @@
                 <button id="full-guide-close" class="primary-btn" type="button"
                     style="padding: 10px 36px; font-weight: 700;">הבנתי, בוא נתחיל! 🚀</button>
             </div>
+    <!-- Interactive Image Crop Modal -->
+    <div id="crop-modal" class="popup-backdrop hidden" style="position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #ccc); border-radius: 16px; width: 95%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            <div style="padding: 14px 20px; background: var(--input-bg, #f8fafc); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--primary-color);">✂️ חיתוך תמונה מעמוד מקור לשאלה</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="crop-page-select" style="font-size: .85rem; font-weight: 600;">עמוד מקור:</label>
+                    <select id="crop-page-select" style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color); font: inherit; font-size: .85rem;"></select>
+                    <button id="crop-modal-close" type="button" class="secondary-btn sm-btn" style="border-radius: 50%; width: 32px; height: 32px; padding: 0;">✕</button>
+                </div>
+            </div>
+            <div style="padding: 10px; background: #0f172a; color: #94a3b8; font-size: .82rem; text-align: center;">
+                💡 <strong>הוראות חיתוך:</strong> לחץ וגרור בעזרת העכבר על גבי עמוד המבחן כדי לסמן את האזור הרצוי, ולאחר מכן לחץ על "גזור והצמד לשאלה".
+            </div>
+            <div id="crop-canvas-wrapper" style="flex: 1; overflow: auto; padding: 16px; text-align: center; position: relative; background: #1e293b;">
+                <canvas id="crop-canvas" style="max-width: 100%; border: 1px solid #334155; cursor: crosshair; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"></canvas>
+            </div>
+            <div style="padding: 14px 20px; background: var(--input-bg, #f8fafc); border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <span id="crop-status-text" style="font-size: .85rem; color: var(--text-secondary);">סמן אזור לחיתוך בעכבר</span>
+                <div style="display: flex; gap: 8px;">
+                    <button id="crop-reset-btn" type="button" class="secondary-btn sm-btn">↺ איפוס בחירה</button>
+                    <button id="crop-cancel-btn" type="button" class="secondary-btn sm-btn">✕ ביטול</button>
+                    <button id="crop-save-btn" type="button" class="primary-btn sm-btn" style="font-weight: 700;">✂️ גזור והצמד לשאלה זו</button>
+                </div>
+            </div>
         </div>
+    </div>
+
     </div>
 
     <script>

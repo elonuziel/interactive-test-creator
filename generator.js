@@ -1323,6 +1323,214 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ── Interactive PDF Page Crop Modal Controller ───────────────────────────
+    let currentCropTargetIndex = null;
+    let cropSelection = { x: 0, y: 0, w: 0, h: 0 };
+    let isCroppingDrag = false;
+    let cropStartPos = { x: 0, y: 0 };
+    let baseCropImage = null;
+
+    const cropElements = {
+        modal: document.getElementById('crop-modal'),
+        pageSelect: document.getElementById('crop-page-select'),
+        canvas: document.getElementById('crop-canvas'),
+        closeBtn: document.getElementById('crop-modal-close'),
+        cancelBtn: document.getElementById('crop-cancel-btn'),
+        resetBtn: document.getElementById('crop-reset-btn'),
+        saveBtn: document.getElementById('crop-save-btn'),
+        statusText: document.getElementById('crop-status-text')
+    };
+
+    async function openCropModal(questionIndex, initialPageNum = 1) {
+        currentCropTargetIndex = questionIndex;
+        if (!cropElements.modal || !cropElements.canvas) return;
+
+        cropElements.modal.style.display = 'flex';
+        cropElements.modal.classList.remove('hidden');
+
+        // Populate page select dropdown
+        if (cropElements.pageSelect) {
+            cropElements.pageSelect.innerHTML = '';
+            const totalPages = state.pdfPagesState?.length || state.proofPageImages?.length || 30;
+            for (let i = 1; i <= totalPages; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `עמוד ${i}`;
+                if (i === Number(initialPageNum)) opt.selected = true;
+                cropElements.pageSelect.appendChild(opt);
+            }
+        }
+
+        await renderCropCanvasPage(initialPageNum);
+    }
+
+    async function renderCropCanvasPage(pageNum) {
+        const canvas = cropElements.canvas;
+        if (!canvas) return;
+
+        cropSelection = { x: 0, y: 0, w: 0, h: 0 };
+        if (cropElements.statusText) cropElements.statusText.textContent = 'סמן אזור לחיתוך בעכבר';
+
+        if (state.pdfBytes && window.pdfjsLib) {
+            try {
+                const freshCopy = new Uint8Array(state.pdfBytes);
+                const pdfDoc = await window.pdfjsLib.getDocument({ data: freshCopy }).promise;
+                const page = await pdfDoc.getPage(Number(pageNum));
+                const viewport = page.getViewport({ scale: 1.5 });
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport }).promise;
+
+                baseCropImage = new Image();
+                baseCropImage.src = canvas.toDataURL('image/png');
+                return;
+            } catch (err) {
+                console.warn('PDF.js render error in crop modal:', err);
+            }
+        }
+
+        // Fallback: draw proof image or thumbnail
+        const pageIdx = Number(pageNum) - 1;
+        const imgUrl = state.proofPageImages?.[pageIdx] || state.pdfPagesState?.[pageIdx]?.thumbnailDataUrl;
+        if (imgUrl) {
+            const img = new Image();
+            img.onload = () => {
+                canvas.width = img.naturalWidth || img.width || 800;
+                canvas.height = img.naturalHeight || img.height || 1100;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                baseCropImage = img;
+            };
+            img.src = imgUrl;
+        } else {
+            const ctx = canvas.getContext('2d');
+            canvas.width = 600;
+            canvas.height = 400;
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, 600, 400);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('לא נמצא עמוד PDF זמין לחיתוך', 300, 200);
+        }
+    }
+
+    function redrawCropCanvas() {
+        const canvas = cropElements.canvas;
+        if (!canvas || !baseCropImage) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(baseCropImage, 0, 0, canvas.width, canvas.height);
+
+        if (cropSelection.w > 5 && cropSelection.h > 5) {
+            // Draw dimmed overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Clear cropped selection area
+            ctx.drawImage(
+                baseCropImage,
+                cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h,
+                cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h
+            );
+
+            // Draw red selection border
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h);
+        }
+    }
+
+    // Attach Crop Canvas Mouse Drag Handlers
+    cropElements.canvas?.addEventListener('mousedown', (e) => {
+        const rect = cropElements.canvas.getBoundingClientRect();
+        const scaleX = cropElements.canvas.width / rect.width;
+        const scaleY = cropElements.canvas.height / rect.height;
+
+        isCroppingDrag = true;
+        cropStartPos = {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+        cropSelection = { x: cropStartPos.x, y: cropStartPos.y, w: 0, h: 0 };
+    });
+
+    cropElements.canvas?.addEventListener('mousemove', (e) => {
+        if (!isCroppingDrag) return;
+        const rect = cropElements.canvas.getBoundingClientRect();
+        const scaleX = cropElements.canvas.width / rect.width;
+        const scaleY = cropElements.canvas.height / rect.height;
+
+        const currentX = (e.clientX - rect.left) * scaleX;
+        const currentY = (e.clientY - rect.top) * scaleY;
+
+        cropSelection.x = Math.min(cropStartPos.x, currentX);
+        cropSelection.y = Math.min(cropStartPos.y, currentY);
+        cropSelection.w = Math.abs(currentX - cropStartPos.x);
+        cropSelection.h = Math.abs(currentY - cropStartPos.y);
+
+        redrawCropCanvas();
+        if (cropElements.statusText) {
+            cropElements.statusText.textContent = `אזור נבחר: ${Math.round(cropSelection.w)}x${Math.round(cropSelection.h)} px`;
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (isCroppingDrag) {
+            isCroppingDrag = false;
+        }
+    });
+
+    cropElements.pageSelect?.addEventListener('change', (e) => {
+        renderCropCanvasPage(e.target.value);
+    });
+
+    cropElements.resetBtn?.addEventListener('click', () => {
+        cropSelection = { x: 0, y: 0, w: 0, h: 0 };
+        redrawCropCanvas();
+        if (cropElements.statusText) cropElements.statusText.textContent = 'סמן אזור לחיתוך בעכבר';
+    });
+
+    function closeCropModal() {
+        if (cropElements.modal) {
+            cropElements.modal.style.display = 'none';
+            cropElements.modal.classList.add('hidden');
+        }
+    }
+
+    cropElements.closeBtn?.addEventListener('click', closeCropModal);
+    cropElements.cancelBtn?.addEventListener('click', closeCropModal);
+
+    cropElements.saveBtn?.addEventListener('click', () => {
+        if (currentCropTargetIndex === null || !state.questions[currentCropTargetIndex]) return;
+        const canvas = cropElements.canvas;
+        if (!canvas || cropSelection.w < 10 || cropSelection.h < 10) {
+            showToast('אנא סמן אזור תמונה רחב יותר לחיתוך.', 'error');
+            return;
+        }
+
+        const offscreen = document.createElement('canvas');
+        offscreen.width = cropSelection.w;
+        offscreen.height = cropSelection.h;
+        const ctx = offscreen.getContext('2d');
+        ctx.drawImage(
+            canvas,
+            cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h,
+            0, 0, cropSelection.w, cropSelection.h
+        );
+
+        const croppedDataUrl = offscreen.toDataURL('image/webp', 0.85);
+        state.questions[currentCropTargetIndex].image = croppedDataUrl;
+        if (cropElements.pageSelect) {
+            state.questions[currentCropTargetIndex].sourcePage = parseInt(cropElements.pageSelect.value, 10);
+        }
+
+        closeCropModal();
+        renderPreview();
+        showToast('תמונת השאלה עודכנה ונחתכה בהצלחה!', 'success');
+    });
+
     function renderPreview() {
         elements.preview.innerHTML = '';
 
@@ -1338,26 +1546,96 @@ document.addEventListener('DOMContentLoaded', () => {
             qLabel.textContent = `שאלה ${index + 1}`;
             questionRow.appendChild(qLabel);
 
-            // Image thumbnail
+            // Image thumbnail & per-question crop/upload controls
+            const imageControlsWrap = document.createElement('div');
+            imageControlsWrap.style.cssText = 'grid-column:1/-1;margin-bottom:8px;padding:8px 10px;background:var(--input-bg);border:1px solid var(--border-color);border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;';
+
+            const leftBox = document.createElement('div');
+            leftBox.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+            const pageLabel = document.createElement('label');
+            pageLabel.style.cssText = 'font-size:.82rem;font-weight:600;color:var(--text-secondary);';
+            pageLabel.textContent = 'עמוד מקור:';
+
+            const pageInput = document.createElement('input');
+            pageInput.type = 'number';
+            pageInput.min = '1';
+            pageInput.value = question.sourcePage || 1;
+            pageInput.style.cssText = 'width:55px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-color);font:inherit;font-size:.82rem;background:var(--card-bg);color:var(--text-primary);';
+            pageInput.addEventListener('change', () => {
+                const p = parseInt(pageInput.value, 10);
+                if (p && p >= 1) {
+                    state.questions[index].sourcePage = p;
+                    renderPreview();
+                }
+            });
+            leftBox.append(pageLabel, pageInput);
+
+            const rightBox = document.createElement('div');
+            rightBox.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
+
+            const cropBtn = document.createElement('button');
+            cropBtn.type = 'button';
+            cropBtn.className = 'secondary-btn sm-btn';
+            cropBtn.textContent = question.image ? '✂️ חתוך תמונה מחדש' : '🖼️ חתוך תמונה מעמוד מקור';
+            cropBtn.style.cssText = 'font-size:.8rem;padding:4px 10px;';
+            cropBtn.addEventListener('click', () => {
+                openCropModal(index, question.sourcePage || 1);
+            });
+
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+            fileInput.addEventListener('change', (e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        state.questions[index].image = ev.target.result;
+                        renderPreview();
+                    };
+                    reader.readAsDataURL(f);
+                }
+            });
+
+            const uploadBtn = document.createElement('button');
+            uploadBtn.type = 'button';
+            uploadBtn.className = 'secondary-btn sm-btn';
+            uploadBtn.textContent = '📁 העלה תמונה מקובץ';
+            uploadBtn.style.cssText = 'font-size:.8rem;padding:4px 10px;';
+            uploadBtn.addEventListener('click', () => fileInput.click());
+
+            rightBox.append(cropBtn, uploadBtn, fileInput);
+
+            if (question.image) {
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'secondary-btn sm-btn';
+                removeBtn.textContent = '✕ הסר תמונה';
+                removeBtn.style.cssText = 'font-size:.8rem;padding:4px 8px;color:var(--danger);';
+                removeBtn.addEventListener('click', () => {
+                    delete state.questions[index].image;
+                    renderPreview();
+                });
+                rightBox.appendChild(removeBtn);
+            }
+
+            imageControlsWrap.append(leftBox, rightBox);
+
             if (question.image) {
                 const imgWrap = document.createElement('div');
                 imgWrap.style.cssText = 'grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-bottom:6px;';
                 const thumb = document.createElement('img');
                 thumb.src = question.image;
-                thumb.style.cssText = 'max-height:120px;max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;';
-                thumb.title = 'לחץ להצגה מלאה';
+                thumb.style.cssText = 'max-height:140px;max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;';
+                thumb.title = 'לחץ להצגה בגודל מלא';
                 thumb.addEventListener('click', () => window.open(question.image, '_blank'));
-                const removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.textContent = '✕ הסר תמונה';
-                removeBtn.style.cssText = 'font-size:.8rem;padding:4px 8px;';
-                removeBtn.addEventListener('click', () => {
-                    delete state.questions[index].image;
-                    imgWrap.remove();
-                });
-                imgWrap.append(thumb, removeBtn);
+                imgWrap.appendChild(thumb);
                 card.appendChild(imgWrap);
             }
+
+            card.appendChild(imageControlsWrap);
 
             const questionTextarea = document.createElement('textarea');
             questionTextarea.value = question.question;
@@ -1379,9 +1657,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             card.appendChild(questionRow);
 
-            if (state.proofMode && question.sourcePage && state.proofPageImages.length) {
+            if (state.proofMode && question.sourcePage) {
                 const sourcePageIndex = Number(question.sourcePage) - 1;
-                const sourcePageImage = state.proofPageImages[sourcePageIndex];
+                const sourcePageImage = state.proofPageImages[sourcePageIndex] || state.pdfPagesState[sourcePageIndex]?.thumbnailDataUrl;
                 if (sourcePageImage) {
                     const proofWrap = document.createElement('details');
                     proofWrap.style.cssText = 'grid-column:1/-1;border:1px solid var(--border-color);border-radius:10px;background:var(--card-bg);padding:8px;';
@@ -2046,41 +2324,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions from this PDF for an interactive Hebrew quiz app.
-You may output as clean Markdown (questions.md) OR as a JSON array (questions.json).
+    const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions from this PDF document as a clean Markdown file (questions.md) for an interactive Hebrew quiz system.
 
 ---------------------------------------------------------------------------
-FORMAT OPTION 1: MARKDOWN (questions.md - Recommended & Lightweight)
+REQUIRED MARKDOWN FORMAT (questions.md):
 ---------------------------------------------------------------------------
-### שאלה 1: [Question text in natural Hebrew]
+### שאלה 1: [Question text in natural Hebrew] (עמוד 1)
+- א. [Option 1 text]
+- ב. [Option 2 text]
+- ג. [Option 3 text]
+- ד. [Option 4 text]
+
+### שאלה 2: [Question text in natural Hebrew] (עמוד 2)
 - א. [Option 1 text]
 - ב. [Option 2 text]
 - ג. [Option 3 text]
 - ד. [Option 4 text]
 
 ---------------------------------------------------------------------------
-FORMAT OPTION 2: JSON SCHEMA (questions.json)
----------------------------------------------------------------------------
-[
-  {
-    "question": "שאלה לדוגמה בעברית...",
-    "options": [
-      "תשובה ראשונה",
-      "תשובה שנייה",
-      "תשובה שלישית",
-      "תשובה רביעית"
-    ],
-    "correctIndex": 0,
-    "sourcePage": 1
-  }
-]
-
----------------------------------------------------------------------------
 EXTRACTION & PROOFREADING RULES:
 ---------------------------------------------------------------------------
-1. HEBREW TEXT ORDER: Extract text in natural, correct Hebrew reading order. Do NOT reverse word order or letters. Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
-2. OPTIONS FORMATTING: Extract all choices into options (questions can have 4, 5, 6 or more choices).
-3. DELIVERABLE: Provide output as a downloadable file (questions.md or questions.json) or in a single clean code block ready for upload. Do not include conversational commentary.`;
+1. HEBREW READING ORDER: Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left). Do NOT reverse words or letter order. Ensure mixed Hebrew, numbers, and scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
+2. OPTIONS FORMATTING: Extract all choice options for each question (questions can have 4, 5, 6 or more choices). Use standard bullet format (- א., - ב., - ג., - ד.).
+3. PAGE NUMBER TRACKING: Always include the 1-based PDF source page number at the end of each question header in parentheses, e.g. (עמוד 3), especially for questions referencing figures, diagrams, charts, graphs, or tables (e.g. Q25, Q33).
+4. OUTPUT ONLY MARKDOWN: Return ONLY the clean Markdown text or a downloadable questions.md file. Do NOT include conversational explanations, introductions, or extra code blocks.`;
 
     if (elements.llmPromptBox) {
         elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
