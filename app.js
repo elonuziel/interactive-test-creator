@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── State ────────────────────────────────────────────────────────────────
     let questions = [];
+    let allMasterQuestions = [];
     let currentQuestionIndex = 0;
     let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
     let isImmediateFeedback = false;
@@ -16,14 +17,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const quizScreen    = document.getElementById('quiz-screen');
     const resultsScreen = document.getElementById('results-screen');
 
-    const startBtn      = document.getElementById('start-btn');
-    const resumeBtn     = document.getElementById('resume-btn');
-    const resumeNotice  = document.getElementById('resume-notice');
-    const prevBtn       = document.getElementById('prev-btn');
-    const nextBtn       = document.getElementById('next-btn');
-    const submitBtn     = document.getElementById('submit-btn');
-    const restartBtn    = document.getElementById('restart-btn');
-    const reviewBackBtn = document.getElementById('review-back-btn');
+    const startBtn          = document.getElementById('start-btn');
+    const resumeBtn         = document.getElementById('resume-btn');
+    const resumeNotice      = document.getElementById('resume-notice');
+    const prevBtn           = document.getElementById('prev-btn');
+    const nextBtn           = document.getElementById('next-btn');
+    const submitBtn         = document.getElementById('submit-btn');
+    const restartBtn        = document.getElementById('restart-btn');
+    const retryIncorrectBtn = document.getElementById('retry-incorrect-btn');
+    const reviewBackBtn     = document.getElementById('review-back-btn');
 
     const questionCounter   = document.getElementById('question-counter');
     const questionText      = document.getElementById('question-text');
@@ -125,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return { ...q, options };
             });
+            allMasterQuestions = [...questions];
 
             // Update welcome text now that questions are confirmed loaded
             const welcomeDesc = document.querySelector('.welcome-card > p');
@@ -237,6 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     restartBtn.addEventListener('click', () => {
         clearProgress();
+        if (allMasterQuestions && allMasterQuestions.length > 0) {
+            questions = [...allMasterQuestions];
+        }
+        userAnswers = new Array(questions.length).fill(null);
+        currentQuestionIndex = 0;
         isReviewMode = false;
         reviewFilter = 'all';
         filterBtns.forEach(b => {
@@ -244,6 +252,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         switchScreen(resultsScreen, setupScreen);
     });
+
+    if (retryIncorrectBtn) {
+        retryIncorrectBtn.addEventListener('click', () => {
+            const wrongOrUnanswered = questions.filter((q, i) => !userAnswers[i] || !userAnswers[i].isCorrect);
+            if (!wrongOrUnanswered.length) return;
+
+            questions = wrongOrUnanswered;
+            userAnswers = new Array(questions.length).fill(null);
+            currentQuestionIndex = 0;
+            isReviewMode = false;
+            reviewFilter = 'all';
+            filterBtns.forEach(b => {
+                b.classList.toggle('active', b.dataset.filter === 'all');
+            });
+            clearProgress();
+            switchScreen(resultsScreen, quizScreen);
+            renderQuestion();
+        });
+    }
 
     if (reviewBackBtn) {
         reviewBackBtn.addEventListener('click', () => {
@@ -437,9 +464,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const total = questions.length;
         const percentage = Math.round((correctCount / total) * 100);
 
-        document.getElementById('final-score').textContent = `${percentage}%`;
-        document.getElementById('score-text').textContent =
-            `ענית נכונה על ${correctCount} מתוך ${total} שאלות.`;
+        const incorrectCount = total - correctCount;
+        const retryBtn = document.getElementById('retry-incorrect-btn');
+        const badge = document.getElementById('incorrect-count-badge');
+        if (retryBtn && badge) {
+            if (incorrectCount > 0) {
+                retryBtn.classList.remove('hidden');
+                badge.textContent = incorrectCount;
+            } else {
+                retryBtn.classList.add('hidden');
+            }
+        }
 
         const circle = document.querySelector('.score-circle');
         const scoreEl = document.getElementById('final-score');
