@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         jsonFile: document.getElementById('json-file'),
         csvFile: document.getElementById('csv-file'),
         formNumber: document.getElementById('form-number'),
+        mergeAnswersBtn: document.getElementById('merge-answers-btn'),
         ocrEngine: document.getElementById('ocr-engine'),
         llmPolicy: document.getElementById('llm-policy'),
         apiKey: document.getElementById('api-key'),
@@ -753,7 +754,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < imageDatas.length; i += CHUNK_SIZE) {
             const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
             setStatus(`מפענח עמודים ${i + 1}-${Math.min(i + CHUNK_SIZE, imageDatas.length)} מתוך ${imageDatas.length} ב-Gemini...`);
-            
+
             const chunkPagesText = await callGeminiOcr(apiKey, chunk);
             pages.push(...chunkPagesText.map((pageText) => maybeFixHebrewWordOrder(pageText || '')));
 
@@ -858,7 +859,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!extractedPages) {
             throw new Error(`Gemini Native PDF OCR failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
         }
-        
+
         // Generate previews for proof mode
         const pagePreviews = [];
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
@@ -917,7 +918,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = await response.json();
         const responseParts = payload.candidates?.[0]?.content?.parts || [];
         let text = responseParts.map((part) => part.text || '').join('\n').trim();
-        
+
         // Remove markdown formatting if Gemini included it despite instructions
         text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
 
@@ -1817,7 +1818,7 @@ EXTRACTION & PROOFREADING RULES:
    - If the question is purely text-based, DO NOT include the \`pageImage\` key.
 
 4. ANSWER KEY (\`correctIndex\`):
-   - Set \`"correctIndex": 0\` by default if unknown.
+   - Set \`"correctIndex": 0\` by default.
 
 5. SELF-PROOFREADING PASS:
    - Once extraction is complete, perform a self-proofreading pass to verify Hebrew word order, punctuation, and JSON formatting before outputting.
@@ -1858,25 +1859,6 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
     elements.downloadCleanPdf?.addEventListener('click', downloadCleanPdf);
     elements.downloadCleanPdfMain?.addEventListener('click', downloadCleanPdf);
 
-    async function tryMergeAnswersFromCsv() {
-        const csv = elements.csvFile?.files?.[0];
-        const formNumber = elements.formNumber?.value?.trim();
-        if (!csv || !formNumber || !state.questions || !state.questions.length) return;
-
-        try {
-            let answerRows = null;
-            const fileName = csv.name.toLowerCase();
-            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                const xlsxBuffer = await csv.arrayBuffer();
-                answerRows = parseXlsxToRows(xlsxBuffer);
-            } else {
-                const csvText = await csv.text();
-                answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
-            }
-
-            const answerMap = extractAnswersForForm(answerRows, formNumber);
-            state.questions = mergeAnswers(state.questions, answerMap);
-            renderPreview();
     elements.toggleSidebarCollapseBtn?.addEventListener('click', () => {
         if (!elements.pdfSidebarCard) return;
         const isCollapsed = elements.pdfSidebarCard.classList.toggle('is-collapsed');
@@ -1884,9 +1866,25 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
         showToast(isCollapsed ? 'סרגל עמודים קופל' : 'סרגל עמודים הורחב', 'info', 2000);
     });
 
-    async function tryMergeAnswersFromCsv() {
+    async function tryMergeAnswersFromCsv(explicit = false) {
         const csv = elements.csvFile?.files?.[0];
         const formNumber = elements.formNumber?.value?.trim();
+
+        if (explicit) {
+            if (!state.questions || !state.questions.length) {
+                showToast('יש להעלות קודם קובץ questions.json!', 'error');
+                return;
+            }
+            if (!csv) {
+                showToast('יש לבחור קובץ תשובות (CSV/XLS)!', 'error');
+                return;
+            }
+            if (!formNumber) {
+                showToast('יש להזין מספר שאלון להתאמת התשובות!', 'error');
+                return;
+            }
+        }
+
         if (!csv || !formNumber || !state.questions || !state.questions.length) return;
 
         try {
@@ -1901,13 +1899,23 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
             }
 
             const answerMap = extractAnswersForForm(answerRows, formNumber);
+            if (explicit && (!answerMap || !Object.keys(answerMap).length)) {
+                showToast(`לא נמצאו תשובות לשאלון ${formNumber} בקובץ שנבחר.`, 'error');
+                return;
+            }
+
             state.questions = mergeAnswers(state.questions, answerMap);
             renderPreview();
             setStatus(`תשובות מ-CSV/XLS מוזגו בהצלחה לשאלון ${formNumber}!`, false, true);
         } catch (e) {
             console.warn('Could not merge CSV answers automatically:', e);
+            if (explicit) {
+                showToast(`שגיאה במיזוג תשובות: ${e.message}`, 'error');
+            }
         }
     }
+
+    elements.mergeAnswersBtn?.addEventListener('click', () => tryMergeAnswersFromCsv(true));
 
     // jsonFile Upload Listener
     elements.jsonFile?.addEventListener('change', async () => {

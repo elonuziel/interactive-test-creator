@@ -496,15 +496,18 @@
         <!-- Sidebar Card for PDF Pages & Filtering -->
         <aside id="pdf-sidebar-card" class="builder-card sidebar-card hidden">
             <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
                     <h2>📑 עמודי PDF</h2>
                     <span id="page-count-badge" class="badge">0 עמודים</span>
+                    <button id="clean-pdf-help-btn" class="help-btn" type="button" title="מה עושה ניקוי ה-PDF?" onclick="document.getElementById('clean-pdf-help-popup').classList.add('show')">?</button>
                 </div>
                 <button id="toggle-sidebar-collapse-btn" type="button" class="sm-btn secondary-btn" title="קיפול / הרחבת סרגל העמודים" style="font-size: .75rem; padding: 3px 8px;">◀ קפל סרגל</button>
             </div>
             
             <div id="sidebar-collapsible-body">
-                <p class="muted" style="font-size: .8rem; margin: 4px 0 10px;">סמן/בטל עמודים להכללה בעיבוד וביצוא קובץ נקי.</p>
+                <p class="muted" style="font-size: .78rem; margin: 4px 0 10px; line-height: 1.4;">
+                    💡 <strong>מומלץ:</strong> סמן עמודים והורד PDF נקי ללא עמודי שער/הוראות לדיוק מקסימלי ב-LLM.
+                </p>
 
                 <div class="preset-buttons">
                     <button id="preset-std-btn" type="button" class="sm-btn secondary-btn" title="מבטל עמודי שער/הוראות 1-4 ועמודים זוגיים">🧹 ניקוי סטנדרטי</button>
@@ -526,17 +529,6 @@
             <section class="builder-card">
                 <h2>קבצי מקור</h2>
 
-                <div class="info-banner">
-                    <span>💡</span>
-                    <div style="flex: 1;">
-                        <strong style="display: block; margin-bottom: 4px; font-size: .9rem;">איך הקובץ שלך יעובד?</strong>
-                        <ul style="margin: 0; padding-right: 18px; list-style-type: disc; display: grid; gap: 4px;">
-                            <li><strong>PDF דיגיטלי (עם טקסט להעתקה):</strong> יעובד <strong>מקומי על המחשב שלך</strong> — בחינם, ללא הגבלה וללא צורך בחיבור לאינטרנט או ב-API Key.</li>
-                            <li><strong>PDF סרוק (צילום/תמונה):</strong> דורש פענוח תמונה (OCR) — באמצעות <strong>Gemini (עם API Key <button class="help-btn" type="button" title="איך משיגים API Key?" onclick="document.getElementById('api-help-popup').classList.add('show')">?</button>)</strong>, או באמצעות <strong>העלאת קובץ <code>questions.json</code> מוכן מראש</strong>.</li>
-                        </ul>
-                    </div>
-                </div>
-
                 <div class="field">
                     <label for="pdf-file">קובץ PDF</label>
                     <div class="file-wrap">
@@ -545,35 +537,11 @@
                     </div>
                     <div id="pdf-type-note" class="field-note-block hidden"></div>
                     <div id="scanned-actions-box" class="field-note-block is-scanned hidden" style="margin-top: 8px;">
-                        <strong style="display:block; margin-bottom: 4px;">🔍 זוהה PDF סרוק — אפשרויות עיבוד:</strong>
-                        
-                        <div style="margin: 8px 0; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 10px; font-size: .83rem;">
-                            <strong style="color: var(--primary-color); display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                                💡 מומלץ בחום: ניקוי ה-PDF ושימוש בקובץ הנקי!
-                            </strong>
-                            <span>עבור מבחנים סרוקים (במיוחד כאלה עם תרשימים, איורים וגרפים), מומלץ ללחוץ על <strong>"הורד PDF נקי"</strong> למטה כדי להסיר עמודי שער והוראות מיותרים. שימוש ב-PDF הנקי (או העלאתו בחזרה) יבטיח <strong>איכות זיהוי מקסימלית</strong> ללא תמונות ורעשים מיותרים!</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; flex-wrap: wrap;">
+                            <label for="llm-prompt-box" style="font-weight: 600; font-size: .83rem;">🔍 זוהה PDF סרוק — העתק את הפרומפט ושלח בצירוף ה-PDF הנקי (מהסרגל מימין) ל-ChatGPT/Claude:</label>
+                            <button id="copy-prompt-btn" type="button" class="secondary-btn sm-btn">📋 העתק ללוח</button>
                         </div>
-
-                        <ul style="margin: 0; padding-right: 18px; line-height: 1.6; font-size: .83rem;">
-                            <li>
-                                <strong>אפשרות 1:</strong> 
-                                <button id="show-api-settings-btn" type="button" class="secondary-btn sm-btn" style="margin-right: 4px;">🔑 הזן Gemini API Key לעיבוד אוטומטי מלא</button>
-                            </li>
-                            <li><strong>אפשרות 2:</strong> לחץ על <strong>"הורד PDF נקי"</strong> למטה (אופציונלי: סמן/בטל עמודים בסרגל הצידי), שלח אותו ל-ChatGPT/Claude והעלה כאן את קובץ ה-<code>questions.json</code>.</li>
-                        </ul>
-                        
-                        <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                            <button id="download-clean-pdf-main" type="button" class="success-btn sm-btn">📥 הורד PDF נקי</button>
-                            <button id="preset-std-btn-main" type="button" class="secondary-btn sm-btn" title="מבטל עמודי שער/הוראות 1-4 ועמודים זוגיים">🧹 ניקוי סטנדרטי (cli-legacy)</button>
-                        </div>
-
-                        <div style="margin-top: 12px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <label for="llm-prompt-box" style="font-weight: 600; font-size: .82rem;">📋 הפרומפט להדבקה ב-LLM חיצוני:</label>
-                                <button id="copy-prompt-btn" type="button" class="secondary-btn sm-btn">📋 העתק ללוח</button>
-                            </div>
-                            <textarea id="llm-prompt-box" readonly rows="7" style="font-family: monospace; font-size: .8rem; width: 100%; resize: vertical; direction: rtl; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px;"></textarea>
-                        </div>
+                        <textarea id="llm-prompt-box" readonly rows="6" style="font-family: monospace; font-size: .8rem; width: 100%; resize: vertical; direction: rtl; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px;"></textarea>
                     </div>
                 </div>
 
@@ -596,15 +564,23 @@
                     <label for="form-number">מספר שאלון <span class="field-note-inline">אופציונלי</span></label>
                     <input id="form-number" type="text" inputmode="numeric" placeholder="לדוגמה: 76">
                 </div>
+                <div style="margin-top: 4px; margin-bottom: 8px;">
+                    <button id="merge-answers-btn" type="button" class="secondary-btn sm-btn" style="width: 100%;">🔗 מזג תשובות נכונות לשאלות (Merge Correct Answers)</button>
+                </div>
 
                 <div style="margin-top: 14px;">
-                    <button id="toggle-processing-settings-btn" type="button" class="secondary-btn sm-btn">⚙️ הצג/הסתר הגדרות עיבוד (Gemini API)</button>
+                    <button id="toggle-processing-settings-btn" type="button" class="secondary-btn sm-btn">⚙️ מצב מתקדם: הגדרות עיבוד ב-Gemini API</button>
                 </div>
 
                 <!-- Hidden Processing & API Settings Section -->
                 <div id="processing-settings-container" class="hidden" style="margin-top: 10px;">
                     <hr class="section-divider">
-                    <p class="section-label">⚙️&nbsp; הגדרות עיבוד (Gemini API)</p>
+                    <p class="section-label">⚙️&nbsp; הגדרות עיבוד מתקדמות (Gemini API)</p>
+
+                    <div style="margin-bottom: 12px; background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); border-radius: 8px; padding: 10px; font-size: .83rem;">
+                        <strong style="display: block; margin-bottom: 4px; color: var(--primary-color);">🤖 ניתוח אוטומטי ישיר מול Gemini API</strong>
+                        <span>מצב זה מיועד למשתמשים שרוצים לפענח PDF סרוק בלחיצת כפתור ישירות דרך קריאות API ל-Gemini (דורש פענוח תמונה OCR מול Gemini API Key <button class="help-btn" type="button" title="איך משיגים API Key?" onclick="document.getElementById('api-help-popup').classList.add('show')">?</button>).</span>
+                    </div>
 
                     <div class="field">
                         <label for="llm-policy">שימוש ב-LLM</label>
@@ -643,6 +619,10 @@
                             </div>
                         </div>
                     </div>
+
+                    <div style="margin-top: 14px;">
+                        <button id="run-parse" class="primary-btn" style="width: 100%;">⚡ הפעל ניתוח אוטומטי מול Gemini API</button>
+                    </div>
                 </div>
 
                 <hr class="section-divider">
@@ -655,11 +635,10 @@
                     </div>
                 </div>
 
-            <div class="actions">
-                <button id="run-parse" class="primary-btn">הפעל ניתוח</button>
-                <button id="download-quiz" class="success-btn" disabled>הורד מבחן עצמאי</button>
-                <button id="take-quiz" class="secondary-btn" disabled>פתור מבחן כעת</button>
-            </div>
+                <div class="actions">
+                    <button id="download-quiz" class="success-btn" disabled>📥 הורד מבחן עצמאי (HTML)</button>
+                    <button id="take-quiz" class="secondary-btn" disabled>▶ פתור מבחן כעת</button>
+                </div>
             <div class="proof-row">
                 <label for="proof-mode-toggle" class="proof-label">מצב הגהה</label>
                 <span class="proof-note">הצגת עמוד מקור לכל שאלה</span>
@@ -729,6 +708,15 @@
     </div>
 </div>
 
+<div id="clean-pdf-help-popup" class="help-popup">
+    <div class="help-popup-content">
+        <h3>🧹 מה עושה "הורד PDF נקי"?</h3>
+        <p>לחצן זה יוצר קובץ PDF חדש המכיל <strong>רק את העמודים המסומנים</strong> בסרגל (ללא עמודי שער, הוראות, או עמודים סרוקים ריקים).</p>
+        <p style="margin-top: 8px;"><strong>למה זה מומלץ?</strong> שליחת PDF נקי ל-ChatGPT או Claude מונעת רעשי רקע, חוסכת טוקנים, ומבטיחה <strong>איכות ודיוק מקסימליים</strong> בהפקת השאלות והאיורים!</p>
+        <button id="clean-pdf-help-close" class="help-popup-close" type="button">הבנתי, תודה</button>
+    </div>
+</div>
+
 <script>
 document.getElementById('api-help-btn').addEventListener('click', () => {
     document.getElementById('api-help-popup').classList.add('show');
@@ -742,6 +730,9 @@ document.getElementById('api-help-close').addEventListener('click', () => {
 document.getElementById('answer-help-close').addEventListener('click', () => {
     document.getElementById('answer-help-popup').classList.remove('show');
 });
+document.getElementById('clean-pdf-help-close')?.addEventListener('click', () => {
+    document.getElementById('clean-pdf-help-popup').classList.remove('show');
+});
 document.getElementById('api-help-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('api-help-popup').classList.remove('show');
 });
@@ -750,6 +741,9 @@ document.getElementById('answer-help-popup').addEventListener('click', (e) => {
 });
 document.getElementById('credential-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) document.getElementById('credential-popup').classList.remove('show');
+});
+document.getElementById('clean-pdf-help-popup')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) document.getElementById('clean-pdf-help-popup').classList.remove('show');
 });
 document.querySelectorAll('.file-clear').forEach(btn => {
     const input = document.getElementById(btn.dataset.target);
