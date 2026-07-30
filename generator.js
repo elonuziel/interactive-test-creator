@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadCleanPdfMain: document.getElementById('download-clean-pdf-main'),
         presetStdBtnMain: document.getElementById('preset-std-btn-main'),
         pdfSidebarCard: document.getElementById('pdf-sidebar-card'),
+        toggleSidebarCollapseBtn: document.getElementById('toggle-sidebar-collapse-btn'),
         builderLayout: document.getElementById('builder-layout'),
         pageCountBadge: document.getElementById('page-count-badge'),
         presetStdBtn: document.getElementById('preset-std-btn'),
@@ -94,10 +95,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function setStatus(message, isError = false) {
+    function showToast(message, type = 'success', duration = 4000) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        const iconMap = {
+            success: '✅',
+            error: '⚠️',
+            info: '💡'
+        };
+
+        const iconSpan = document.createElement('span');
+        iconSpan.textContent = iconMap[type] || 'ℹ️';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = message;
+
+        toast.append(iconSpan, textSpan);
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            toast.style.transition = 'all 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    function setStatus(message, isError = false, triggerToast = false) {
         elements.status.textContent = message;
         elements.status.classList.toggle('muted', !isError);
         elements.status.style.color = isError ? 'var(--danger)' : 'var(--text-primary)';
+        if (triggerToast || isError) {
+            showToast(message, isError ? 'error' : 'success');
+        }
     }
 
     function disableOutputActions(disabled) {
@@ -1824,6 +1858,57 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
     elements.downloadCleanPdf?.addEventListener('click', downloadCleanPdf);
     elements.downloadCleanPdfMain?.addEventListener('click', downloadCleanPdf);
 
+    async function tryMergeAnswersFromCsv() {
+        const csv = elements.csvFile?.files?.[0];
+        const formNumber = elements.formNumber?.value?.trim();
+        if (!csv || !formNumber || !state.questions || !state.questions.length) return;
+
+        try {
+            let answerRows = null;
+            const fileName = csv.name.toLowerCase();
+            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                const xlsxBuffer = await csv.arrayBuffer();
+                answerRows = parseXlsxToRows(xlsxBuffer);
+            } else {
+                const csvText = await csv.text();
+                answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
+            }
+
+            const answerMap = extractAnswersForForm(answerRows, formNumber);
+            state.questions = mergeAnswers(state.questions, answerMap);
+            renderPreview();
+    elements.toggleSidebarCollapseBtn?.addEventListener('click', () => {
+        if (!elements.pdfSidebarCard) return;
+        const isCollapsed = elements.pdfSidebarCard.classList.toggle('is-collapsed');
+        elements.toggleSidebarCollapseBtn.textContent = isCollapsed ? '▶ פתח סרגל' : '◀ קפל סרגל';
+        showToast(isCollapsed ? 'סרגל עמודים קופל' : 'סרגל עמודים הורחב', 'info', 2000);
+    });
+
+    async function tryMergeAnswersFromCsv() {
+        const csv = elements.csvFile?.files?.[0];
+        const formNumber = elements.formNumber?.value?.trim();
+        if (!csv || !formNumber || !state.questions || !state.questions.length) return;
+
+        try {
+            let answerRows = null;
+            const fileName = csv.name.toLowerCase();
+            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                const xlsxBuffer = await csv.arrayBuffer();
+                answerRows = parseXlsxToRows(xlsxBuffer);
+            } else {
+                const csvText = await csv.text();
+                answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
+            }
+
+            const answerMap = extractAnswersForForm(answerRows, formNumber);
+            state.questions = mergeAnswers(state.questions, answerMap);
+            renderPreview();
+            setStatus(`תשובות מ-CSV/XLS מוזגו בהצלחה לשאלון ${formNumber}!`, false, true);
+        } catch (e) {
+            console.warn('Could not merge CSV answers automatically:', e);
+        }
+    }
+
     // jsonFile Upload Listener
     elements.jsonFile?.addEventListener('change', async () => {
         const file = elements.jsonFile.files?.[0];
@@ -1837,12 +1922,18 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
             state.questions = normalizedQuestions;
             renderPreview();
             disableOutputActions(false);
-            setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ JSON!`);
+            setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ JSON!`, false, true);
+
+            await tryMergeAnswersFromCsv();
         } catch (error) {
             console.error('Error loading questions.json:', error);
             setStatus(error.message || 'נכשלה טעינת קובץ questions.json.', true);
         }
     });
+
+    elements.csvFile?.addEventListener('change', tryMergeAnswersFromCsv);
+    elements.formNumber?.addEventListener('change', tryMergeAnswersFromCsv);
+    elements.formNumber?.addEventListener('blur', tryMergeAnswersFromCsv);
 
     function toggleProcessingSettings(showOnly = false) {
         if (!elements.processingSettingsContainer) return;

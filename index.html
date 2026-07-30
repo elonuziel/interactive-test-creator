@@ -126,9 +126,70 @@
             background: rgba(59,130,246,.12);
             color: var(--primary-color);
         }
+        .help-btn {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color);
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary-color);
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+        .help-btn:hover {
+            transform: scale(1.18);
+            background: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+        }
+        .sidebar-card.is-collapsed #sidebar-collapsible-body {
+            display: none;
+        }
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            background: var(--card-bg, #ffffff);
+            color: var(--text-primary, #1e293b);
+            border: 1px solid var(--border-color, #cbd5e1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18);
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+            animation: toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            direction: rtl;
+        }
+        .toast.success { border-right: 4px solid #10b981; }
+        .toast.error { border-right: 4px solid #ef4444; }
+        .toast.info { border-right: 4px solid #3b82f6; }
+        @keyframes toastIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
         @media (max-width: 900px) {
             .builder-layout { grid-template-columns: 1fr; }
             .sidebar-card { position: static; max-height: none; }
+            .preset-buttons { grid-template-columns: 1fr 1fr; gap: 8px; }
         }
         .builder-card {
             background: var(--card-bg);
@@ -434,23 +495,29 @@
     <div id="builder-layout" class="builder-layout no-sidebar">
         <!-- Sidebar Card for PDF Pages & Filtering -->
         <aside id="pdf-sidebar-card" class="builder-card sidebar-card hidden">
-            <div class="sidebar-header">
-                <h2>📑 עמודי PDF</h2>
-                <span id="page-count-badge" class="badge">0 עמודים</span>
+            <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <h2>📑 עמודי PDF</h2>
+                    <span id="page-count-badge" class="badge">0 עמודים</span>
+                </div>
+                <button id="toggle-sidebar-collapse-btn" type="button" class="sm-btn secondary-btn" title="קיפול / הרחבת סרגל העמודים" style="font-size: .75rem; padding: 3px 8px;">◀ קפל סרגל</button>
             </div>
-            <p class="muted" style="font-size: .8rem; margin: 4px 0 10px;">סמן/בטל עמודים להכללה בעיבוד וביצוא קובץ נקי.</p>
+            
+            <div id="sidebar-collapsible-body">
+                <p class="muted" style="font-size: .8rem; margin: 4px 0 10px;">סמן/בטל עמודים להכללה בעיבוד וביצוא קובץ נקי.</p>
 
-            <div class="preset-buttons">
-                <button id="preset-std-btn" type="button" class="sm-btn secondary-btn" title="מבטל עמודי שער/הוראות 1-4 ועמודים זוגיים">🧹 ניקוי סטנדרטי</button>
-                <button id="preset-blank-btn" type="button" class="sm-btn secondary-btn" title="מזהה ומבטל עמודים ללא טקסט">📄 הסר ריקים</button>
-                <button id="preset-select-all-btn" type="button" class="sm-btn secondary-btn">☑️ בחר הכל</button>
-                <button id="preset-deselect-all-btn" type="button" class="sm-btn secondary-btn">☐ בטל הכל</button>
-            </div>
+                <div class="preset-buttons">
+                    <button id="preset-std-btn" type="button" class="sm-btn secondary-btn" title="מבטל עמודי שער/הוראות 1-4 ועמודים זוגיים">🧹 ניקוי סטנדרטי</button>
+                    <button id="preset-blank-btn" type="button" class="sm-btn secondary-btn" title="מזהה ומבטל עמודים ללא טקסט">📄 הסר ריקים</button>
+                    <button id="preset-select-all-btn" type="button" class="sm-btn secondary-btn">☑️ בחר הכל</button>
+                    <button id="preset-deselect-all-btn" type="button" class="sm-btn secondary-btn">☐ בטל הכל</button>
+                </div>
 
-            <button id="download-clean-pdf" type="button" class="success-btn sm-btn" style="width:100%; margin: 8px 0 12px;" disabled>📥 הורד PDF נקי</button>
+                <button id="download-clean-pdf" type="button" class="success-btn sm-btn" style="width:100%; margin: 8px 0 12px;" disabled>📥 הורד PDF נקי</button>
 
-            <div id="page-thumbnails-container" class="thumbnails-grid">
-                <!-- Page thumbnails dynamically injected here -->
+                <div id="page-thumbnails-container" class="thumbnails-grid">
+                    <!-- Page thumbnails dynamically injected here -->
+                </div>
             </div>
         </aside>
 
@@ -479,6 +546,14 @@
                     <div id="pdf-type-note" class="field-note-block hidden"></div>
                     <div id="scanned-actions-box" class="field-note-block is-scanned hidden" style="margin-top: 8px;">
                         <strong style="display:block; margin-bottom: 4px;">🔍 זוהה PDF סרוק — אפשרויות עיבוד:</strong>
+                        
+                        <div style="margin: 8px 0; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 10px; font-size: .83rem;">
+                            <strong style="color: var(--primary-color); display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                                💡 מומלץ בחום: ניקוי ה-PDF ושימוש בקובץ הנקי!
+                            </strong>
+                            <span>עבור מבחנים סרוקים (במיוחד כאלה עם תרשימים, איורים וגרפים), מומלץ ללחוץ על <strong>"הורד PDF נקי"</strong> למטה כדי להסיר עמודי שער והוראות מיותרים. שימוש ב-PDF הנקי (או העלאתו בחזרה) יבטיח <strong>איכות זיהוי מקסימלית</strong> ללא תמונות ורעשים מיותרים!</span>
+                        </div>
+
                         <ul style="margin: 0; padding-right: 18px; line-height: 1.6; font-size: .83rem;">
                             <li>
                                 <strong>אפשרות 1:</strong> 
@@ -758,6 +833,7 @@ document.querySelectorAll('.eye-btn').forEach(btn => {
 
 </script>
 
+<div id="toast-container" class="toast-container"></div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="generator.js"></script>
