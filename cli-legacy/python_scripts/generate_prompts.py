@@ -85,7 +85,7 @@ Please perform a thorough AI proofreading pass according to these guidelines:
 1. HEBREW TEXT ACCURACY:
    - Fix any reversed Hebrew words or backward reading order.
    - Fix inverted parentheses, brackets, or mixed English/Hebrew terms (e.g., "pH 7-ב" or "חלבונים (Proteins)").
-   - Ensure questions end with proper Hebrew punctuation.
+   - Ensure questions end with proper Hebrew punctuation (e.g., '?').
 
 2. OPTIONS CLEANUP:
    - Ensure each question has a clean `options` array containing all choices (e.g. 4, 5, 6+ choices).
@@ -96,8 +96,11 @@ Please perform a thorough AI proofreading pass according to these guidelines:
    - Do NOT alter or remove `pageImage` paths (e.g. `"pages_output/page_X.png"`).
    - Do NOT change the order or number of questions.
 
-OUTPUT REQUIREMENTS:
-Return ONLY the final, complete, valid JSON array. Do not include markdown code block ticks (```json), intro text, or explanation commentary.
+---------------------------------------------------------------------------
+OUTPUT & DELIVERABLE REQUIREMENTS:
+---------------------------------------------------------------------------
+1. Provide your response either as a downloadable `questions.json` file OR in a single clean code block ready for one-click copy-pasting.
+2. Return ONLY complete, valid JSON without introductory commentary or explanations.
 """
     else:
         web_prompt = f"""I am uploading the exam document for Hebrew test "{test_name}".
@@ -105,10 +108,10 @@ Return ONLY the final, complete, valid JSON array. Do not include markdown code 
 Please extract all multiple-choice questions into a clean `questions.json` array for an interactive quiz app.
 
 ---------------------------------------------------------------------------
-EXTRACTION RULES:
+EXTRACTION & PROOFREADING RULES:
 ---------------------------------------------------------------------------
 1. HEBREW TEXT ORDER:
-   - Extract text in natural, correct Hebrew reading order.
+   - Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left).
    - Do NOT reverse word order or letters.
    - Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
 
@@ -122,6 +125,9 @@ EXTRACTION RULES:
 
 4. ANSWER KEY (`correctIndex`):
    - Set `"correctIndex": null` for all questions (the answer key will be merged automatically).
+
+5. SELF-PROOFREADING PASS:
+   - Once extraction is complete, perform a self-proofreading pass to verify Hebrew word order, punctuation, and JSON formatting before outputting.
 
 ---------------------------------------------------------------------------
 REQUIRED JSON SCHEMA:
@@ -140,8 +146,11 @@ REQUIRED JSON SCHEMA:
   }}
 ]
 
-OUTPUT REQUIREMENT:
-Return ONLY the raw JSON array. Do NOT wrap in markdown blocks, and do NOT add intro/outro commentary.
+---------------------------------------------------------------------------
+OUTPUT & DELIVERABLE REQUIREMENTS:
+---------------------------------------------------------------------------
+1. Provide your final response either as a downloadable `questions.json` file OR as a single clean code block formatted for easy copy-pasting into `questions.json`.
+2. Do NOT include conversational commentary or explanation text. Output raw, valid JSON only.
 """
 
     if target in ["local", "all"]:

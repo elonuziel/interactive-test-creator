@@ -582,13 +582,26 @@ def process_workspace(test_name, test_dir):
     # Check for candidate JSON files
     q_final = os.path.join(test_dir, 'questions.json')
     if not os.path.exists(q_final):
-        candidates = ['final_questions.json', 'output.json', 'response.json', 'data.json']
+        candidates = ['final_questions.json', 'output.json', 'response.json', 'data.json', 'interactive_quiz.json']
+        found = False
         for cand in candidates:
             cand_p = os.path.join(test_dir, cand)
             if os.path.exists(cand_p):
-                print(f"\n  {C_CYAN}[i] Found {cand}. Renaming to questions.json...{C_RESET}")
+                print(f"\n  {C_CYAN}[i] Found candidate {cand}. Renaming to questions.json...{C_RESET}")
                 shutil.move(cand_p, q_final)
+                found = True
                 break
+
+        if not found:
+            other_jsons = [
+                f for f in os.listdir(test_dir)
+                if f.lower().endswith('.json') and f.lower() not in ['answers.json', 'page_map.json', 'questions.json']
+            ]
+            if other_jsons:
+                target_json = other_jsons[0]
+                cand_p = os.path.join(test_dir, target_json)
+                print(f"\n  {C_CYAN}[i] Auto-detected question JSON file ({target_json}). Renaming to questions.json...{C_RESET}")
+                shutil.move(cand_p, q_final)
 
     # Step 6: Post-processing & Validation
     run_step6(test_name, test_dir, q_final)
