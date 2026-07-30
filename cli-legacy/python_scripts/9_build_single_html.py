@@ -169,7 +169,7 @@ def build_html(test_dir, embed_images=True, title=None):
 
     # ── Inline JS: replace <script src="app.js"></script> ──────────────────
     html = re.sub(
-        r'<script\s+src="app\.js">\s*</script>',
+        r'<script\s+[^>]*src=["\']\.?/?app\.js["\'][^>]*>\s*</script>',
         lambda _: f'{embedded_script}\n<script>\n{js}\n</script>',
         html
     )
