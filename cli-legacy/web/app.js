@@ -809,11 +809,109 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ── Practice Mode Selection Modal Controllers ───────────────────────────
+    const practiceModeModal     = document.getElementById('practice-mode-modal');
+    const closePracticeModalBtn = document.getElementById('close-practice-modal-btn');
+    const modeFlashcardsBtn     = document.getElementById('mode-flashcards-btn');
+    const modeQuizImmediateBtn = document.getElementById('mode-quiz-immediate-btn');
+    const modeQuizStandardBtn  = document.getElementById('mode-quiz-standard-btn');
+
+    let fullOriginalQuestions = null;
+    let pendingPracticeQuestions = [];
+
+    function openPracticeModeSelection(source) {
+        let missedList = [];
+        if (source === 'results' && userAnswers.length > 0) {
+            // Get wrong or unanswered questions from recent test session
+            missedList = questions.filter((q, i) => !userAnswers[i] || !userAnswers[i].isCorrect);
+        } else {
+            // Get missed questions from study deck
+            const deck = getStudyDeck();
+            const currentTestId = testPath || 'מבחן';
+            const deckCards = deck.filter(c => !c.mastered && (testPath ? c.testId === currentTestId : true));
+            missedList = deckCards.map(c => ({
+                question: c.questionText,
+                options: c.options || [],
+                correctIndex: c.correctIndex,
+                image: c.image || '',
+                pageImage: c.pageImage || '',
+                explanation: c.explanation
+            }));
+        }
+
+        if (!missedList || missedList.length === 0) {
+            alert('אין שאלות שנפסלו או שלא נענו בבחינה זו!');
+            return;
+        }
+
+        pendingPracticeQuestions = missedList;
+        if (practiceModeModal) {
+            practiceModeModal.classList.remove('hidden');
+            practiceModeModal.classList.add('active');
+        }
+    }
+
+    if (closePracticeModalBtn) {
+        closePracticeModalBtn.addEventListener('click', () => {
+            if (practiceModeModal) {
+                practiceModeModal.classList.add('hidden');
+                practiceModeModal.classList.remove('active');
+            }
+        });
+    }
+
+    if (modeFlashcardsBtn) {
+        modeFlashcardsBtn.addEventListener('click', () => {
+            if (practiceModeModal) {
+                practiceModeModal.classList.add('hidden');
+                practiceModeModal.classList.remove('active');
+            }
+            openStudyScreen();
+        });
+    }
+
+    function startPracticeQuizMode(immediateFeedback) {
+        if (practiceModeModal) {
+            practiceModeModal.classList.add('hidden');
+            practiceModeModal.classList.remove('active');
+        }
+        if (!pendingPracticeQuestions || pendingPracticeQuestions.length === 0) return;
+
+        // Preserve full original questions if not saved
+        if (!fullOriginalQuestions) {
+            fullOriginalQuestions = [...questions];
+        }
+
+        isImmediateFeedback = immediateFeedback;
+        if (feedbackToggle) feedbackToggle.checked = immediateFeedback;
+
+        questions = [...pendingPracticeQuestions];
+        currentQuestionIndex = 0;
+        userAnswers = [];
+        clearProgress();
+
+        // Switch screen to quiz screen
+        [setupScreen, resultsScreen, studyScreen, menuScreen, errorScreen].forEach(s => {
+            if (s) s.classList.remove('active');
+        });
+        if (quizScreen) quizScreen.classList.add('active');
+
+        renderQuestion();
+        renderJumpBar();
+    }
+
+    if (modeQuizImmediateBtn) {
+        modeQuizImmediateBtn.addEventListener('click', () => startPracticeQuizMode(true));
+    }
+    if (modeQuizStandardBtn) {
+        modeQuizStandardBtn.addEventListener('click', () => startPracticeQuizMode(false));
+    }
+
     if (studyModeNavBtn) {
-        studyModeNavBtn.addEventListener('click', openStudyScreen);
+        studyModeNavBtn.addEventListener('click', () => openPracticeModeSelection('nav'));
     }
     if (practiceMissedBtn) {
-        practiceMissedBtn.addEventListener('click', openStudyScreen);
+        practiceMissedBtn.addEventListener('click', () => openPracticeModeSelection('results'));
     }
     if (exitStudyBtn) {
         exitStudyBtn.addEventListener('click', () => {
