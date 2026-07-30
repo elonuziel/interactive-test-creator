@@ -104,17 +104,12 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(getStorageKey());
     }
 
-    // ── Load Questions (Embedded vs Fetch) ────────────────────────────────────
-    const loadQuestionsPromise = (typeof window.__EMBEDDED_QUESTIONS !== 'undefined' && Array.isArray(window.__EMBEDDED_QUESTIONS) && window.__EMBEDDED_QUESTIONS.length > 0)
-        ? Promise.resolve(window.__EMBEDDED_QUESTIONS)
-        : (typeof window.embeddedQuestions !== 'undefined' && Array.isArray(window.embeddedQuestions) && window.embeddedQuestions.length > 0)
-        ? Promise.resolve(window.embeddedQuestions)
-        : fetch('questions.json').then(r => {
+    // ── Fetch Questions ───────────────────────────────────────────────────────
+    fetch('questions.json')
+        .then(r => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json();
-        });
-
-    loadQuestionsPromise
+        })
         .then(data => {
             if (!Array.isArray(data) || data.length === 0) {
                 throw new Error('questions.json is empty or malformed');
