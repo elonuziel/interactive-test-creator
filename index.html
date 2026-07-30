@@ -892,50 +892,25 @@
 
     <div id="api-help-popup" class="help-popup">
         <div class="help-popup-content" style="max-width: 520px;">
-            <h3>🔑 איך משיגים API Key?</h3>
+            <h3>🔑 איך משיגים AQ API Key?</h3>
             <p style="font-size: .88rem; color: var(--text-secondary); margin-bottom: 12px;">
-                המערכת פועלת כעת ברירת מחדל מול <strong>AQ API</strong> (שרת Elza הישן בביטול):
+                המערכת פועלת כעת בלעדית מול <strong>AQ API</strong> להפעלת מודלי Gemini מתקדמים:
             </p>
-
-            <div style="display: grid; gap: 10px; margin-bottom: 14px;">
-                <div
-                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <strong style="color: var(--primary-color); font-size: .92rem;">1. AQ API Key (ברירת מחדל
-                            מומלצת)</strong>
-                        <span
-                            style="font-family: monospace; font-size: .82rem; background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color);"
-                            dir="ltr">AQ...</span>
-                    </div>
-                    <p style="margin: 0; font-size: .83rem; color: var(--text-secondary); line-height: 1.4;">
-                        מפתח מומלץ למודלים מתקדמים (Gemini 2.5 Flash / 2.0 Flash). מתקבל דרך
-                        <a href="https://console.cloud.google.com/apis/credentials" target="_blank"
-                            rel="noopener noreferrer">Google Cloud Console</a>.
-                    </p>
+            
+            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <strong style="color: var(--primary-color); font-size: .95rem;">AQ API Key</strong>
+                    <span style="font-family: monospace; font-size: .85rem; background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color);" dir="ltr">AQ...</span>
                 </div>
-
-                <div
-                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <strong style="color: var(--primary-color); font-size: .92rem;">2. Gemini API Key</strong>
-                        <span
-                            style="font-family: monospace; font-size: .82rem; background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color);"
-                            dir="ltr">AIza...</span>
-                    </div>
-                    <p style="margin: 0; font-size: .83rem; color: var(--text-secondary); line-height: 1.4;">
-                        חינמי, מתקבל מ־
-                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI
-                            Studio</a>.
-                        מתאים לשימוש אישי עם מכסה נדיבה.
-                    </p>
-                </div>
+                <p style="margin: 0; font-size: .85rem; color: var(--text-secondary); line-height: 1.5;">
+                    מפתח מומלץ למודלים מתקדמים (Gemini 2.5 Flash / 2.0 Flash).<br>
+                    מתקבל בחינם מ־
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="font-weight: 600; text-decoration: underline;">Google AI Studio</a>.
+                </p>
             </div>
 
             <p style="font-size: .82rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.4;">
-                💡 את המפתח מדביקים בשדה API Key — המערכת מזהה את סוג המפתח אוטומטית. ⚠️ <strong>שימו לב:</strong> שרת
-                Elza הישן בביטול (Phasing Out), והמערכת פועלת ברירת מחדל מול AQ API.
+                💡 את המפתח מדביקים בשדה <bdi>API Key</bdi> — המערכת תשתמש בו לפענוח וניתוח המבחן.
             </p>
 
             <button id="api-help-close" class="help-popup-close" type="button" style="width: 100%;">הבנתי, תודה</button>

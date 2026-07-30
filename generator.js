@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const typedApiKey = elements.apiKey.value.trim();
         if (typedApiKey) {
             if (typedApiKey.toLowerCase().includes('elza')) {
-                throw new Error('שרת Elza בביטול / יוצא משימוש (Phasing Out). אנא הזן מפתח AQ API (AQ...) או Gemini API Key (AIza...).');
+                throw new Error('שרת Elza בביטול / יוצא משימוש (Phasing Out). אנא הזן מפתח AQ API תקין (AQ...) מ-Google AI Studio.');
             }
             return typedApiKey;
         }
@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { apiKey: promptedApiKey, passcode: promptedPasscode } = await requestGeminiCredentials();
         if (promptedApiKey) {
             if (promptedApiKey.toLowerCase().includes('elza')) {
-                throw new Error('שרת Elza בביטול / יוצא משימוש (Phasing Out). אנא הזן מפתח AQ API (AQ...) או Gemini API Key (AIza...).');
+                throw new Error('שרת Elza בביטול / יוצא משימוש (Phasing Out). אנא הזן מפתח AQ API תקין (AQ...) מ-Google AI Studio.');
             }
             elements.apiKey.value = promptedApiKey;
             return promptedApiKey;
