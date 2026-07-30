@@ -107,28 +107,28 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
 
 Please extract all multiple-choice questions into a clean Markdown file (`questions.md`) for an interactive Hebrew quiz system.
 
----------------------------------------------------------------------------
+===========================================================================
 REQUIRED MARKDOWN FORMAT (questions.md):
----------------------------------------------------------------------------
-### שאלה 1: מהו התפקיד העיקרי של המיטוכונדריה בתא? (עמוד 1)
-- א. ייצור אנרגיה (ATP)
-- ב. סינתזת חלבונים
-- ג. אחסון החומר התורשתי
-- ד. פירוק רעלים בתא
+===========================================================================
+### שאלה 1: [נוסח השאלה המלא בעברית] (עמוד 1)
+- א. [אפשרות 1]
+- ב. [אפשרות 2]
+- ג. [אפשרות 3]
+- ד. [אפשרות 4]
 
-### שאלה 2: איזה איבר אחראי על סינון דם בגוף? (עמוד 2)
-- א. כבד
-- ב. כליות
-- ג. לב
-- ד. ריאות
+### שאלה 2: [נוסח השאלה השנייה בעברית] (עמוד 2)
+- א. [אפשרות 1]
+- ב. [אפשרות 2]
+- ג. [אפשרות 3]
+- ד. [אפשרות 4]
 
----------------------------------------------------------------------------
-EXTRACTION & PROOFREADING RULES:
----------------------------------------------------------------------------
-1. HEBREW READING ORDER: Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left). Do NOT reverse words or letter order. Ensure mixed Hebrew, numbers, and scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
-2. OPTIONS FORMATTING: Extract all choices into the options list (questions can have 4, 5, 6 or more choices; strip option prefixes like 'א.', 'ב.', '1.', '2.').
-3. PAGE NUMBER TRACKING: Always include the 1-based PDF source page number at the end of each question header in parentheses, e.g. (עמוד 3), especially for questions referencing figures, diagrams, charts, graphs, or tables (e.g. Q25, Q33).
-4. DELIVERABLE: Provide your response as a clean downloadable `questions.md` file or in a single clean code block ready for one-click copy-pasting. Do NOT include conversational explanations or introductory commentary.
+===========================================================================
+STRICT EXTRACTION & PROOFREADING RULES:
+===========================================================================
+1. HEBREW READING ORDER & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve scientific terms and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
+2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: - א., - ב., - ג., - ד., - ה., etc. Extract all options for each question (questions may have 4, 5, 6 or more choices).
+3. PAGE NUMBER TRACKING: Always end each question header with the exact 1-based PDF source page number in parentheses: (עמוד X), e.g. (עמוד 1), (עמוד 5). This is CRITICAL for matching questions referencing graphs, diagrams, figures, or tables.
+4. NO CONVERSATIONAL FILLER: Return ONLY the clean Markdown text or a downloadable questions.md file. Do NOT include conversational explanations, introductions, or extra code blocks.
 """
 
     if target in ["local", "all"]:

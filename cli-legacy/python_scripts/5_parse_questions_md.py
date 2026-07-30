@@ -11,16 +11,16 @@ if hasattr(sys.stdout, 'reconfigure'):
 # ── Patterns (mirrors quiz_builder.js L216–L225) ───────────────────────────
 # Step 2.1: robust question detection
 Q_PATTERN = re.compile(
-    r'(?:שאלה\s+(?:מספר\s+)?:?\d+\s*:?'       # שאלה מספר :1  /  שאלה 1:
-    r'|(?:מספר\s+)?שאלה\s*:?\s*\d+\s*:?'       # מספר שאלה :1  (reversed on line)
-    r'|\d+\s*:?\s*מספר\s+שאלה'                 # 1 :מספר שאלה  (fully reversed)
+    r'(?:^#*\s*שאלה\s+(?:מספר\s+)?:?\d+\s*:?'   # ### שאלה 1:  /  שאלה מספר :1
+    r'|^#*\s*(?:מספר\s+)?שאלה\s*:?\s*\d+\s*:?'   # מספר שאלה :1
+    r'|\d+\s*:?\s*מספר\s+שאלה'                 # 1 :מספר שאלה
     r'|^\d+\s*[\.\)]\s'                         # 1.  /  1)
     r'|^\d+\s*-\s)'                             # 1 -
 )
 
 # Step 2.2: dual answer patterns
 ANS_START_PATTERN = re.compile(
-    r'^([א-ט1-9])\s*[\.\)]\s*(.*)$'           # א. text  /  1) text
+    r'^(?:[-\*\+\u2022]\s*)?([א-ט1-9])\s*[\.\)]\s*(.*)$'   # - א. text  /  * א) text
 )
 ANS_START_DOT_FIRST = re.compile(
     r'^[\.\)]\s*([א-ט1-9])\s+(.*)$'            # .א text  (LTR-grouped Hebrew)

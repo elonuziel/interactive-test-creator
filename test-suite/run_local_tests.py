@@ -7,6 +7,7 @@ Executes comprehensive unit & integration tests without launching browser subage
 import sys
 import re
 import json
+import os
 
 def normalize_whitespace(value):
     if not value:
@@ -204,6 +205,18 @@ def run_all_tests():
     assert get_api_call_count(True) == 2, "Verification toggle must trigger 2 API calls"
     print(" [PASS] Test 6: AI Verification Toggle Logic (1 Call Default vs 2 Calls)")
     passed += 1
+
+    # Test 7: Gemini Markdown Output with Bullet Options & (עמוד X) Page Tracking
+    total += 1
+    gemini_md_path = os.path.join("tests", "2022_litoral", "gemini-code-1785448744164.md")
+    if os.path.exists(gemini_md_path):
+        with open(gemini_md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        parsed_gemini_md = parse_questions_from_markdown(content)
+        assert len(parsed_gemini_md) == 33, f"Expected 33 questions from gemini.md, got {len(parsed_gemini_md)}"
+        assert parsed_gemini_md[0]['options'][0].startswith("בחינה של שמורת")
+        print(" [PASS] Test 7: Markdown Gemini Output (33 Questions & Bullet Options)")
+        passed += 1
 
     print("=" * 65)
     print(f" RESULT: {passed}/{total} Tests Passed Successfully!")

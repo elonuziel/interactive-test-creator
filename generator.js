@@ -1063,12 +1063,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        // Matches common Hebrew exam question headers in both normal and extracted-reversed forms.
-        // Supports numeric-start styles such as "22.", "22)", "22 -", and optional leading dot artifacts (". 22").
-        const qPattern = /(?:שאלה\s+(?:מספר\s*)?:?\s*\d+\s*:?|\d+\s*:?\s*מספר\s+שאלה|^\.?\s*\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/;
-        // Matches: 'א. text', 'א . text' (space between letter and dot from PDF.js visual layout)
-        // Also: '.א text' or '. א text' (dot-before-letter, another Hebrew PDF extraction artifact)
-        const ansPatternStart = /^([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^([אבגדהוזחטי1-9])[\)]\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/;
+        const qPattern = /(?:^#*\s*שאלה\s+(?:מספר\s*)?:?\s*\d+\s*:?|^#*\s*\d+\s*:?\s*מספר\s+שאלה|^\.?\s*\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/;
+        // Matches: '- א. text', '* א. text', 'א. text', 'א . text', '.א text'
+        const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?([אבגדהוזחטי1-9])\s*[\.]\s*(.*)$|^(?:[-\*\+\u2022]\s*)?([אבגדהוזחטי1-9])[\)]\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/;
         // Matches: 'text א.' or 'text .א' at end of line
         const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$|^(.*)\s+[\.]\s*([אבגדהוזחטי])$/;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
@@ -1137,36 +1134,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pushCurrent();
 
-        const imageKeywords = /לפניכם|גרף|תרשים|תמונה|טבלה|לוח|איור|מפה|ציור|דיאגרמה|צילום|סכמה|טבלאות|תרשים/;
+        const imageKeywords = /לפניכם|לפניך|להלן|גרף|תרשים|תמונה|טבלה|לוח|איור|מפה|ציור|דיאגרמה|צילום|סכמה|טבלאות|שרטוט|סרטוט|עקומה|עקומות|ניסוי|מבנה|נוסחה|מולקולה|מיוצג|מוצג|במוצג/;
 
         const diagnostics = [];
         const formatted = rawQuestions
             .map((q, idx) => {
-                const question = normalizeWhitespace(stripExamFooterArtifacts(q.text.join(' ')));
+                let rawQuestionText = normalizeWhitespace(stripExamFooterArtifacts(q.text.join(' ')));
+                // Clean leading Markdown heading syntax (e.g. ### שאלה 1:)
+                rawQuestionText = rawQuestionText.replace(/^#+\s*/, '').trim();
+
+                let pageIdx = filteredLinePageMap[q.lineIdx] ?? 0;
+                const pageMatch = rawQuestionText.match(/\((?:עמוד|עמ'|page)\s*(\d+)\)/i);
+                if (pageMatch) {
+                    pageIdx = Math.max(0, parseInt(pageMatch[1], 10) - 1);
+                }
+                const cleanQuestionText = rawQuestionText.replace(/\s*\((?:עמוד|עמ'|page)\s*\d+\)$/i, '').trim();
+
                 const options = q.answers
                     .map((a) => normalizeWhitespace(stripExamFooterArtifacts(a.text.join(' '))))
                     .filter(Boolean);
-                const pageIdx = filteredLinePageMap[q.lineIdx] ?? 0;
-                const obj = { question, options, correctIndex: 0, sourcePage: pageIdx + 1 };
 
-                // Attach embedded image if available; visual-keyword questions without
-                // an embedded image will get a full-page render later in runParse.
-                if (imageKeywords.test(question)) {
+                const obj = { question: cleanQuestionText, options, correctIndex: 0, sourcePage: pageIdx + 1 };
+
+                if (imageKeywords.test(cleanQuestionText)) {
                     if (pageImages && pageIdx >= 0 && pageIdx < pageImages.length && pageImages[pageIdx]) {
                         obj.image = pageImages[pageIdx];
                     }
-                    // Mark for fallback page render (handled by caller)
                     obj._needsPageRender = true;
                 }
 
-                if (!question || options.length < 2) {
+                if (!cleanQuestionText || options.length < 2) {
                     diagnostics.push({
                         index: idx + 1,
                         sourcePage: pageIdx + 1,
                         lineIdx: q.lineIdx,
-                        questionPreview: question.slice(0, 80),
+                        questionPreview: cleanQuestionText.slice(0, 80),
                         optionCount: options.length,
-                        dropReason: !question ? 'empty-question' : 'insufficient-options'
+                        dropReason: !cleanQuestionText ? 'empty-question' : 'insufficient-options'
                     });
                 }
 
@@ -1952,28 +1956,28 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Render full-page images for questions that mention visuals but lack embedded images.
         for (const q of parsedQuestions) {
-            if (q._needsPageRender && !q.image && extracted.pdf) {
+            if (q._needsPageRender && !q.image && extracted.pdf && q.sourcePage) {
                 try {
                     const page = await extracted.pdf.getPage(q.sourcePage);
-                    q.image = await extractPageImage(page);
+                    const viewport = page.getViewport({ scale: 1.3 });
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = Math.floor(viewport.width);
+                    canvas.height = Math.floor(viewport.height);
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    q.image = canvas.toDataURL('image/png');
                 } catch { /* skip if render fails */ }
             }
             delete q._needsPageRender;
         }
 
-        if (answerRows && formNumber) {
-            const answerMap = extractAnswersForForm(answerRows, formNumber);
-            state.questions = mergeAnswers(parsedQuestions, answerMap);
-        } else {
-            // No answer file: Default correct answer to index 0 ('א')
-            state.questions = parsedQuestions.map(q => ({
-                ...q,
-                correctIndex: 0,
-                shuffleOptions: true
-            }));
-        }
+        // Default correct answer to index 0 ('א') and shuffle options until explicit merge
+        state.questions = parsedQuestions.map(q => ({
+            ...q,
+            correctIndex: (typeof q.correctIndex === 'number' && q.correctIndex >= 0) ? q.correctIndex : 0,
+            shuffleOptions: true
+        }));
 
         // Additional AI Verification step (if explicitly enabled by user toggle)
         const enableVerification = elements.enableLlmVerification ? elements.enableLlmVerification.checked : false;
@@ -2326,28 +2330,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions from this PDF document as a clean Markdown file (questions.md) for an interactive Hebrew quiz system.
 
----------------------------------------------------------------------------
+===========================================================================
 REQUIRED MARKDOWN FORMAT (questions.md):
----------------------------------------------------------------------------
-### שאלה 1: [Question text in natural Hebrew] (עמוד 1)
-- א. [Option 1 text]
-- ב. [Option 2 text]
-- ג. [Option 3 text]
-- ד. [Option 4 text]
+===========================================================================
+### שאלה 1: [נוסח השאלה המלא בעברית] (עמוד 1)
+- א. [אפשרות 1]
+- ב. [אפשרות 2]
+- ג. [אפשרות 3]
+- ד. [אפשרות 4]
 
-### שאלה 2: [Question text in natural Hebrew] (עמוד 2)
-- א. [Option 1 text]
-- ב. [Option 2 text]
-- ג. [Option 3 text]
-- ד. [Option 4 text]
+### שאלה 2: [נוסח השאלה השנייה בעברית] (עמוד 2)
+- א. [אפשרות 1]
+- ב. [אפשרות 2]
+- ג. [אפשרות 3]
+- ד. [אפשרות 4]
 
----------------------------------------------------------------------------
-EXTRACTION & PROOFREADING RULES:
----------------------------------------------------------------------------
-1. HEBREW READING ORDER: Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left). Do NOT reverse words or letter order. Ensure mixed Hebrew, numbers, and scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
-2. OPTIONS FORMATTING: Extract all choice options for each question (questions can have 4, 5, 6 or more choices). Use standard bullet format (- א., - ב., - ג., - ד.).
-3. PAGE NUMBER TRACKING: Always include the 1-based PDF source page number at the end of each question header in parentheses, e.g. (עמוד 3), especially for questions referencing figures, diagrams, charts, graphs, or tables (e.g. Q25, Q33).
-4. OUTPUT ONLY MARKDOWN: Return ONLY the clean Markdown text or a downloadable questions.md file. Do NOT include conversational explanations, introductions, or extra code blocks.`;
+===========================================================================
+STRICT EXTRACTION & PROOFREADING RULES:
+===========================================================================
+1. HEBREW READING ORDER & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve scientific terms and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
+2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: - א., - ב., - ג., - ד., - ה., etc. Extract all options for each question (questions may have 4, 5, 6 or more choices).
+3. PAGE NUMBER TRACKING: Always end each question header with the exact 1-based PDF source page number in parentheses: (עמוד X), e.g. (עמוד 1), (עמוד 5). This is CRITICAL for matching questions referencing graphs, diagrams, figures, or tables.
+4. NO CONVERSATIONAL FILLER: Return ONLY the clean Markdown text or a downloadable questions.md file. Do NOT include conversational explanations, introductions, or extra code blocks.`;
 
     if (elements.llmPromptBox) {
         elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
@@ -2457,17 +2461,18 @@ EXTRACTION & PROOFREADING RULES:
             renderPreview();
             disableOutputActions(false);
             setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ ${file.name}!`, false, true);
-
-            await tryMergeAnswersFromCsv();
         } catch (error) {
             console.error('Error loading question file:', error);
             setStatus(error.message || `נכשלה טעינת קובץ ${file.name}.`, true);
         }
     });
 
-    elements.csvFile?.addEventListener('change', tryMergeAnswersFromCsv);
-    elements.formNumber?.addEventListener('change', tryMergeAnswersFromCsv);
-    elements.formNumber?.addEventListener('blur', tryMergeAnswersFromCsv);
+    elements.csvFile?.addEventListener('change', () => {
+        const file = elements.csvFile.files?.[0];
+        if (file) {
+            showToast(`קובץ תשובות (${file.name}) נבחר. הזן מספר שאלון ולחץ "🔗 מזג תשובות נכונות לשאלות".`, 'info', 4000);
+        }
+    });
 
     function toggleProcessingSettings(showOnly = false) {
         if (!elements.processingSettingsContainer) return;
