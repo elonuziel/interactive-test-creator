@@ -568,19 +568,16 @@
                     <button id="merge-answers-btn" type="button" class="secondary-btn sm-btn" style="width: 100%;">🔗 מזג תשובות נכונות לשאלות (Merge Correct Answers)</button>
                 </div>
 
-                <div style="margin-top: 14px;">
-                    <button id="toggle-processing-settings-btn" type="button" class="secondary-btn sm-btn">⚙️ מצב מתקדם: הגדרות עיבוד ב-Gemini API</button>
+                <div style="margin-top: 12px; text-align: center;">
+                    <button id="toggle-processing-settings-btn" type="button" style="background: none; border: none; color: var(--text-secondary); opacity: 0.65; font-size: .78rem; cursor: pointer; padding: 4px 8px; text-decoration: underline;">
+                        ⚙️ הגדרות עיבוד מתקדמות (Gemini API)
+                    </button>
                 </div>
 
                 <!-- Hidden Processing & API Settings Section -->
                 <div id="processing-settings-container" class="hidden" style="margin-top: 10px;">
                     <hr class="section-divider">
                     <p class="section-label">⚙️&nbsp; הגדרות עיבוד מתקדמות (Gemini API)</p>
-
-                    <div style="margin-bottom: 12px; background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); border-radius: 8px; padding: 10px; font-size: .83rem;">
-                        <strong style="display: block; margin-bottom: 4px; color: var(--primary-color);">🤖 ניתוח אוטומטי ישיר מול Gemini API</strong>
-                        <span>מצב זה מיועד למשתמשים שרוצים לפענח PDF סרוק בלחיצת כפתור ישירות דרך קריאות API ל-Gemini (דורש פענוח תמונה OCR מול Gemini API Key <button class="help-btn" type="button" title="איך משיגים API Key?" onclick="document.getElementById('api-help-popup').classList.add('show')">?</button>).</span>
-                    </div>
 
                     <div class="field">
                         <label for="llm-policy">שימוש ב-LLM</label>
