@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>הרצת בדיקות רכיבים — Component Test Suite</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        .test-container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 32px 16px;
+        }
+        .test-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-sm);
+        }
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .test-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--primary-color);
+        }
+        .test-summary-badge {
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 4px 14px;
+            border-radius: 20px;
+            background: var(--input-bg);
+        }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            background: var(--input-bg);
+            font-size: 0.92rem;
+            font-family: inherit;
+        }
+        .test-item.pass {
+            border-right: 4px solid var(--success-color);
+        }
+        .test-item.fail {
+            border-right: 4px solid var(--error-color);
+            background: var(--error-bg);
+        }
+        .test-status {
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+        .test-status.pass {
+            background: var(--success-bg);
+            color: var(--success-color);
+        }
+        .test-status.fail {
+            background: var(--error-bg);
+            color: var(--error-color);
+        }
+        .test-error-details {
+            font-family: monospace;
+            font-size: 0.82rem;
+            color: var(--error-color);
+            margin-top: 4px;
+            direction: ltr;
+            text-align: left;
+        }
+        .nav-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="logo">🧪 הרצת בדיקות רכיבים (Component Test Suite)</div>
+        <div class="controls">
+            <a href="../index.html" class="nav-link">יוצר מבחן ←</a>
+            <a href="../quiz_player.html" class="nav-link">נגן מבחן ←</a>
+            <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
+                <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="test-container">
+        <div class="nav-actions">
+            <button id="run-all-tests-btn" class="primary-btn">🔄 הרץ את כל הבדיקות מחדש</button>
+        </div>
+
+        <div class="test-card">
+            <div class="test-header">
+                <h2 class="test-title">📊 סיכום תזמור הבדיקות</h2>
+                <span id="overall-badge" class="test-summary-badge">ממתין להרצה...</span>
+            </div>
+            <p style="color:var(--text-secondary); font-size: 0.9rem;">
+                בדיקות אלו מאמתות את תקינות הפונקציות הליבתיות בדפדפן (פרסור JSON, מיזוג תשובות מ-CSV/XLS, נירמול טקסט עברי, ושמירת התקדמות מקומית).
+            </p>
+        </div>
+
+        <div id="test-results-container"></div>
+    </main>
+
+    <script>
+        // ── Theme Manager ──────────────────────────────────────────────────────
+        let theme = localStorage.getItem('theme') || 'light';
+        function setTheme(newTheme) {
+            theme = newTheme;
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            const icon = document.getElementById('theme-icon');
+            if (theme === 'dark') {
+                icon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>';
+            } else {
+                icon.innerHTML = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>';
+            }
+        }
+        setTheme(theme);
+        document.getElementById('theme-toggle').addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
+
+        // ── Test Logic Helpers ─────────────────────────────────────────────────
+        function assert(condition, message) {
+            if (!condition) throw new Error(message || 'Assertion failed');
+        }
+
+        function assertEqual(actual, expected, message) {
+            if (actual !== expected) {
+                throw new Error(`${message || 'Equal assertion failed'}: expected "${expected}", got "${actual}"`);
+            }
+        }
+
+        function normalizeWhitespace(value) {
+            if (!value) return '';
+            return String(value)
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/[ \t]+/g, ' ')
+                .trim();
+        }
+
+        function stripExamFooterArtifacts(value) {
+            if (!value) return '';
+            return String(value)
+                .replace(/עמוד\s+\d+\s+מתוך\s+\d+/gi, '')
+                .replace(/-+\s*סוף\s+המבחן\s*-+/gi, '')
+                .trim();
+        }
+
+        function normalizeQuestionsJson(data) {
+            if (!Array.isArray(data)) return [];
+            return data
+                .filter((item) => item && typeof item === 'object')
+                .map((item, index) => {
+                    const rawQuestion = normalizeWhitespace(stripExamFooterArtifacts(item.question || item.title || ''));
+                    const rawOptions = Array.isArray(item.options) ? item.options : [];
+
+                    const options = rawOptions
+                        .map((opt) => normalizeWhitespace(String(opt || '')))
+                        .filter(Boolean)
+                        .map((text) => text.replace(/^[אבגדהוזחטי1-9][\.\)]\s*/, '').trim());
+
+                    let correctIndex = Number(item.correctIndex);
+                    if (isNaN(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
+                        correctIndex = 0;
+                    }
+
+                    const shuffleOptions = !!(item.shuffleOptions || item.shuffle_options);
+
+                    return {
+                        question: rawQuestion,
+                        options: options,
+                        correctIndex: correctIndex,
+                        image: item.image || item.pageImage || null,
+                        sourcePage: item.sourcePage || item.page || (index + 1),
+                        shuffleOptions: shuffleOptions
+                    };
+                })
+                .filter((q) => q.question && q.options.length > 0);
+        }
+
+        function parseCsvRows(csvText) {
+            const lines = csvText.split(/\r?\n/).filter((line) => line.trim().length > 0);
+            const rows = [];
+            for (const line of lines) {
+                const row = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (ch === '"') {
+                        if (inQuotes && line[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (ch === ',' && !inQuotes) {
+                        row.push(current.trim());
+                        current = '';
+                    } else {
+                        current += ch;
+                    }
+                }
+                row.push(current.trim());
+                if (row.some((cell) => cell.trim() !== '')) rows.push(row);
+            }
+            return rows;
+        }
+
+        function extractAnswersForForm(rows, formNumber) {
+            if (!rows || !rows.length) return {};
+            const cleanFormTarget = String(formNumber).trim().toLowerCase();
+            const answerMap = {};
+            let formRow = null;
+            let headerRow = null;
+
+            for (let i = 0; i < rows.length; i++) {
+                const firstCell = String(rows[i][0] || '').trim().toLowerCase();
+                if (firstCell === cleanFormTarget || firstCell.includes(cleanFormTarget)) {
+                    formRow = rows[i];
+                    if (i > 0) headerRow = rows[i - 1];
+                    break;
+                }
+            }
+            if (!formRow) return {};
+
+            for (let colIdx = 1; colIdx < formRow.length; colIdx++) {
+                let qNum = colIdx;
+                if (headerRow && headerRow[colIdx]) {
+                    const match = String(headerRow[colIdx]).match(/\d+/);
+                    if (match) qNum = parseInt(match[0], 10);
+                }
+                const rawVal = String(formRow[colIdx] || '').trim().toUpperCase();
+                let correctIdx = -1;
+
+                if (/^[1-9]\d*$/.test(rawVal)) {
+                    correctIdx = parseInt(rawVal, 10) - 1;
+                } else if (rawVal === 'א' || rawVal === 'A') correctIdx = 0;
+                else if (rawVal === 'ב' || rawVal === 'B') correctIdx = 1;
+                else if (rawVal === 'ג' || rawVal === 'C') correctIdx = 2;
+                else if (rawVal === 'ד' || rawVal === 'D') correctIdx = 3;
+
+                if (correctIdx >= 0) answerMap[qNum] = correctIdx;
+            }
+            return answerMap;
+        }
+
+        function mergeAnswers(questions, answerMap) {
+            if (!answerMap || !Object.keys(answerMap).length) return questions;
+            return questions.map((q, index) => {
+                const qNum = index + 1;
+                if (answerMap.hasOwnProperty(qNum)) {
+                    const correctIndex = answerMap[qNum];
+                    if (correctIndex < q.options.length) {
+                        return { ...q, correctIndex, shuffleOptions: false };
+                    }
+                }
+                return q;
+            });
+        }
+
+        function getStorageKey(questions) {
+            if (!questions || !questions.length) return 'quiz_answers_v1';
+            let hash = 0;
+            const sampleText = (questions[0].question || '') + questions.length;
+            for (let i = 0; i < sampleText.length; i++) {
+                hash = ((hash << 5) - hash) + sampleText.charCodeAt(i);
+                hash |= 0;
+            }
+            return `quiz_answers_${Math.abs(hash)}`;
+        }
+
+        // ── Test Execution Pipeline ───────────────────────────────────────────
+        function runSuite() {
+            const container = document.getElementById('test-results-container');
+            container.innerHTML = '';
+
+            const suites = [
+                {
+                    name: '1. נירמול וניקוי JSON (normalizeQuestionsJson)',
+                    tests: [
+                        {
+                            name: 'מנקה רווחים כפולים ומסיר קידומות א., ב. מהתשובות',
+                            fn: () => {
+                                const res = normalizeQuestionsJson([{ question: '  שאלה 1.  ', options: ['א. תשובה 1', 'ב. תשובה 2'] }]);
+                                assertEqual(res.length, 1, 'Question count');
+                                assertEqual(res[0].question, 'שאלה 1.', 'Question text');
+                                assertEqual(res[0].options[0], 'תשובה 1', 'Option 1 text');
+                                assertEqual(res[0].options[1], 'תשובה 2', 'Option 2 text');
+                            }
+                        },
+                        {
+                            name: 'מגדיר ברירת מחדל correctIndex = 0 ומסנן שאלות ריקות',
+                            fn: () => {
+                                const res = normalizeQuestionsJson([
+                                    { question: '', options: ['תשובה'] },
+                                    { question: 'שאלה 2', options: ['א', 'ב'], correctIndex: 99 }
+                                ]);
+                                assertEqual(res.length, 1, 'Valid question count');
+                                assertEqual(res[0].correctIndex, 0, 'Reset out-of-bound correctIndex');
+                            }
+                        }
+                    ]
+                },
+                {
+                    name: '2. ניתוח קובצי תשובות CSV/XLS (parseCsvRows & mergeAnswers)',
+                    tests: [
+                        {
+                            name: 'מחלץ תשובות 0-based עבור מספר שאלון ספציפי',
+                            fn: () => {
+                                const csv = 'Form,Q1,Q2,Q3\n76,א,ב,ג\n32,3,2,1';
+                                const rows = parseCsvRows(csv);
+                                const map76 = extractAnswersForForm(rows, '76');
+                                assertEqual(map76[1], 0, 'Form 76 Q1');
+                                assertEqual(map76[2], 1, 'Form 76 Q2');
+                                assertEqual(map76[3], 2, 'Form 76 Q3');
+                            }
+                        },
+                        {
+                            name: 'ממזג תשובות נכונות למערך השאלות',
+                            fn: () => {
+                                const q = [
+                                    { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0 },
+                                    { question: 'Q2', options: ['A', 'B', 'C'], correctIndex: 0 }
+                                ];
+                                const merged = mergeAnswers(q, { 1: 2, 2: 1 });
+                                assertEqual(merged[0].correctIndex, 2, 'Merged Q1 correctIndex');
+                                assertEqual(merged[1].correctIndex, 1, 'Merged Q2 correctIndex');
+                            }
+                        }
+                    ]
+                },
+                {
+                    name: '3. שמירת התקדמות ומפתחות LocalStorage (getStorageKey)',
+                    tests: [
+                        {
+                            name: 'מפיק מפתח דטרמיניסטי ועקבי לפי מזהה השאלות',
+                            fn: () => {
+                                const q1 = [{ question: 'שאלה בוטניקה', options: ['1', '2'] }];
+                                const q2 = [{ question: 'שאלה פיזיקה', options: ['1', '2'] }];
+                                const key1 = getStorageKey(q1);
+                                const key1_repeat = getStorageKey(q1);
+                                const key2 = getStorageKey(q2);
+
+                                assertEqual(key1, key1_repeat, 'Deterministic hash');
+                                assert(key1 !== key2, 'Different questions give different keys');
+                                assert(key1.startsWith('quiz_answers_'), 'Valid key prefix');
+                            }
+                        }
+                    ]
+                }
+            ];
+
+            let totalPassed = 0;
+            let totalFailed = 0;
+
+            suites.forEach((suite) => {
+                const card = document.createElement('div');
+                card.className = 'test-card';
+
+                let suiteHtml = `<div class="test-header"><h3 class="test-title">${suite.name}</h3></div>`;
+
+                suite.tests.forEach((test) => {
+                    let isPass = true;
+                    let errorMsg = '';
+                    try {
+                        test.fn();
+                        totalPassed++;
+                    } catch (err) {
+                        isPass = false;
+                        errorMsg = err.message;
+                        totalFailed++;
+                    }
+
+                    suiteHtml += `
+                        <div class="test-item ${isPass ? 'pass' : 'fail'}">
+                            <div>
+                                <div>${test.name}</div>
+                                ${errorMsg ? `<div class="test-error-details">⚠️ ${errorMsg}</div>` : ''}
+                            </div>
+                            <span class="test-status ${isPass ? 'pass' : 'fail'}">${isPass ? 'עבר ✓' : 'נכשל ✕'}</span>
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = suiteHtml;
+                container.appendChild(card);
+            });
+
+            const badge = document.getElementById('overall-badge');
+            if (totalFailed === 0) {
+                badge.textContent = `כל הבדיקות עברו בהצלחה! (${totalPassed}/${totalPassed})`;
+                badge.style.background = 'var(--success-bg)';
+                badge.style.color = 'var(--success-color)';
+            } else {
+                badge.textContent = `נכשלו ${totalFailed} בדיקות מתוך ${totalPassed + totalFailed}`;
+                badge.style.background = 'var(--error-bg)';
+                badge.style.color = 'var(--error-color)';
+            }
+        }
+
+        document.getElementById('run-all-tests-btn').addEventListener('click', runSuite);
+        runSuite();
+    </script>
+</body>
+</html>

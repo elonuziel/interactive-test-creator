@@ -31,12 +31,23 @@ jobs:
         with:
           enablement: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Component Integrity Unit Tests
+        run: node test-suite/run_tests.js
+
       - name: Prepare site artifact
         run: |
           mkdir -p site
           cp index.html app.js style.css quiz_player.html generator.js site/
           if [ -d vendor ]; then
             cp -R vendor site/vendor
+          fi
+          if [ -d test-suite ]; then
+            cp -R test-suite site/test-suite
           fi
           if [ -f questions.json ]; then
             cp questions.json site/questions.json
