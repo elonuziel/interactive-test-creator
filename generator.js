@@ -662,17 +662,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function callGeminiOcr(apiKey, imageDatas) {
         const prompt = [
-            'You are an OCR engine for scanned Hebrew exams.',
-            'Extract visible text exactly as printed.',
-            'Do NOT translate, summarize, reorder, paraphrase, or explain.',
-            'Keep Hebrew text in its original reading order.',
-            'Preserve line breaks and option markers exactly.',
-            'Preserve question and option structure (e.g., "שאלה מספר", "א.", "ב.", "ג.", "ד.", "ה.", "ו." etc.).',
-            'If text is unclear, keep best-effort literal OCR and do not invent content.',
-            'Return plain text only.',
+            'You are an expert exam parser for Hebrew multiple-choice exams.',
+            'Extract all multiple-choice questions into a clean JSON array of objects.',
+            'JSON Schema per object:',
+            '  - "question": string (full question text in natural Hebrew reading order)',
+            '  - "options": array of strings (all answer choices, stripping option letter prefixes like "א." or "ב.")',
+            '  - "correctIndex": number (0 by default)',
+            '  - "sourcePage": number (1-based physical page number)',
             '',
-            'CRITICAL: You are receiving multiple page images.',
-            'You MUST separate each page output with the exact delimiter "---PAGE_BOUNDARY---" on its own line.'
+            'Rules:',
+            '1. Do NOT reverse Hebrew word or letter order.',
+            '2. Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "pH", "DNA") read correctly.',
+            '3. Extract all options into the options array (questions can have 4, 5, 6 or more choices).',
+            '4. Output ONLY valid JSON array.'
         ].join('\n');
         const attemptErrors = [];
         const candidates = await discoverGeminiModelCandidates(apiKey);
@@ -697,7 +699,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         generationConfig: {
                             temperature: 0,
                             topP: 0.1,
-                            maxOutputTokens: 8192
+                            maxOutputTokens: 16384,
+                            responseMimeType: "application/json"
                         }
                     })
                 });
@@ -781,14 +784,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const base64Pdf = await fileToBase64(pdfFile);
         const prompt = [
-            'You are an OCR engine for scanned Hebrew exams.',
-            'Extract visible text exactly as printed. Keep Hebrew text in its original reading order.',
-            'Do NOT translate, summarize, reorder, paraphrase, or explain.',
-            'Preserve line breaks and option markers exactly.',
-            'Return plain text only.',
+            'You are an expert exam parser for Hebrew multiple-choice exams.',
+            'Extract all multiple-choice questions into a clean JSON array of objects.',
+            'JSON Schema per object:',
+            '  - "question": string (full question text in natural Hebrew reading order)',
+            '  - "options": array of strings (all answer choices, stripping option letter prefixes like "א." or "ב.")',
+            '  - "correctIndex": number (0 by default)',
+            '  - "sourcePage": number (1-based physical page number)',
             '',
-            'CRITICAL: You are receiving a multipage PDF.',
-            'You MUST insert the exact delimiter "---PAGE_BOUNDARY---" on its own line between the text of EACH physical page of the PDF to allow us to map text back to the original page number.'
+            'Rules:',
+            '1. Do NOT reverse Hebrew word or letter order.',
+            '2. Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "pH", "DNA") read correctly.',
+            '3. Extract all options into the options array (questions can have 4, 5, 6 or more choices).',
+            '4. Output ONLY valid JSON array.'
         ].join('\n');
 
         const attemptErrors = [];
@@ -814,7 +822,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         generationConfig: {
                             temperature: 0,
                             topP: 0.1,
-                            maxOutputTokens: 8192
+                            maxOutputTokens: 16384,
+                            responseMimeType: "application/json"
                         }
                     })
                 });
@@ -937,6 +946,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function parseQuestionsFromText(text, rawPages, pageImages) {
+        if (!text) return [];
+
+        let trimmedText = text.trim();
+        if (trimmedText.startsWith('```json')) {
+            trimmedText = trimmedText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+        } else if (trimmedText.startsWith('```')) {
+            trimmedText = trimmedText.replace(/^```\s*/i, '').replace(/\s*```$/, '').trim();
+        }
+
+        if (trimmedText.startsWith('[') || trimmedText.startsWith('{')) {
+            try {
+                const parsed = JSON.parse(trimmedText);
+                const questionsArray = Array.isArray(parsed) ? parsed : (parsed.questions || parsed.data);
+                if (Array.isArray(questionsArray) && questionsArray.length > 0) {
+                    return normalizeQuestionsJson(questionsArray);
+                }
+            } catch (e) {
+                console.warn('JSON parse attempt failed, falling back to line-by-line parser:', e);
+            }
+        }
+
         const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
         // Build linePageMap from the same processed text that lines[] comes from.
         // We apply fixHebrewWordOrder per page and count non-empty lines to match the filter(Boolean).
