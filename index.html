@@ -776,14 +776,22 @@
                         <div class="field">
                             <label for="ocr-engine">מנוע OCR <span class="field-note-inline">לסרוקים</span></label>
                             <select id="ocr-engine">
-                                <option value="gemini_chunked">Gemini — פיצול לעמודים (מומלץ)</option>
-                                <option value="gemini_native">Gemini — העלאת PDF ישירה (מהיר)</option>
+                                <option value="gemini_native_schema">Gemini — Native PDF + Enforced JSON Schema (1 קריאה — מומלץ וגמיש)</option>
+                                <option value="gemini_native_markdown">Gemini — Native PDF + Clean Markdown (1 קריאה — קל ומהיר)</option>
+                                <option value="gemini_chunked">Gemini — פיצול עמודי תמונה (Chunking)</option>
                                 <option value="offline_local">OCR מקומי חינמי — ללא API Key</option>
                             </select>
                             <div class="offline-warning-box">
                                 ⚠️&nbsp; OCR חינמי זה מתבצע בדפדפן, אך דורש חיבור לאינטרנט חד-פעמי להורדת מודל השפה.
                                 בעברית הדיוק נמוך בהרבה מ-Gemini.
                             </div>
+                        </div>
+
+                        <div class="field" style="margin-top: 6px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);" title="כאשר מסומן, המערכת תדלג על שלב הגהת השאלות הנוסף מול Gemini כדי לחסוך קריאות API ולהאיץ את העיבוד">
+                                <input type="checkbox" id="skip-llm-verification" style="accent-color: var(--primary-color);">
+                                <span>⚡ דילוג על הגהת LLM (עיבוד קל ומהיר יותר — 1 קריאת API בלבד)</span>
+                            </label>
                         </div>
 
                         <div id="llm-auth-section" class="auth-section">

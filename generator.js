@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
         preview: document.getElementById('preview'),
         proofModeToggle: document.getElementById('proof-mode-toggle'),
         useCleanPdfForApi: document.getElementById('use-clean-pdf-for-api'),
+        skipLlmVerification: document.getElementById('skip-llm-verification'),
         themeToggle: document.getElementById('theme-toggle'),
         themeIcon: document.getElementById('theme-icon')
     };
@@ -804,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    async function extractTextViaGeminiNativePdf(pdfFile, pdf, apiKey) {
+    async function extractTextViaGeminiNativePdf(pdfFile, pdf, apiKey, mode = 'schema') {
         if (!apiKey) {
             throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
         }
@@ -815,18 +816,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = [
             'You are an expert exam parser for Hebrew multiple-choice exams.',
             'Extract all multiple-choice questions into a clean JSON array of objects.',
-            'JSON Schema per object:',
-            '  - "question": string (full question text in natural Hebrew reading order)',
-            '  - "options": array of strings (all answer choices, stripping option letter prefixes like "א." or "ב.")',
-            '  - "correctIndex": number (0 by default)',
-            '  - "sourcePage": number (1-based physical page number)',
-            '',
             'Rules:',
             '1. Do NOT reverse Hebrew word or letter order.',
             '2. Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "pH", "DNA") read correctly.',
             '3. Extract all options into the options array (questions can have 4, 5, 6 or more choices).',
-            '4. Output ONLY valid JSON array.'
+            '4. Set "sourcePage" to 1-based physical page number.',
+            '5. Set "hasVisualElement" to true if the question references a diagram, graph, chart, table, or figure.',
+            '6. Output ONLY valid JSON array.'
         ].join('\n');
+
+        const generationConfig = {
+            temperature: 0,
+            topP: 0.1,
+            maxOutputTokens: 16384,
+            responseMimeType: "application/json"
+        };
+
+        if (mode === 'schema') {
+            generationConfig.responseSchema = {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: {
+                        question: { type: "STRING" },
+                        options: {
+                            type: "ARRAY",
+                            items: { type: "STRING" }
+                        },
+                        sourcePage: { type: "INTEGER" },
+                        hasVisualElement: { type: "BOOLEAN" }
+                    },
+                    required: ["question", "options", "sourcePage"]
+                }
+            };
+        }
 
         const attemptErrors = [];
         const candidates = await discoverGeminiModelCandidates(apiKey);
@@ -847,12 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
                             ]
                         }],
-                        generationConfig: {
-                            temperature: 0,
-                            topP: 0.1,
-                            maxOutputTokens: 16384,
-                            responseMimeType: "application/json"
-                        }
+                        generationConfig
                     })
                 });
 
@@ -875,7 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
                     const delayMs = computeRetryDelayMs(response, retryCount);
-                    setStatus(`Gemini החזיר 429 ב-Native PDF. ממתין ${Math.ceil(delayMs / 1000)} שניות ומנסה שוב...`);
+                    setStatus(`Gemini החזיר 429 ב-Native PDF (${candidate.model}). ממתין ${Math.ceil(delayMs / 1000)} שניות ומנסה שוב...`);
                     await delay(delayMs);
                     continue;
                 }
@@ -901,7 +919,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Generate previews for proof mode
         const pagePreviews = [];
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            setStatus(`מכין תצוגה מקדימה לעמוד ${pageNumber}/${pdf.numPages}...`);
+            setStatus(`מכין תצוגות מקדימות לעמוד ${pageNumber}/${pdf.numPages}...`);
             const page = await pdf.getPage(pageNumber);
             const imageData = await renderPageImageData(page);
             pagePreviews.push(`data:image/png;base64,${imageData}`);
@@ -1518,7 +1536,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        setStatus('מחלץ טקסט מה-PDF...');
+        setStatus('טוען ומנתח את מבנה קובץ ה-PDF...');
         const extracted = await extractPdfText(pdfBufferForParse);
 
         let examText = extracted.text;
@@ -1527,33 +1545,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
 
         if (!extracted.isScanned && llmPolicy !== 'force_llm') {
-            setStatus('זוהה PDF דיגיטלי. ממשיך בעיבוד מקומי ללא LLM.');
+            setStatus('זוהה PDF דיגיטלי. מחלץ שאלות מקומית מתוך טקסט ה-PDF ללא LLM.');
         }
 
         if (useOfflineOcr) {
-            setStatus('זוהה PDF סרוק. מפעיל OCR חינמי בדפדפן; האיכות כנראה תהיה נמוכה יותר מ-Gemini.');
+            setStatus('מפעיל OCR מקומי בדפדפן (ללא API Key)...');
             const offlineExtraction = await extractTextViaOfflineOcr(extracted.pdf);
             examText = offlineExtraction.text;
             sourcePages = offlineExtraction.pages;
             state.proofPageImages = offlineExtraction.pagePreviews || [];
         } else if (useLlmExtraction) {
             apiKey = await resolveGeminiApiKey(true);
-            if (ocrEngine === 'gemini_native') {
-                setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...' : 'נבחר מצב LLM כפוי. שולח את ה-PDF ל-Gemini Native PDF...');
-                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfFileToParse, extracted.pdf, apiKey);
+            if (ocrEngine.startsWith('gemini_native')) {
+                const mode = ocrEngine === 'gemini_native_markdown' ? 'markdown' : 'schema';
+                setStatus(`שולח את מסמך ה-PDF המלא ל-Gemini API (Native PDF - ${mode === 'schema' ? 'Enforced Schema' : 'Clean Markdown'})...`);
+                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfFileToParse, extracted.pdf, apiKey, mode);
                 examText = nativeExtraction.text;
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
                 state.proofPageImages = previews.pagePreviews || [];
             } else {
-                setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini (Page Chunking)...' : 'נבחר מצב LLM כפוי. שולח עמודים ל-Gemini OCR...');
+                setStatus('שולח עמודי תמונה ל-Gemini API (מצב Page Chunking)...');
                 const geminiExtraction = await extractTextViaGemini(extracted.pdf, apiKey);
                 examText = geminiExtraction.text;
                 sourcePages = geminiExtraction.pages;
                 state.proofPageImages = geminiExtraction.pagePreviews || [];
             }
         } else if (extracted.isScanned) {
-            setStatus('זוהה PDF סרוק במצב מקומי בלבד. מנסה להמשיך בלי LLM, אבל התוצאה עלולה להיות חלקית.');
+            setStatus('זוהה PDF סרוק במצב מקומי בלבד (ללא LLM). התוצאה עלולה להיות חלקית.');
         }
 
         let parsedQuestions;
@@ -1561,7 +1580,7 @@ document.addEventListener('DOMContentLoaded', () => {
             parsedQuestions = parseQuestionsFromText(examText, sourcePages, extracted.pageImages);
         } catch (error) {
             if (useLlmExtraction) {
-                setStatus('פענוח ה-LLM לא היה בפורמט צפוי. מנסה פרסור מקומי מהטקסט הדיגיטלי...');
+                setStatus('פורמט תשובת ה-LLM לא תאם מודל צפוי, מנסה ניתוח מקומי מהטקסט הדיגיטלי...');
                 parsedQuestions = parseQuestionsFromText(extracted.text, extracted.rawPages, extracted.pageImages);
             } else {
                 throw error;
@@ -1569,7 +1588,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
-            setStatus('זוהו מעט שאלות. מנסה פענוח מדויק יותר עמוד-עמוד...');
+            setStatus('זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...');
             const fallbackExtraction = await extractTextViaGemini(extracted.pdf, apiKey, 1);
             const fallbackQuestions = parseQuestionsFromText(
                 fallbackExtraction.text,
@@ -1608,9 +1627,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         }
 
-        // Verification step using Gemini Pro
-        if (llmPolicy === 'force_llm' && apiKey) {
+        // Verification step using Gemini
+        const shouldSkipVerification = elements.skipLlmVerification ? elements.skipLlmVerification.checked : false;
+        if (llmPolicy === 'force_llm' && apiKey && !shouldSkipVerification) {
+            setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
             state.questions = await verifyTestWithGemini(state.questions, apiKey);
+        } else if (shouldSkipVerification) {
+            setStatus('מדלג על הגהת AI (דילוג על קריאת API משנית למען מהירות קלה)...');
         }
 
         renderPreview();
