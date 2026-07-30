@@ -46,6 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
         credentialCancel: document.getElementById('credential-cancel'),
         htmlFile: document.getElementById('html-file'),
         scannedActionsBox: document.getElementById('scanned-actions-box'),
+        digitalActionsBox: document.getElementById('digital-actions-box'),
+        runDigitalLocalBtn: document.getElementById('run-digital-local-btn'),
+        showDigitalPromptBtn: document.getElementById('show-digital-prompt-btn'),
+        digitalPromptExpandable: document.getElementById('digital-prompt-expandable'),
+        copyDigitalPromptBtn: document.getElementById('copy-digital-prompt-btn'),
+        digitalLlmPromptBox: document.getElementById('digital-llm-prompt-box'),
         showApiSettingsBtn: document.getElementById('show-api-settings-btn'),
         toggleProcessingSettingsBtn: document.getElementById('toggle-processing-settings-btn'),
         processingSettingsContainer: document.getElementById('processing-settings-container'),
@@ -2073,6 +2079,9 @@ EXTRACTION & PROOFREADING RULES:
     if (elements.llmPromptBox) {
         elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
     }
+    if (elements.digitalLlmPromptBox) {
+        elements.digitalLlmPromptBox.value = DEFAULT_LLM_PROMPT;
+    }
 
     // Preset buttons & Clean PDF download listeners
     elements.presetStdBtn?.addEventListener('click', applyStandardFilter);
@@ -2218,6 +2227,26 @@ EXTRACTION & PROOFREADING RULES:
         }
     });
 
+    elements.showDigitalPromptBtn?.addEventListener('click', () => {
+        if (!elements.digitalPromptExpandable) return;
+        const isHidden = elements.digitalPromptExpandable.classList.toggle('hidden');
+        elements.showDigitalPromptBtn.textContent = isHidden ? '📋 הצג פרומפט ל-AI חיצוני' : '📋 הסתר פרומפט';
+    });
+
+    elements.copyDigitalPromptBtn?.addEventListener('click', async () => {
+        const textToCopy = elements.digitalLlmPromptBox ? elements.digitalLlmPromptBox.value : DEFAULT_LLM_PROMPT;
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            const originalText = elements.copyDigitalPromptBtn.textContent;
+            elements.copyDigitalPromptBtn.textContent = '✓ הועתק!';
+            setTimeout(() => {
+                elements.copyDigitalPromptBtn.textContent = originalText;
+            }, 3000);
+        } catch (e) {
+            setStatus('נכשלה העתקת הפרומפט ללוח.', true);
+        }
+    });
+
     elements.htmlFile.addEventListener('change', async () => {
         const file = elements.htmlFile.files?.[0];
         if (!file) return;
@@ -2240,11 +2269,23 @@ EXTRACTION & PROOFREADING RULES:
         }
     });
 
+    elements.runDigitalLocalBtn?.addEventListener('click', async () => {
+        if (elements.llmPolicy) {
+            elements.llmPolicy.value = 'force_no_llm';
+        }
+        try {
+            await runParse();
+        } catch (error) {
+            setStatus(error.message || 'אירעה שגיאה בעיבוד המקומי.', true);
+        }
+    });
+
     elements.pdfFile.addEventListener('change', async () => {
         const file = elements.pdfFile.files?.[0];
         if (!file) {
             setPdfTypeNote('');
             if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
+            if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
             if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
             if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
             return;
@@ -2264,6 +2305,9 @@ EXTRACTION & PROOFREADING RULES:
             if (elements.scannedActionsBox) {
                 elements.scannedActionsBox.classList.toggle('hidden', !detection.isScanned);
             }
+            if (elements.digitalActionsBox) {
+                elements.digitalActionsBox.classList.toggle('hidden', detection.isScanned);
+            }
 
             // Load sidebar thumbnails & page selection state
             await loadPdfSidebar(state.pdfArrayBuffer.slice(0));
@@ -2275,6 +2319,7 @@ EXTRACTION & PROOFREADING RULES:
     document.querySelector('[data-target="pdf-file"]')?.addEventListener('click', () => {
         setPdfTypeNote('');
         if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
+        if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
         if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
         if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
     });
