@@ -278,6 +278,29 @@ def is_pdf_digital(pdf_path):
     except Exception:
         return False
 
+def cleanup_workspace_folder(test_dir):
+    """Clean up intermediate scratch files from workspace folder, keeping only relevant final files."""
+    scratch_files = [
+        'raw_text.md',
+        'pdf_type_result.txt',
+        'page_map.json',
+        'final_questions.json',
+        'output.json',
+        'response.json',
+        'data.json',
+    ]
+    cleaned = 0
+    for sf in scratch_files:
+        fp = os.path.join(test_dir, sf)
+        if os.path.isfile(fp):
+            try:
+                os.remove(fp)
+                cleaned += 1
+            except Exception:
+                pass
+    if cleaned > 0:
+        print(f"  {C_GRAY}[i] Cleaned up {cleaned} intermediate scratch file(s).{C_RESET}")
+
 def process_workspace(test_name, test_dir):
     # Step 3: Check for source files & launch Explorer
     pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
@@ -328,7 +351,7 @@ def process_workspace(test_name, test_dir):
         print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
         print(f"{C_CYAN}{C_BOLD}   [2/2] ANSWER KEY FORM SETUP{C_RESET}")
         print("   Enter the Form Number corresponding to this answer key.")
-        print("   (e.g., 32, 76, 1, 0). Refer to your PDF title page if unsure.")
+        print("   (e.g., 111, 32, 76, 1, 0). Refer to your PDF title page if unsure.")
         print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
         fn_input = input("   [?] Form Number [Default: 1]: ").strip()
         if fn_input:
@@ -342,7 +365,7 @@ def process_workspace(test_name, test_dir):
         print(f"{C_CYAN}{C_BOLD}   [2/2] FORM NUMBER SETUP (No answer spreadsheet found){C_RESET}")
         print("   Is this Form 0 (Master Exam where option 1/א is always the answer)?")
         print("   - Enter '0' to auto-generate Form Zero answer key")
-        print("   - Enter Form Number (e.g., 1, 32) if adding answers manually later")
+        print("   - Enter Form Number (e.g., 111, 32, 1) if adding answers manually later")
         print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
         fn_input = input("   [?] Form Number [Default: 0 for Form Zero]: ").strip()
         if not fn_input:
@@ -397,11 +420,10 @@ def process_workspace(test_name, test_dir):
     local_prompt_path = os.path.join(test_dir, 'prompt_local_agent.txt')
     web_prompt_path = os.path.join(test_dir, 'prompt_web_ai.txt')
 
-    if os.path.isfile(local_prompt_path):
-        with open(local_prompt_path, 'r', encoding='utf-8') as f:
-            local_prompt_text = f.read()
-        copy_to_clipboard(local_prompt_text)
-        print(f"  {C_GREEN}[OK] Local prompt has been copied to your Windows Clipboard!{C_RESET}")
+    print(f"  {C_GREEN}[OK] Prompt files created in workspace folder:{C_RESET}")
+    print(f"       • Local Prompt: {local_prompt_path}")
+    print(f"       • Web AI Prompt: {web_prompt_path}")
+    print(f"       Copy-paste prompt_local_agent.txt or prompt_web_ai.txt into your AI assistant.\n")
 
     # Check CLI Agents
     agent_found = None
@@ -434,29 +456,25 @@ def process_workspace(test_name, test_dir):
     print(f"    • Web AI Prompt: {web_prompt_path}\n")
     print("  Select a prompt helper option:")
     print("    [1] LOCAL AGENT (agy, gemini, claude, Cursor, Antigravity, VS Code)")
-    print("        Copies local prompt to clipboard.")
+    print("        Refers to prompt_local_agent.txt.")
     print("    [2] WEB AI (ChatGPT, Claude.ai, Gemini Web, Google AI Studio)")
-    print("        Copies web prompt to clipboard & opens AI website.")
+    print("        Opens AI website to copy-paste prompt_web_ai.txt.")
     print("    [3] Print both prompts to console")
     print("    [S] Skip prompt helper\n")
 
     p_choice = input("   [?] Your choice (1/2/3/S) [Default: 1]: ").strip().lower()
     if p_choice == '2':
-        if os.path.isfile(web_prompt_path):
-            with open(web_prompt_path, 'r', encoding='utf-8') as f:
-                copy_to_clipboard(f.read())
-            print(f"\n  {C_GREEN}[OK] Web AI prompt copied to clipboard!{C_RESET}\n")
-            print("  Open a Web AI assistant in browser?")
-            print("    [1] ChatGPT (chatgpt.com)")
-            print("    [2] Gemini Web (gemini.google.com)")
-            print("    [3] Claude Web (claude.ai)")
-            print("    [4] Google AI Studio (aistudio.google.com)")
-            print("    [N] Skip opening browser\n")
-            web_choice = input("   [?] Your choice (1/2/3/4/N): ").strip()
-            if web_choice == '1': webbrowser.open('https://chatgpt.com')
-            elif web_choice == '2': webbrowser.open('https://gemini.google.com')
-            elif web_choice == '3': webbrowser.open('https://claude.ai')
-            elif web_choice == '4': webbrowser.open('https://aistudio.google.com')
+        print(f"\n  {C_GREEN}[OK] Open Web AI assistant in browser?{C_RESET}")
+        print("    [1] ChatGPT (chatgpt.com)")
+        print("    [2] Gemini Web (gemini.google.com)")
+        print("    [3] Claude Web (claude.ai)")
+        print("    [4] Google AI Studio (aistudio.google.com)")
+        print("    [N] Skip opening browser\n")
+        web_choice = input("   [?] Your choice (1/2/3/4/N): ").strip()
+        if web_choice == '1': webbrowser.open('https://chatgpt.com')
+        elif web_choice == '2': webbrowser.open('https://gemini.google.com')
+        elif web_choice == '3': webbrowser.open('https://claude.ai')
+        elif web_choice == '4': webbrowser.open('https://aistudio.google.com')
     elif p_choice == '3':
         if os.path.isfile(local_prompt_path):
             with open(local_prompt_path, 'r', encoding='utf-8') as f:
@@ -489,6 +507,9 @@ def process_workspace(test_name, test_dir):
 
         print(f"\n  {C_CYAN}[i] Updating test manifest...{C_RESET}")
         run_script('8_generate_manifest.py', [])
+
+        # Clean up intermediate scratch files
+        cleanup_workspace_folder(test_dir)
 
         print(f"\n  {C_GREEN}[OK] All processing steps finished!{C_RESET}\n")
         build_opt = input("   [?] Build standalone HTML quiz now? (Y/n) [Default: Y]: ").strip().lower()
