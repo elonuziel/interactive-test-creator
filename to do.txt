@@ -1,7 +1,0 @@
-- fix merging answers to questions - weather it is loaded from jemini or from json file. it shouldnt matter when i upload csv and clickiung merge
-- make AQ api the default (elza is phasing out)
-- make the advanced option more clear
-- understand weather md or json id faster or same processing time for llm output - maybe adjust creation of those outputs for all?
-- make sure the proof mode works as intended with the new structure
-- make sure the plugin structure works as intended with the new structure
-- make sure the local pdf generation works as intended with the new structure

@@ -420,12 +420,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function extractPdfText(inputBuffer) {
-        if (!window.pdfjsLib?.getDocument) {
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+        if (!pdfjs?.getDocument) {
             throw new Error('PDF.js לא נטען. רענן את העמוד ונסה שוב.');
         }
 
         const freshData = new Uint8Array(inputBuffer);
-        const loadingTask = window.pdfjsLib.getDocument({ data: freshData });
+        const loadingTask = pdfjs.getDocument({ data: freshData });
         const pdf = await loadingTask.promise;
         const pages = [];
         const pageImages = []; // index = pageNumber-1, value = base64 data URL or null
@@ -442,8 +443,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fallback to hardcoded PDF.js OPS values if .OPS is not exported.
             try {
                 const ops = await page.getOperatorList();
-                const PAINT_IMAGE = (window.pdfjsLib.OPS && window.pdfjsLib.OPS.paintImageXObject) || 85;
-                const PAINT_INLINE = (window.pdfjsLib.OPS && window.pdfjsLib.OPS.paintInlineImageXObject) || 86;
+                const PAINT_IMAGE = (pdfjs.OPS && pdfjs.OPS.paintImageXObject) || 85;
+                const PAINT_INLINE = (pdfjs.OPS && pdfjs.OPS.paintInlineImageXObject) || 86;
                 const hasPaintOp = ops.fnArray.some((fn) => fn === PAINT_IMAGE || fn === PAINT_INLINE);
                 pageImages.push(hasPaintOp ? await extractPageImage(page) : null);
             } catch {
@@ -461,12 +462,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function detectPdfType(inputBuffer) {
-        if (!window.pdfjsLib?.getDocument) {
-            throw new Error('PDF.js לא נטען. רענן את העמוד ונסה שוב.');
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+        if (!pdfjs?.getDocument) {
+            throw new Error('PDF.js לא נטען. אם העמוד נפתח ישירות מהדיסק (file://), יש להשתמש בשרת מקומי (start_test_server.bat) או לוודא חיבור לרשת.');
         }
 
         const freshData = new Uint8Array(inputBuffer);
-        const loadingTask = window.pdfjsLib.getDocument({ data: freshData });
+        const loadingTask = pdfjs.getDocument({ data: freshData });
         const pdf = await loadingTask.promise;
         let nonWhitespaceChars = 0;
 
@@ -480,10 +482,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const isScanned = nonWhitespaceChars < Math.max(pdf.numPages * 60, 120);
         return {
             isScanned,
-            pdfTypeLabel: isScanned ? 'PDF סרוק (תמונה)' : 'PDF דיגיטלי (עם טקסט)',
+            pdfTypeLabel: isScanned ? '📷 PDF סרוק (תמונה)' : '📄 PDF דיגיטלי (עם טקסט)',
             recommendation: isScanned
                 ? 'יזדקק ל-OCR. אפשר להשתמש ב-Gemini או ב-OCR החינמי בדפדפן.'
-                : 'יעובד מקומית ללא OCR וללא צורך ב-API Key.'
+                : 'יעובד מקומית בלחיצת כפתור ללא OCR וללא צורך ב-API Key.'
         };
     }
 
@@ -2082,17 +2084,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── PDF Page Sidebar & Thumbnail Generator ─────────────────────────────────
     async function loadPdfSidebar(pdfBytesInput) {
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
         if (pdfBytesInput) {
             state.pdfBytes = new Uint8Array(pdfBytesInput);
         }
         state.pdfPagesState = [];
         if (elements.pageThumbnailsContainer) elements.pageThumbnailsContainer.innerHTML = '';
 
-        if (!state.pdfBytes || state.pdfBytes.length === 0 || !window.pdfjsLib) return;
+        if (!state.pdfBytes || state.pdfBytes.length === 0 || !pdfjs?.getDocument) return;
 
         try {
             const freshCopy = new Uint8Array(state.pdfBytes);
-            const loadingTask = window.pdfjsLib.getDocument({ data: freshCopy });
+            const loadingTask = pdfjs.getDocument({ data: freshCopy });
             const pdfDoc = await loadingTask.promise;
             const numPages = pdfDoc.numPages;
 
