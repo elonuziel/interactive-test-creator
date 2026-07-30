@@ -105,7 +105,7 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
     else:
         web_prompt = f"""I am uploading the exam document for Hebrew test "{test_name}".
 
-Please extract all multiple-choice questions into a clean `questions.json` array for an interactive quiz app.
+Please extract all multiple-choice questions into a clean `questions.md` or `questions.json` for an interactive quiz app.
 
 ---------------------------------------------------------------------------
 EXTRACTION & PROOFREADING RULES:
@@ -116,41 +116,50 @@ EXTRACTION & PROOFREADING RULES:
    - Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
 
 2. OPTIONS FORMATTING:
-   - Extract all choices into the `options` array (questions can have 4, 5, 6 or more choices).
-   - Remove option letter prefixes (e.g. convert "א. תגובה מהירה" to "תגובה מהירה").
+   - Extract all choices into the options list (questions can have 4, 5, 6 or more choices).
 
-3. DIAGRAM & IMAGE REFERENCES (`pageImage`):
-   - If a question includes or references a visual element (diagram, chart, graph, illustration, or complex chemical formula), set `"pageImage": "pages_output/page_X.png"` where X is the page number (e.g., `"pages_output/page_4.png"`).
-   - If the question is purely text-based, DO NOT include the `pageImage` key.
+3. DIAGRAM & IMAGE REFERENCES:
+   - If a question includes or references a visual element (diagram, chart, graph, illustration, or complex chemical formula), reference the page image (e.g., `"pages_output/page_4.png"`).
 
-4. ANSWER KEY (`correctIndex`):
-   - Set `"correctIndex": null` for all questions (the answer key will be merged automatically).
-
-5. SELF-PROOFREADING PASS:
-   - Once extraction is complete, perform a self-proofreading pass to verify Hebrew word order, punctuation, and JSON formatting before outputting.
+4. SELF-PROOFREADING PASS:
+   - Once extraction is complete, perform a self-proofreading pass to verify Hebrew word order and punctuation before outputting.
 
 ---------------------------------------------------------------------------
-REQUIRED JSON SCHEMA:
+OUTPUT & DELIVERABLE FORMATS (MARKDOWN OR JSON):
 ---------------------------------------------------------------------------
+You may provide your response either as Markdown (questions.md) OR valid JSON (questions.json).
+
+OPTION A: MARKDOWN (questions.md) - RECOMMENDED
+### שאלה 1: מהו התפקיד העיקרי של המיטוכונדריה בתא?
+- א. ייצור אנרגיה (ATP)
+- ב. סינתזת חלבונים
+- ג. אחסון החומר התורשתי
+- ד. פירוק רעלים בתא
+
+### שאלה 2: איזה איבר אחראי על סינון דם בגוף?
+- א. כבד
+- ב. כליות
+- ג. לב
+- ד. ריאות
+
+OPTION B: JSON (questions.json)
 [
   {{
-    "question": "שאלה לדוגמה בעברית...",
+    "question": "מהו התפקיד העיקרי של המיטוכונדריה בתא?",
     "options": [
-      "תשובה ראשונה",
-      "תשובה שנייה",
-      "תשובה שלישית",
-      "תשובה רביעית"
+      "ייצור אנרגיה (ATP)",
+      "סינתזת חלבונים",
+      "אחסון החומר התורשתי",
+      "פירוק רעלים בתא"
     ],
-    "correctIndex": null,
-    "pageImage": "pages_output/page_2.png"
+    "correctIndex": null
   }}
 ]
 
 ---------------------------------------------------------------------------
-OUTPUT & DELIVERABLE REQUIREMENTS:
+DELIVERABLE INSTRUCTIONS:
 ---------------------------------------------------------------------------
-1. Provide your final response either as a downloadable `questions.json` file OR as a single clean code block formatted for easy copy-pasting into `questions.json`.
-2. Do NOT include conversational commentary or explanation text. Output raw, valid JSON only.
+Save or paste the result into `{test_dir}/questions.md` or `{test_dir}/questions.json`.
 """
 
     if target in ["local", "all"]:

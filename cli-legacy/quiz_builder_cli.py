@@ -611,6 +611,30 @@ def run_step6(test_name, test_dir, q_final):
     print(f"\n {C_BOLD}[Step 6/6] Automated Post-Processing & Validation{C_RESET}")
     print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
 
+    # Auto-detect Markdown questions file (questions.md, output.md, questions.txt, etc.)
+    if not os.path.exists(q_final):
+        md_candidates = ['questions.md', 'output.md', 'questions.txt']
+        found_md = None
+        for cand in md_candidates:
+            cand_p = os.path.join(test_dir, cand)
+            if os.path.exists(cand_p):
+                found_md = cand_p
+                break
+
+        if not found_md:
+            other_mds = [
+                f for f in os.listdir(test_dir)
+                if f.lower().endswith(('.md', '.txt')) and f.lower() not in ['prompt_local_agent.txt', 'prompt_web_ai.txt', 'readme.md', 'raw_text.md']
+            ]
+            if other_mds:
+                found_md = os.path.join(test_dir, other_mds[0])
+
+        if found_md and os.path.exists(found_md):
+            print(f"  {C_CYAN}[i] Auto-detected Markdown question file ({os.path.basename(found_md)}). Parsing into questions.json...{C_RESET}\n")
+            img_dir = os.path.join(test_dir, 'images')
+            page_map = os.path.join(test_dir, 'page_map.json')
+            run_script('5_parse_questions_md.py', [found_md, '-o', q_final, '--image-dir', img_dir, '--page-map', page_map])
+
     # Auto-detect any exported JSON file that is not answers.json / page_map.json
     if not os.path.exists(q_final):
         other_jsons = [
