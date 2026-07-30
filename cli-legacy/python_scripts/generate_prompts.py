@@ -1,7 +1,8 @@
 import os
 import sys
+import argparse
 
-def generate_prompts(test_dir, test_name, form_number, has_answers):
+def generate_prompts(test_dir, test_name, form_number, has_answers, target="all"):
     # Ensure test directory exists
     os.makedirs(test_dir, exist_ok=True)
     
@@ -9,13 +10,8 @@ def generate_prompts(test_dir, test_name, form_number, has_answers):
     questions_json_path = os.path.join(test_dir, "questions.json")
     is_proofread = os.path.exists(questions_json_path)
 
-    # Resolve paths relative to test_dir for clean prompt display
-    clean_pdf_name = f"{test_name}_clean.pdf"
-    
+    # 1. Local Agent Prompts (Extraction vs Proofread)
     if is_proofread:
-        # =========================================================================
-        # PROMPT 1: LOCAL AGENT — PROOFREADING PASS
-        # =========================================================================
         local_prompt = f"""[TASK: HEBREW EXAM QUESTION PROOFREADING & FORMATTING]
 
 Context:
@@ -42,14 +38,44 @@ JSON Schema to maintain:
       "אפשרות רביעית"
     ],
     "correctIndex": 0,
-    "pageImage": "pages_output/page_2.png"  // Keep existing value if present
+    "pageImage": "pages_output/page_2.png"
+  }}
+]
+"""
+    else:
+        local_prompt = f"""[TASK: HEBREW MULTIPLE-CHOICE EXAM EXTRACTION]
+
+Context:
+You are processing test "{test_name}" (Form {form_number}). Rendered page images are saved in `{test_dir}/pages_output/` (e.g., `page_1.png`, `page_2.png`). Raw extracted text (if available) is in `{test_dir}/raw_text.md`.
+
+Your Instructions:
+1. Inspect all rendered page images in `{test_dir}/pages_output/` sequentially.
+2. Extract EVERY multiple-choice question in the exam.
+3. For each question:
+   - `question`: Full question statement in correct Hebrew reading order (left-to-right sentences, right-to-left Hebrew words).
+   - `options`: Array of all 4 choice strings (strip prefixes like 'א.', 'ב.', '1.', '2.').
+   - `correctIndex`: Set to `null` (answer key will be merged automatically by quiz_builder).
+   - `pageImage`: Set to `"pages_output/page_X.png"` (where X is the 1-based page number) ONLY IF the question contains or references a diagram, figure, chart, table, image, or mathematical formula. Omit `pageImage` if the question is purely text.
+4. Save the complete output as valid JSON directly to `{test_dir}/questions.json`.
+
+Target JSON Schema:
+[
+  {{
+    "question": "מהו התפקיד העיקרי של המיטוכונדריה בתא?",
+    "options": [
+      "ייצור אנרגיה (ATP)",
+      "סינתזת חלבונים",
+      "אחסון החומר התורשתי",
+      "פירוק רעלים בתא"
+    ],
+    "correctIndex": null,
+    "pageImage": "pages_output/page_3.png"
   }}
 ]
 """
 
-        # =========================================================================
-        # PROMPT 2: WEB AI — PROOFREADING PASS
-        # =========================================================================
+    # 2. Web AI Prompts (Extraction vs Proofread)
+    if is_proofread:
         web_prompt = f"""I am attaching the auto-extracted `questions.json` file for the Hebrew exam "{test_name}".
 
 Because this file was generated automatically from a PDF, it may contain reversed Hebrew words, inverted parentheses, or minor formatting errors.
@@ -73,45 +99,7 @@ Please perform a thorough AI proofreading pass according to these guidelines:
 OUTPUT REQUIREMENTS:
 Return ONLY the final, complete, valid JSON array. Do not include markdown code block ticks (```json), intro text, or explanation commentary.
 """
-
     else:
-        # =========================================================================
-        # PROMPT 3: LOCAL AGENT — FULL QUESTION EXTRACTION
-        # =========================================================================
-        local_prompt = f"""[TASK: HEBREW MULTIPLE-CHOICE EXAM EXTRACTION]
-
-Context:
-You are processing test "{test_name}" (Form {form_number}). Rendered page images are saved in `{test_dir}/pages_output/` (e.g., `page_1.png`, `page_2.png`). Raw extracted text (if available) is in `{test_dir}/raw_text.md`.
-
-Your Instructions:
-1. Inspect all rendered page images in `{test_dir}/pages_output/` sequentially.
-2. Extract EVERY multiple-choice question in the exam.
-3. For each question:
-   - `question`: Full question statement in correct Hebrew reading order (left-to-right sentences, right-to-left Hebrew words).
-   - `options`: Array of all 4 choice strings (strip prefixes like 'א.', 'ב.', '1.', '2.').
-   - `correctIndex`: Set to `null` (answer key will be merged automatically by start.bat/quiz_builder).
-   - `pageImage`: Set to `"pages_output/page_X.png"` (where X is the 1-based page number) ONLY IF the question contains or references a diagram, figure, chart, table, image, or mathematical formula. Omit `pageImage` if the question is purely text.
-4. Save the complete output as valid JSON directly to `{test_dir}/questions.json`.
-
-Target JSON Schema:
-[
-  {{
-    "question": "מהו התפקיד העיקרי של המיטוכונדריה בתא?",
-    "options": [
-      "ייצור אנרגיה (ATP)",
-      "סינתזת חלבונים",
-      "אחסון החומר התורשתי",
-      "פירוק רעלים בתא"
-    ],
-    "correctIndex": null,
-    "pageImage": "pages_output/page_3.png"
-  }}
-]
-"""
-
-        # =========================================================================
-        # PROMPT 4: WEB AI — FULL QUESTION EXTRACTION
-        # =========================================================================
         web_prompt = f"""I am uploading the exam document for Hebrew test "{test_name}".
 
 Please extract all multiple-choice questions into a clean `questions.json` array for an interactive quiz app.
@@ -156,26 +144,26 @@ OUTPUT REQUIREMENT:
 Return ONLY the raw JSON array. Do NOT wrap in markdown blocks, and do NOT add intro/outro commentary.
 """
 
-    local_path = os.path.join(test_dir, "prompt_local_agent.txt")
-    with open(local_path, "w", encoding="utf-8") as f:
-        f.write(local_prompt)
+    if target in ["local", "all"]:
+        local_path = os.path.join(test_dir, "prompt_local_agent.txt")
+        with open(local_path, "w", encoding="utf-8") as f:
+            f.write(local_prompt)
+        print(f"  [OK] Created local agent prompt: {local_path}")
 
-    web_path = os.path.join(test_dir, "prompt_web_ai.txt")
-    with open(web_path, "w", encoding="utf-8") as f:
-        f.write(web_prompt)
-
-    print(f"  [OK] Generated prompt files in {test_dir}/:")
-    print(f"       • Local Agent Prompt: prompt_local_agent.txt")
-    print(f"       • Web AI Prompt:      prompt_web_ai.txt")
+    if target in ["web", "all"]:
+        web_path = os.path.join(test_dir, "prompt_web_ai.txt")
+        with open(web_path, "w", encoding="utf-8") as f:
+            f.write(web_prompt)
+        print(f"  [OK] Created web AI prompt: {web_path}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
-        print("Usage: python generate_prompts.py <test_dir> <test_name> <form_number> <has_answers(1/0)>")
-        sys.exit(1)
-        
-    test_dir_arg = sys.argv[1]
-    test_name_arg = sys.argv[2]
-    form_number_arg = sys.argv[3]
-    has_answers_arg = sys.argv[4] == "1"
-    
-    generate_prompts(test_dir_arg, test_name_arg, form_number_arg, has_answers_arg)
+    parser = argparse.ArgumentParser(description="Generate on-demand prompts for local and web AI assistants.")
+    parser.add_argument("test_dir", help="Target test directory")
+    parser.add_argument("test_name", help="Test workspace name")
+    parser.add_argument("form_number", help="Form number")
+    parser.add_argument("has_answers", help="Has answers (1/0)")
+    parser.add_argument("target", nargs="?", default="all", help="Target prompt to generate (local, web, all)")
+
+    args = parser.parse_args()
+    has_ans = args.has_answers in ["1", "true", "True"]
+    generate_prompts(args.test_dir, args.test_name, args.form_number, has_ans, args.target)

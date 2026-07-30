@@ -415,15 +415,8 @@ def process_workspace(test_name, test_dir):
     print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
 
     has_answers_flag = "1" if os.path.isfile(os.path.join(test_dir, 'answers.json')) else "0"
-    run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag])
-
     local_prompt_path = os.path.join(test_dir, 'prompt_local_agent.txt')
     web_prompt_path = os.path.join(test_dir, 'prompt_web_ai.txt')
-
-    print(f"  {C_GREEN}[OK] Prompt files created in workspace folder:{C_RESET}")
-    print(f"       • Local Prompt: {local_prompt_path}")
-    print(f"       • Web AI Prompt: {web_prompt_path}")
-    print(f"       Copy-paste prompt_local_agent.txt or prompt_web_ai.txt into your AI assistant.\n")
 
     # Check CLI Agents
     agent_found = None
@@ -435,36 +428,38 @@ def process_workspace(test_name, test_dir):
     if agent_found:
         print(f"  {C_GREEN}[OK] Detected CLI Agent: {agent_found}{C_RESET}")
         use_ag = input(f"   [?] Launch {agent_found} automatically? (Y/n) [Default: Y]: ").strip().lower()
-        if use_ag != 'n' and os.path.isfile(local_prompt_path):
-            print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-            print(f"{C_CYAN}{C_BOLD}            LAUNCHING AGENT: {agent_found}{C_RESET}")
-            print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-            print("   1. Opening agent in a new terminal window with prompt piped.")
-            print("   2. The agent will output/update questions.json automatically.")
-            print("   3. Once finished, return here and press Enter to continue.")
-            print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
-            if sys.platform == 'win32':
-                cmd_str = f'type "{local_prompt_path}" | {agent_found}'
-                subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', cmd_str], shell=True)
-            input("   Press Enter after the AI agent completes...")
+        if use_ag != 'n':
+            # Generate local prompt on demand
+            run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
+            if os.path.isfile(local_prompt_path):
+                print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+                print(f"{C_CYAN}{C_BOLD}            LAUNCHING AGENT: {agent_found}{C_RESET}")
+                print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+                print("   1. Opening agent in a new terminal window with prompt piped.")
+                print("   2. The agent will output/update questions.json automatically.")
+                print("   3. Once finished, return here and press Enter to continue.")
+                print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
+                if sys.platform == 'win32':
+                    cmd_str = f'type "{local_prompt_path}" | {agent_found}'
+                    subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', cmd_str], shell=True)
+                input("   Press Enter after the AI agent completes...")
 
     print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}                 AI PROMPT ASSISTANT{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
-    print(f"  Prompt files generated:")
-    print(f"    • Local Prompt: {local_prompt_path}")
-    print(f"    • Web AI Prompt: {web_prompt_path}\n")
     print("  Select a prompt helper option:")
     print("    [1] LOCAL AGENT (agy, gemini, claude, Cursor, Antigravity, VS Code)")
-    print("        Refers to prompt_local_agent.txt.")
+    print("        Generates prompt_local_agent.txt on demand.")
     print("    [2] WEB AI (ChatGPT, Claude.ai, Gemini Web, Google AI Studio)")
-    print("        Opens AI website to copy-paste prompt_web_ai.txt.")
+    print("        Generates prompt_web_ai.txt on demand & opens AI website.")
     print("    [3] Print both prompts to console")
     print("    [S] Skip prompt helper\n")
 
     p_choice = input("   [?] Your choice (1/2/3/S) [Default: 1]: ").strip().lower()
     if p_choice == '2':
-        print(f"\n  {C_GREEN}[OK] Open Web AI assistant in browser?{C_RESET}")
+        run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'web'])
+        print(f"\n  {C_GREEN}[OK] Created {web_prompt_path}{C_RESET}")
+        print("  Open a Web AI assistant in browser?")
         print("    [1] ChatGPT (chatgpt.com)")
         print("    [2] Gemini Web (gemini.google.com)")
         print("    [3] Claude Web (claude.ai)")
@@ -476,12 +471,16 @@ def process_workspace(test_name, test_dir):
         elif web_choice == '3': webbrowser.open('https://claude.ai')
         elif web_choice == '4': webbrowser.open('https://aistudio.google.com')
     elif p_choice == '3':
+        run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'all'])
         if os.path.isfile(local_prompt_path):
             with open(local_prompt_path, 'r', encoding='utf-8') as f:
                 print(f"\n{C_GRAY}--- LOCAL PROMPT ---{C_RESET}\n{f.read()}\n")
         if os.path.isfile(web_prompt_path):
             with open(web_prompt_path, 'r', encoding='utf-8') as f:
                 print(f"\n{C_GRAY}--- WEB PROMPT ---{C_RESET}\n{f.read()}\n")
+    elif p_choice != 's':
+        run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
+        print(f"\n  {C_GREEN}[OK] Created {local_prompt_path}{C_RESET}")
 
     # Check for candidate JSON files
     q_final = os.path.join(test_dir, 'questions.json')
