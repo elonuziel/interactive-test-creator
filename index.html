@@ -798,16 +798,25 @@
                                     בעברית הדיוק נמוך בהרבה מ-Gemini.
                                 </div>
                             </div>
-                            <div class="verification-toggle-box" style="margin-top: 12px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; transition: all 0.2s ease;">
-                                <label style="display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; user-select: none;">
+                            <div class="verification-toggle-box"
+                                style="margin-top: 12px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; transition: all 0.2s ease;">
+                                <label
+                                    style="display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; user-select: none;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <input type="checkbox" id="enable-llm-verification" style="width: 16px; height: 16px; accent-color: var(--primary-color); cursor: pointer;">
-                                        <span style="font-size: .83rem; font-weight: 600; color: var(--text-primary);">🔍 הגהת AI משנית (Verification Pass)</span>
+                                        <input type="checkbox" id="enable-llm-verification"
+                                            style="width: 16px; height: 16px; accent-color: var(--primary-color); cursor: pointer;">
+                                        <span
+                                            style="font-size: .83rem; font-weight: 600; color: var(--text-primary);">🔍
+                                            הגהת AI משנית (Verification Pass)</span>
                                     </div>
-                                    <span id="verification-badge" style="font-size: .74rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3);">⚡ קריאה 1 (מהיר)</span>
+                                    <span id="verification-badge"
+                                        style="font-size: .74rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3);">⚡
+                                        קריאה 1 (מהיר)</span>
                                 </label>
-                                <div id="verification-warning-box" class="field-note-block hidden" style="margin-top: 8px; font-size: .78rem; color: #b45309; background: rgba(217, 119, 6, 0.1); border: 1px solid rgba(217, 119, 6, 0.25); padding: 8px 10px; border-radius: 6px; line-height: 1.4;">
-                                    ⚠️ <strong>שימו לב:</strong> הפעלת הגהה נוספת תבצע קריאת API משנית מול Gemini לבדיקת ניתוח הטקסטים והתשובות. העיבוד ייקח מעט יותר זמן.
+                                <div id="verification-warning-box" class="field-note-block hidden"
+                                    style="margin-top: 8px; font-size: .78rem; color: #b45309; background: rgba(217, 119, 6, 0.1); border: 1px solid rgba(217, 119, 6, 0.25); padding: 8px 10px; border-radius: 6px; line-height: 1.4;">
+                                    ⚠️ <strong>שימו לב:</strong> הפעלת הגהה נוספת תבצע קריאת API משנית מול Gemini לבדיקת
+                                    ניתוח הטקסטים והתשובות. העיבוד ייקח מעט יותר זמן.
                                 </div>
                             </div>
                         </div>
@@ -816,13 +825,13 @@
                         <div id="llm-auth-section" class="auth-section"
                             style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
                             <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">2. 🔑&nbsp; אימות
-                                AQ / Gemini API</p>
+                                Gemini API</p>
                             <div class="field">
                                 <label for="api-key">API Key <span dir="ltr"
                                         style="font-size: .8rem; opacity: .8;">(AQ...)</span> <button id="api-help-btn"
                                         class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
                                 <div class="password-wrap">
-                                    <input id="api-key" type="password" placeholder="AQ... הזן API Key">
+                                    <input id="api-key" type="password" placeholder="AQ...">
                                     <button class="eye-btn" type="button" data-target="api-key"
                                         aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
                                 </div>
@@ -892,16 +901,20 @@
             <p style="font-size: .88rem; color: var(--text-secondary); margin-bottom: 12px;">
                 המערכת פועלת כעת בלעדית מול <strong>AQ API</strong> להפעלת מודלי Gemini מתקדמים:
             </p>
-            
-            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+
+            <div
+                style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <strong style="color: var(--primary-color); font-size: .95rem;">AQ API Key</strong>
-                    <span style="font-family: monospace; font-size: .85rem; background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color);" dir="ltr">AQ...</span>
+                    <span
+                        style="font-family: monospace; font-size: .85rem; background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color);"
+                        dir="ltr">AQ...</span>
                 </div>
                 <p style="margin: 0; font-size: .85rem; color: var(--text-secondary); line-height: 1.5;">
                     מפתח מומלץ למודלים מתקדמים (Gemini 2.5 Flash / 2.0 Flash).<br>
                     מתקבל בחינם מ־
-                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="font-weight: 600; text-decoration: underline;">Google AI Studio</a>.
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
+                        style="font-weight: 600; text-decoration: underline;">Google AI Studio</a>.
                 </p>
             </div>
 
