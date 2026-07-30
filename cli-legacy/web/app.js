@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (errorScreen) errorScreen.classList.add('active');
     }
 
-    if (!testPath && !window.__EMBEDDED_QUESTIONS) {
+    if (!testPath && !window.__EMBEDDED_QUESTIONS && !window.embeddedQuestions) {
         // No test selected and no embedded questions: show exam selection menu
         setupScreen.classList.remove('active');
         if(menuScreen) menuScreen.classList.add('active');
@@ -236,10 +236,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Support embedded questions (single-file HTML mode)
-    if (window.__EMBEDDED_QUESTIONS) {
-        initQuestions(window.__EMBEDDED_QUESTIONS);
+    const embeddedData = (typeof window.__EMBEDDED_QUESTIONS !== 'undefined' && Array.isArray(window.__EMBEDDED_QUESTIONS) && window.__EMBEDDED_QUESTIONS.length > 0)
+        ? window.__EMBEDDED_QUESTIONS
+        : (typeof window.embeddedQuestions !== 'undefined' && Array.isArray(window.embeddedQuestions) && window.embeddedQuestions.length > 0)
+        ? window.embeddedQuestions
+        : null;
+
+    if (embeddedData) {
+        initQuestions(embeddedData);
     } else {
-        const jsonUrl = `../${testPath}/questions.json?v=` + new Date().getTime();
+        const jsonUrl = testPath ? (`../${testPath}/questions.json?v=` + new Date().getTime()) : 'questions.json';
         fetch(jsonUrl)
             .then(r => {
                 if (!r.ok) throw new Error("Could not load " + jsonUrl);

@@ -23,23 +23,25 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 # Resolve paths relative to the repo root & PyInstaller _MEIPASS
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) == 'python_scripts' else SCRIPT_DIR
+CLI_LEGACY_DIR = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) == 'python_scripts' else SCRIPT_DIR
+REPO_ROOT = os.path.dirname(CLI_LEGACY_DIR) if os.path.basename(CLI_LEGACY_DIR) == 'cli-legacy' else CLI_LEGACY_DIR
 
 def resolve_web_asset(filename):
-    """Find template assets (index.html, style.css, app.js) across PyInstaller bundle & disk paths."""
+    """Find template assets (index.html, style.css, app.js) prioritizing cli-legacy/web/."""
     frozen_base = getattr(sys, '_MEIPASS', None)
     candidates = []
     if frozen_base:
         candidates.extend([
-            os.path.join(frozen_base, filename),
+            os.path.join(frozen_base, 'cli-legacy', 'web', filename),
             os.path.join(frozen_base, 'web', filename),
-            os.path.join(frozen_base, 'cli-legacy', filename),
+            os.path.join(frozen_base, filename),
         ])
     candidates.extend([
-        os.path.join(REPO_ROOT, filename),
+        os.path.join(CLI_LEGACY_DIR, 'web', filename),
+        os.path.join(REPO_ROOT, 'cli-legacy', 'web', filename),
         os.path.join(REPO_ROOT, 'web', filename),
+        os.path.join(REPO_ROOT, filename),
         os.path.join(SCRIPT_DIR, filename),
-        os.path.join(os.path.dirname(REPO_ROOT), filename),
     ])
 
     for cand in candidates:

@@ -18,6 +18,12 @@ datas = [
 ]
 
 # Include web app assets in bundle
+web_dir_src = os.path.join(spec_dir, 'web')
+if os.path.isdir(web_dir_src):
+    datas.append((web_dir_src, 'cli-legacy/web'))
+    datas.append((web_dir_src, 'web'))
+    datas.append((web_dir_src, '.'))
+
 for web_asset in ['index.html', 'style.css', 'app.js', 'generator.js', 'quiz_generator.html', 'favicon.svg']:
     asset_path = os.path.join(repo_root, web_asset)
     if os.path.isfile(asset_path):
