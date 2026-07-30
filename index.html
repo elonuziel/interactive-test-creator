@@ -479,12 +479,25 @@
                     <div id="pdf-type-note" class="field-note-block hidden"></div>
                     <div id="scanned-actions-box" class="field-note-block is-scanned hidden" style="margin-top: 8px;">
                         <strong style="display:block; margin-bottom: 4px;">🔍 זוהה PDF סרוק — אפשרויות עיבוד:</strong>
-                        <ul style="margin: 0; padding-right: 18px; line-height: 1.5; font-size: .83rem;">
-                            <li><strong>אפשרות 1:</strong> הזן Gemini API Key לעיבוד אוטומטי מלא.</li>
-                            <li><strong>אפשרות 2:</strong> לחץ על <strong>"הורד PDF נקי"</strong> בסרגל הצידי, העבר אותו ל-ChatGPT/Claude והעלה כאן את ה-<code>questions.json</code>.</li>
+                        <ul style="margin: 0; padding-right: 18px; line-height: 1.6; font-size: .83rem;">
+                            <li>
+                                <strong>אפשרות 1:</strong> 
+                                <button id="show-api-settings-btn" type="button" class="secondary-btn sm-btn" style="margin-right: 4px;">🔑 הזן Gemini API Key לעיבוד אוטומטי מלא</button>
+                            </li>
+                            <li><strong>אפשרות 2:</strong> לחץ על <strong>"הורד PDF נקי"</strong> למטה (אופציונלי: סמן/בטל עמודים בסרגל הצידי), שלח אותו ל-ChatGPT/Claude והעלה כאן את קובץ ה-<code>questions.json</code>.</li>
                         </ul>
-                        <div style="margin-top: 8px;">
-                            <button id="copy-prompt-btn" type="button" class="secondary-btn sm-btn">📋 העתק פרומפט חילוץ שאלות ל-LLM</button>
+                        
+                        <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                            <button id="download-clean-pdf-main" type="button" class="success-btn sm-btn">📥 הורד PDF נקי</button>
+                            <button id="preset-std-btn-main" type="button" class="secondary-btn sm-btn" title="מבטל עמודי שער/הוראות 1-4 ועמודים זוגיים">🧹 ניקוי סטנדרטי (cli-legacy)</button>
+                        </div>
+
+                        <div style="margin-top: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <label for="llm-prompt-box" style="font-weight: 600; font-size: .82rem;">📋 הפרומפט להדבקה ב-LLM חיצוני:</label>
+                                <button id="copy-prompt-btn" type="button" class="secondary-btn sm-btn">📋 העתק ללוח</button>
+                            </div>
+                            <textarea id="llm-prompt-box" readonly rows="7" style="font-family: monospace; font-size: .8rem; width: 100%; resize: vertical; direction: rtl; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px;"></textarea>
                         </div>
                     </div>
                 </div>
@@ -509,43 +522,50 @@
                     <input id="form-number" type="text" inputmode="numeric" placeholder="לדוגמה: 76">
                 </div>
 
-                <hr class="section-divider">
-                <p class="section-label">⚙️&nbsp; הגדרות עיבוד</p>
-
-                <div class="field">
-                    <label for="llm-policy">שימוש ב-LLM</label>
-                    <select id="llm-policy">
-                        <option value="auto">אוטומטי — מקומי לדיגיטלי, LLM לסרוק</option>
-                        <option value="force_llm">LLM תמיד (Gemini)</option>
-                        <option value="force_no_llm">ללא LLM — מקומי בלבד</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="ocr-engine">מנוע OCR <span class="field-note-inline">לסרוקים</span></label>
-                    <select id="ocr-engine">
-                        <option value="gemini_chunked">Gemini — פיצול לעמודים (מומלץ)</option>
-                        <option value="gemini_native">Gemini — העלאת PDF ישירה (מהיר)</option>
-                        <option value="offline_local">OCR מקומי חינמי — ללא API Key</option>
-                    </select>
-                    <div class="offline-warning-box">
-                        ⚠️&nbsp; OCR חינמי זה מתבצע בדפדפן, אך דורש חיבור לאינטרנט חד-פעמי להורדת מודל השפה. בעברית הדיוק נמוך בהרבה מ-Gemini.
-                    </div>
+                <div style="margin-top: 14px;">
+                    <button id="toggle-processing-settings-btn" type="button" class="secondary-btn sm-btn">⚙️ הצג/הסתר הגדרות עיבוד (Gemini API)</button>
                 </div>
 
-                <div id="llm-auth-section" class="auth-section">
-                    <p class="section-label">🔑&nbsp; אימות Gemini</p>
+                <!-- Hidden Processing & API Settings Section -->
+                <div id="processing-settings-container" class="hidden" style="margin-top: 10px;">
+                    <hr class="section-divider">
+                    <p class="section-label">⚙️&nbsp; הגדרות עיבוד (Gemini API)</p>
+
                     <div class="field">
-                        <label for="api-key">API Key <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
-                        <div class="password-wrap">
-                            <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
-                            <button class="eye-btn" type="button" data-target="api-key" aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
+                        <label for="llm-policy">שימוש ב-LLM</label>
+                        <select id="llm-policy">
+                            <option value="auto">אוטומטי — מקומי לדיגיטלי, LLM לסרוק</option>
+                            <option value="force_llm">LLM תמיד (Gemini)</option>
+                            <option value="force_no_llm">ללא LLM — מקומי בלבד</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="ocr-engine">מנוע OCR <span class="field-note-inline">לסרוקים</span></label>
+                        <select id="ocr-engine">
+                            <option value="gemini_chunked">Gemini — פיצול לעמודים (מומלץ)</option>
+                            <option value="gemini_native">Gemini — העלאת PDF ישירה (מהיר)</option>
+                            <option value="offline_local">OCR מקומי חינמי — ללא API Key</option>
+                        </select>
+                        <div class="offline-warning-box">
+                            ⚠️&nbsp; OCR חינמי זה מתבצע בדפדפן, אך דורש חיבור לאינטרנט חד-פעמי להורדת מודל השפה. בעברית הדיוק נמוך בהרבה מ-Gemini.
                         </div>
                     </div>
-                    <div class="field">
-                        <label for="passcode">Passcode <span class="field-note-inline">למפתח מוצפן — אופציונלי</span></label>
-                        <div class="password-wrap">
-                            <input id="passcode" type="password" autocomplete="off" placeholder="קוד גישה סודי">
-                            <button class="eye-btn" type="button" data-target="passcode" aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
+
+                    <div id="llm-auth-section" class="auth-section">
+                        <p class="section-label">🔑&nbsp; אימות Gemini</p>
+                        <div class="field">
+                            <label for="api-key">API Key <button id="api-help-btn" class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
+                            <div class="password-wrap">
+                                <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
+                                <button class="eye-btn" type="button" data-target="api-key" aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="passcode">Passcode <span class="field-note-inline">למפתח מוצפן — אופציונלי</span></label>
+                            <div class="password-wrap">
+                                <input id="passcode" type="password" autocomplete="off" placeholder="קוד גישה סודי">
+                                <button class="eye-btn" type="button" data-target="passcode" aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
+                            </div>
                         </div>
                     </div>
                 </div>

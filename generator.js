@@ -44,9 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
         credentialSubmit: document.getElementById('credential-submit'),
         credentialCancel: document.getElementById('credential-cancel'),
         htmlFile: document.getElementById('html-file'),
-        pdfTypeNote: document.getElementById('pdf-type-note'),
         scannedActionsBox: document.getElementById('scanned-actions-box'),
+        showApiSettingsBtn: document.getElementById('show-api-settings-btn'),
+        toggleProcessingSettingsBtn: document.getElementById('toggle-processing-settings-btn'),
+        processingSettingsContainer: document.getElementById('processing-settings-container'),
         copyPromptBtn: document.getElementById('copy-prompt-btn'),
+        llmPromptBox: document.getElementById('llm-prompt-box'),
+        downloadCleanPdfMain: document.getElementById('download-clean-pdf-main'),
+        presetStdBtnMain: document.getElementById('preset-std-btn-main'),
         pdfSidebarCard: document.getElementById('pdf-sidebar-card'),
         builderLayout: document.getElementById('builder-layout'),
         pageCountBadge: document.getElementById('page-count-badge'),
@@ -1729,12 +1734,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    const DEFAULT_LLM_PROMPT = `חבר קובץ questions.json בעברית מתוך שאלות המבחן המצורף.
+פורמט הפלט הנדרש (JSON array בלבד):
+[
+  {
+    "question": "נוסח השאלה",
+    "options": ["תשובה 1", "תשובה 2", "תשובה 3", "תשובה 4"],
+    "correctIndex": 0,
+    "sourcePage": 1
+  }
+]
+הנחיות:
+1. correctIndex הוא אינדקס 0-מבוסס של התשובה הנכונה (0 עבור א', 1 עבור ב', 2 עבור ג', 3 עבור ד').
+2. החזר אך ורק קוד JSON תקין בתוך קוד בלוק clean JSON.`;
+
+    if (elements.llmPromptBox) {
+        elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
+    }
+
     // Preset buttons & Clean PDF download listeners
     elements.presetStdBtn?.addEventListener('click', applyStandardFilter);
+    elements.presetStdBtnMain?.addEventListener('click', applyStandardFilter);
     elements.presetBlankBtn?.addEventListener('click', applyBlankFilter);
     elements.presetSelectAllBtn?.addEventListener('click', () => selectAllPages(true));
     elements.presetDeselectAllBtn?.addEventListener('click', () => selectAllPages(false));
     elements.downloadCleanPdf?.addEventListener('click', downloadCleanPdf);
+    elements.downloadCleanPdfMain?.addEventListener('click', downloadCleanPdf);
 
     // jsonFile Upload Listener
     elements.jsonFile?.addEventListener('change', async () => {
@@ -1756,26 +1781,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function toggleProcessingSettings(showOnly = false) {
+        if (!elements.processingSettingsContainer) return;
+        if (showOnly) {
+            elements.processingSettingsContainer.classList.remove('hidden');
+        } else {
+            elements.processingSettingsContainer.classList.toggle('hidden');
+        }
+
+        if (!elements.processingSettingsContainer.classList.contains('hidden')) {
+            elements.processingSettingsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    elements.showApiSettingsBtn?.addEventListener('click', () => toggleProcessingSettings(true));
+    elements.toggleProcessingSettingsBtn?.addEventListener('click', () => toggleProcessingSettings(false));
+
     // Copy prompt helper listener
     elements.copyPromptBtn?.addEventListener('click', async () => {
-        const promptText = `חבר קובץ questions.json בעברית מתוך שאלות המבחן המצורף.
-פורמט הפלט הנדרש (JSON array בלבד):
-[
-  {
-    "question": "נוסח השאלה",
-    "options": ["תשובה 1", "תשובה 2", "תשובה 3", "תשובה 4"],
-    "correctIndex": 0,
-    "sourcePage": 1
-  }
-]
-הנחיות:
-1. correctIndex הוא אינדקס 0-מבוסס של התשובה הנכונה (0 עבור א', 1 עבור ב', 2 עבור ג', 3 עבור ד').
-2. החזר אך ורק קוד JSON תקין בתוך קוד בלוק clean JSON.`;
-
+        const textToCopy = elements.llmPromptBox ? elements.llmPromptBox.value : DEFAULT_LLM_PROMPT;
         try {
-            await navigator.clipboard.writeText(promptText);
+            await navigator.clipboard.writeText(textToCopy);
             const originalText = elements.copyPromptBtn.textContent;
-            elements.copyPromptBtn.textContent = '✓ הפרומפט הועתק ללוח!';
+            elements.copyPromptBtn.textContent = '✓ הועתק!';
             setTimeout(() => {
                 elements.copyPromptBtn.textContent = originalText;
             }, 3000);

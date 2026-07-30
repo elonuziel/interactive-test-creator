@@ -3,6 +3,9 @@ name: Build & Release Quiz Builder Executable
 on:
   push:
     branches: [ main, feat/exe-builder ]
+    paths:
+      - 'cli-legacy/**'
+      - '.github/workflows/build-exe.yml'
     tags: [ 'v*' ]
   workflow_dispatch:
     inputs:
