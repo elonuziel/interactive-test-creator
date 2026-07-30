@@ -682,7 +682,12 @@
                     </div>
 
                     <button id="download-clean-pdf" type="button" class="success-btn sm-btn"
-                        style="width:100%; margin: 8px 0 12px;" disabled>📥 הורד PDF נקי</button>
+                        style="width:100%; margin: 8px 0 6px;" disabled>📥 הורד PDF נקי</button>
+
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: .78rem; margin: 0 0 10px; cursor: pointer; color: var(--text-primary);" title="כאשר מסומן, ניתוח ה-API והפענוח האוטומטי ישלחו רק את העמודים שנבחרו בסרגל זה">
+                        <input type="checkbox" id="use-clean-pdf-for-api" checked style="accent-color: var(--primary-color);">
+                        <span>⚡ השתמש בעמודים המסומנים בלבד בניתוח Gemini</span>
+                    </label>
 
                     <div id="page-thumbnails-container" class="thumbnails-grid">
                         <!-- Page thumbnails dynamically injected here -->

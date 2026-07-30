@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         status: document.getElementById('status'),
         preview: document.getElementById('preview'),
         proofModeToggle: document.getElementById('proof-mode-toggle'),
+        useCleanPdfForApi: document.getElementById('use-clean-pdf-for-api'),
         themeToggle: document.getElementById('theme-toggle'),
         themeIcon: document.getElementById('theme-icon')
     };
@@ -1433,10 +1434,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus('קורא קובצי מקור...');
 
-        let apiKey = '';
+        let pdfFileToParse = pdf;
+        let pdfBufferForParse = (await pdf.arrayBuffer()).slice(0);
 
-        const pdfBuffer = await pdf.arrayBuffer();
-        const pdfBufferForParse = pdfBuffer.slice(0);
+        const useCleanPdf = elements.useCleanPdfForApi ? elements.useCleanPdfForApi.checked : true;
+        if (useCleanPdf) {
+            try {
+                const cleanBuffer = await getCleanPdfBuffer();
+                if (cleanBuffer) {
+                    pdfBufferForParse = cleanBuffer.slice(0);
+                    pdfFileToParse = new File([cleanBuffer], `cleaned_${pdf.name}`, { type: 'application/pdf' });
+                    const keptCount = state.pdfPagesState.filter(p => p.keep).length;
+                    setStatus(`משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל) לעיבוד...`);
+                }
+            } catch (e) {
+                console.warn('Could not build clean PDF for parse:', e);
+            }
+        }
+
         let answerRows = null;
         if (csv) {
             const fileName = csv.name.toLowerCase();
@@ -1474,7 +1489,7 @@ document.addEventListener('DOMContentLoaded', () => {
             apiKey = await resolveGeminiApiKey(true);
             if (ocrEngine === 'gemini_native') {
                 setStatus(extracted.isScanned ? 'זוהה PDF סרוק. מנסה חילוץ עם Gemini Native PDF...' : 'נבחר מצב LLM כפוי. שולח את ה-PDF ל-Gemini Native PDF...');
-                const nativeExtraction = await extractTextViaGeminiNativePdf(pdf, extracted.pdf, apiKey);
+                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfFileToParse, extracted.pdf, apiKey);
                 examText = nativeExtraction.text;
                 sourcePages = nativeExtraction.pages;
                 const previews = await renderAllPdfPageImages(extracted.pdf);
@@ -1791,6 +1806,36 @@ document.addEventListener('DOMContentLoaded', () => {
             p.keep = keepState;
         });
         renderSidebarThumbnails();
+    }
+
+    async function getCleanPdfBuffer() {
+        if (!state.pdfPagesState || !state.pdfPagesState.length) return null;
+        const totalPages = state.pdfPagesState.length;
+        const keptIndices = state.pdfPagesState
+            .filter(p => p.keep)
+            .map(p => p.pageNum - 1);
+
+        if (keptIndices.length === 0 || keptIndices.length === totalPages) {
+            return null;
+        }
+        if (!window.PDFLib) return null;
+
+        let bytes = state.pdfBytes;
+        if (!bytes || bytes.length === 0 || bytes.buffer.byteLength === 0) {
+            const file = elements.pdfFile?.files?.[0];
+            if (!file) return null;
+            const buffer = await file.arrayBuffer();
+            state.pdfBytes = new Uint8Array(buffer);
+            bytes = state.pdfBytes;
+        }
+
+        const freshCopy = new Uint8Array(bytes.buffer.slice(0));
+        const srcDoc = await window.PDFLib.PDFDocument.load(freshCopy);
+        const newDoc = await window.PDFLib.PDFDocument.create();
+        const copiedPages = await newDoc.copyPages(srcDoc, keptIndices);
+        copiedPages.forEach(page => newDoc.addPage(page));
+        const cleanPdfBytes = await newDoc.save();
+        return cleanPdfBytes.buffer;
     }
 
     async function downloadCleanPdf() {
