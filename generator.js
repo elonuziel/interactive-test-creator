@@ -1096,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (qPattern.test(line) || qPattern.test(reversedLine)) {
                 pushCurrent();
-                current = { text: [], answers: [], lineIdx: i }; // use i, not indexOf
+                current = { text: [line], answers: [], lineIdx: i }; // use i, not indexOf
                 stateMode = 1;
                 continue;
             }
