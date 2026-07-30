@@ -56,8 +56,12 @@
             </div>
 
             <div class="quiz-card">
-                <div class="question-header">
+                <div class="question-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <span id="question-counter" class="badge">שאלה 1 מתוך X</span>
+                    <button id="flag-btn" class="flag-btn" type="button" title="סמן שאלה זו (Flag/Star)">
+                        <span class="flag-star">☆</span>
+                        <span class="flag-text">סמן שאלה</span>
+                    </button>
                 </div>
 
                 <div class="question-container">
@@ -94,6 +98,7 @@
                 <div class="results-actions" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px;">
                     <button id="restart-btn" class="primary-btn">התחל מחדש</button>
                     <button id="retry-incorrect-btn" class="warning-btn hidden">🔄 נסה שוב שאלות שגויות/שלא נענו (<span id="incorrect-count-badge">0</span>)</button>
+                    <button id="retry-flagged-btn" class="secondary-btn hidden" style="border-color: #f59e0b; color: #d97706;">⭐ תרגל שאלות מסומנות (<span id="flagged-count-badge-action">0</span>)</button>
                 </div>
                 <button id="review-back-btn" class="secondary-btn" style="margin-top:8px;">חזרה לשאלות</button>
             </div>
@@ -105,6 +110,7 @@
                 <button class="filter-btn active" data-filter="all">הכל</button>
                 <button class="filter-btn" data-filter="wrong">שגויות בלבד</button>
                 <button class="filter-btn" data-filter="unanswered">לא נענו</button>
+                <button class="filter-btn" data-filter="flagged">⭐ מסומנות (<span id="flagged-count-badge-filter">0</span>)</button>
             </div>
 
             <div id="review-container" class="review-list">

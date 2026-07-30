@@ -67,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
         takeQuiz: document.getElementById('take-quiz'),
+        compressExportImages: document.getElementById('compress-export-images'),
         status: document.getElementById('status'),
         preview: document.getElementById('preview'),
         proofModeToggle: document.getElementById('proof-mode-toggle'),
@@ -1393,13 +1394,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function compressImageBase64(dataUrl, quality = 0.75) {
+        if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+            return dataUrl;
+        }
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const compressed = canvas.toDataURL('image/webp', quality);
+                resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+        });
+    }
+
     async function createStandaloneQuizHtml() {
-        const cleanedQuestions = state.questions.map((q) => ({
-            question: normalizeWhitespace(q.question),
-            options: q.options.map((opt) => normalizeWhitespace(opt)),
-            correctIndex: q.correctIndex,
-            ...(q.shuffleOptions ? { shuffleOptions: true } : {}),
-            ...(q.image ? { image: q.image } : {}) // embed base64 image directly
+        const shouldCompress = elements.compressExportImages ? elements.compressExportImages.checked : true;
+
+        const cleanedQuestions = await Promise.all(state.questions.map(async (q) => {
+            let img = q.image;
+            if (shouldCompress && img) {
+                img = await compressImageBase64(img, 0.75);
+            }
+            return {
+                question: normalizeWhitespace(q.question),
+                options: q.options.map((opt) => normalizeWhitespace(opt)),
+                correctIndex: q.correctIndex,
+                ...(q.shuffleOptions ? { shuffleOptions: true } : {}),
+                ...(img ? { image: img } : {}) // embed base64 image directly
+            };
         }));
 
         const { indexHtml, styleCss, appJs } = await getTemplateSources();

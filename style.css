@@ -448,10 +448,51 @@ input:checked + .slider:before {
     color: var(--error-color);
 }
 
+.jump-btn {
+    position: relative;
+}
+
 .jump-btn.answered-neutral {
     border-color: var(--primary-color);
     background: var(--option-selected);
     color: var(--primary-color);
+}
+
+.jump-btn.flagged::after {
+    content: '★';
+    position: absolute;
+    top: -5px;
+    right: -3px;
+    font-size: 10px;
+    color: #f59e0b;
+    line-height: 1;
+}
+
+.flag-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.flag-btn:hover {
+    border-color: #f59e0b;
+    color: #d97706;
+}
+
+.flag-btn.starred {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: #f59e0b;
+    color: #d97706;
+    font-weight: 600;
 }
 
 /* ── Progress Bar ────────────────────────────────────────────────────────── */

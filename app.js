@@ -5,8 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let allMasterQuestions = [];
     let currentQuestionIndex = 0;
     let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
+    let userFlags = []; // boolean per question
     let isImmediateFeedback = false;
-    let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered'
+    let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered' | 'flagged'
     let isReviewMode = false; // true when reviewing from results screen
     let theme = localStorage.getItem('theme') || 'light';
 
@@ -25,7 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitBtn         = document.getElementById('submit-btn');
     const restartBtn        = document.getElementById('restart-btn');
     const retryIncorrectBtn = document.getElementById('retry-incorrect-btn');
+    const retryFlaggedBtn   = document.getElementById('retry-flagged-btn');
     const reviewBackBtn     = document.getElementById('review-back-btn');
+    const flagBtn           = document.getElementById('flag-btn');
+
+    const flaggedCountBadgeAction = document.getElementById('flagged-count-badge-action');
+    const flaggedCountBadgeFilter = document.getElementById('flagged-count-badge-filter');
 
     const questionCounter   = document.getElementById('question-counter');
     const questionText      = document.getElementById('question-text');
@@ -91,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveProgress() {
         localStorage.setItem(getStorageKey(), JSON.stringify({
             answers: userAnswers,
+            flags: userFlags,
             index: currentQuestionIndex
         }));
     }
@@ -224,6 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     startBtn.addEventListener('click', () => {
         clearProgress();
         userAnswers = new Array(questions.length).fill(null);
+        userFlags = new Array(questions.length).fill(false);
         currentQuestionIndex = 0;
         isReviewMode = false;
         switchScreen(setupScreen, quizScreen);
@@ -232,8 +240,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     resumeBtn.addEventListener('click', () => {
         const saved = loadProgress();
-        userAnswers = saved.answers;
-        currentQuestionIndex = saved.index;
+        userAnswers = (saved && saved.answers) ? saved.answers : new Array(questions.length).fill(null);
+        userFlags = (saved && saved.flags) ? saved.flags : new Array(questions.length).fill(false);
+        currentQuestionIndex = saved ? saved.index : 0;
         switchScreen(setupScreen, quizScreen);
         renderQuestion();
     });
@@ -244,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
             questions = [...allMasterQuestions];
         }
         userAnswers = new Array(questions.length).fill(null);
+        userFlags = new Array(questions.length).fill(false);
         currentQuestionIndex = 0;
         isReviewMode = false;
         reviewFilter = 'all';
@@ -260,6 +270,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
             questions = wrongOrUnanswered;
             userAnswers = new Array(questions.length).fill(null);
+            userFlags = new Array(questions.length).fill(false);
+            currentQuestionIndex = 0;
+            isReviewMode = false;
+            reviewFilter = 'all';
+            filterBtns.forEach(b => {
+                b.classList.toggle('active', b.dataset.filter === 'all');
+            });
+            clearProgress();
+            switchScreen(resultsScreen, quizScreen);
+            renderQuestion();
+        });
+    }
+
+    if (retryFlaggedBtn) {
+        retryFlaggedBtn.addEventListener('click', () => {
+            const flaggedList = questions.filter((q, i) => userFlags[i]);
+            if (!flaggedList.length) return;
+
+            questions = flaggedList;
+            userAnswers = new Array(questions.length).fill(null);
+            userFlags = new Array(questions.length).fill(true);
             currentQuestionIndex = 0;
             isReviewMode = false;
             reviewFilter = 'all';
@@ -325,6 +356,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     btn.classList.add('answered-neutral');
                 }
             }
+            if (userFlags[i]) {
+                btn.classList.add('flagged');
+            }
             if (i === currentQuestionIndex) {
                 btn.classList.add('current');
                 btn.setAttribute('aria-current', 'step');
@@ -345,6 +379,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         questionCounter.textContent = `שאלה ${currentQuestionIndex + 1} מתוך ${questions.length}`;
         questionText.textContent = q.question;
+
+        // Flag button state
+        if (flagBtn) {
+            const isFlagged = !!userFlags[currentQuestionIndex];
+            flagBtn.classList.toggle('starred', isFlagged);
+            const starSpan = flagBtn.querySelector('.flag-star');
+            const textSpan = flagBtn.querySelector('.flag-text');
+            if (starSpan) starSpan.textContent = isFlagged ? '★' : '☆';
+            if (textSpan) textSpan.textContent = isFlagged ? 'מסומנת' : 'סמן שאלה';
+        }
 
         // Image
         if (q.image) {
@@ -413,6 +457,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderJumpBar();
     }
 
+    if (flagBtn) {
+        flagBtn.addEventListener('click', () => {
+            userFlags[currentQuestionIndex] = !userFlags[currentQuestionIndex];
+            saveProgress();
+            renderQuestion();
+        });
+    }
+
     // ── Handle Option Select ──────────────────────────────────────────────────
     function handleOptionSelect(selectedId, btnElement, correctId) {
         const answered = userAnswers[currentQuestionIndex];
@@ -477,6 +529,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        const flaggedCount = userFlags.filter(Boolean).length;
+        if (retryFlaggedBtn) {
+            if (flaggedCount > 0) {
+                retryFlaggedBtn.classList.remove('hidden');
+                if (flaggedCountBadgeAction) flaggedCountBadgeAction.textContent = flaggedCount;
+            } else {
+                retryFlaggedBtn.classList.add('hidden');
+            }
+        }
+        if (flaggedCountBadgeFilter) flaggedCountBadgeFilter.textContent = flaggedCount;
+
         const circle = document.querySelector('.score-circle');
         const scoreEl = document.getElementById('final-score');
 
@@ -515,6 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Apply filter
             if (reviewFilter === 'wrong'      && (isCorrect || isUnanswered)) return;
             if (reviewFilter === 'unanswered' && !isUnanswered)                return;
+            if (reviewFilter === 'flagged'    && !userFlags[i])                return;
 
             const div = document.createElement('div');
             div.className = 'review-item';
