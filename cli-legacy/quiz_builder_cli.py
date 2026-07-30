@@ -45,7 +45,7 @@ try:
 except ImportError:
     pd = None
 
-# ANSI colors for terminal
+# ANSI colors for terminal UI
 C_RESET = "\033[0m"
 C_BOLD = "\033[1m"
 C_GREEN = "\033[32m"
@@ -53,6 +53,7 @@ C_YELLOW = "\033[33m"
 C_CYAN = "\033[36m"
 C_RED = "\033[31m"
 C_GRAY = "\033[90m"
+C_WHITE = "\033[97m"
 
 # Path setup: Resolve actual directory where the .exe or script is executed
 if getattr(sys, 'frozen', False):
@@ -95,16 +96,16 @@ def open_in_explorer(path):
         subprocess.Popen(['xdg-open', path])
 
 def print_header():
-    print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}  INTERACTIVE HEBREW QUIZ BUILDER (EXECUTABLE WIZARD){C_RESET}")
-    print(f"{C_GRAY}  Transform PDF Exams into Interactive Quizzes — 100% Offline Compatible{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-    print(f"  {C_YELLOW}[!] TIP: Move quiz_builder.exe to whichever folder you want your tests stored in.{C_RESET}")
-    print(f"  {C_GRAY}    Current Test Location: {TESTS_DIR}{C_RESET}\n")
+    print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+    print(f"{C_CYAN}│{C_RESET} {C_BOLD}{C_WHITE}         INTERACTIVE HEBREW QUIZ BUILDER (CLI EXECUTABLE)                 {C_RESET} {C_CYAN}│{C_RESET}")
+    print(f"{C_CYAN}│{C_RESET} {C_GRAY}  Transform PDF Exams & Spreadsheet Answer Keys into Interactive Quizzes  {C_RESET} {C_CYAN}│{C_RESET}")
+    print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
+    print(f"  {C_YELLOW}💡 TIP: Move quiz_builder.exe to any folder to manage your tests there.{C_RESET}")
+    print(f"  {C_GRAY}   Current Storage Location: {TESTS_DIR}{C_RESET}\n")
 
 def check_prerequisites():
-    print(f" {C_BOLD}[Step 1/6] Checking Prerequisites...{C_RESET}")
-    print(f" {C_GRAY}{'-' * 75}{C_RESET}")
+    print(f" {C_BOLD}[Step 1/6] System Environment Check{C_RESET}")
+    print(f" {C_GRAY}{'─' * 74}{C_RESET}")
     
     missing = []
     if fitz is None:
@@ -113,10 +114,10 @@ def check_prerequisites():
         missing.append("pandas")
         
     if missing:
-        print(f"  {C_YELLOW}[!] Notice: Optional Python libraries missing ({', '.join(missing)}).{C_RESET}")
+        print(f"  {C_YELLOW}[!] Notice: Optional libraries missing ({', '.join(missing)}).{C_RESET}")
         print(f"      PDF/Excel fallback scripts will run via system handlers if needed.\n")
     else:
-        print(f"  {C_GREEN}[OK]{C_RESET} Python Environment & Libraries (PyMuPDF, Pandas) are ready.\n")
+        print(f"  {C_GREEN}[✔] Python Core Environment & Libraries are ready.{C_RESET}\n")
 
 def format_size(size_bytes):
     if size_bytes < 1024:
@@ -144,7 +145,7 @@ def run_script(script_name, args):
             break
 
     if not script_path:
-        print(f"  {C_RED}[!] Error: Script {script_name} not found in bundle or disk.{C_RESET}")
+        print(f"  {C_RED}[✘] Error: Script {script_name} not found in bundle or disk.{C_RESET}")
         return 1
 
     old_argv = sys.argv
@@ -155,7 +156,7 @@ def run_script(script_name, args):
     except SystemExit as e:
         return e.code if isinstance(e.code, int) else 0
     except Exception as e:
-        print(f"  {C_RED}[!] Error executing {script_name}: {e}{C_RESET}")
+        print(f"  {C_RED}[✘] Error executing {script_name}: {e}{C_RESET}")
         return 1
     finally:
         sys.argv = old_argv
@@ -164,7 +165,7 @@ def start_local_server(port=8000):
     os.chdir(REPO_ROOT)
     handler = http.server.SimpleHTTPRequestHandler
     httpd = socketserver.TCPServer(("", port), handler)
-    print(f"\n  {C_GREEN}[OK] Local Web Server active at http://localhost:{port}/{C_RESET}")
+    print(f"\n  {C_GREEN}[✔] Local Web Server active at http://localhost:{port}/{C_RESET}")
     print(f"      Opening default browser...\n")
     
     def serve():
@@ -184,31 +185,37 @@ def interactive_wizard():
     os.makedirs(TESTS_DIR, exist_ok=True)
 
     while True:
-        print(f" {C_BOLD}[Step 2/6] Test Workspace Setup{C_RESET}")
-        print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
+        print(f" {C_BOLD}[Step 2/6] Test Workspaces{C_RESET}")
+        print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
 
         workspaces = [d for d in sorted(os.listdir(TESTS_DIR)) if os.path.isdir(os.path.join(TESTS_DIR, d))]
         has_ready = False
         
         if workspaces:
-            print("  Available Test Workspaces:")
+            print("  Available Workspaces:")
             for idx, w in enumerate(workspaces, 1):
-                q_path = os.path.join(TESTS_DIR, w, 'questions.json')
+                w_path = os.path.join(TESTS_DIR, w)
+                q_path = os.path.join(w_path, 'questions.json')
+                html_files = [f for f in os.listdir(w_path) if f.endswith('.html')]
+                
                 if os.path.exists(q_path):
                     has_ready = True
-                    print(f"    [{idx}] {w}  {C_GREEN}[OK READY - questions.json present]{C_RESET}")
+                    status_badge = f"{C_GREEN}[READY]{C_RESET}"
+                    extra_info = f" ({len(html_files)} HTML built)" if html_files else ""
                 else:
-                    print(f"    [{idx}] {w}  {C_YELLOW}[... PENDING - needs processing]{C_RESET}")
+                    status_badge = f"{C_YELLOW}[PENDING]{C_RESET}"
+                    extra_info = ""
+                print(f"    [{idx}] {w:<20} {status_badge}{extra_info}")
         else:
             print("    (No existing test folders found in tests/)")
 
-        print("\n  What would you like to do?")
+        print("\n  Actions:")
         if workspaces:
-            print(f"    [1-{len(workspaces)}] Select an existing test workspace above")
+            print(f"    [1-{len(workspaces)}] Select an existing test workspace")
         print("    [N] Create a NEW test workspace")
         if has_ready:
-            print("    [B] BUILD a standalone HTML quiz from a ready test")
-            print("    [S] START the local web server to browse tests")
+            print("    [B] Build standalone HTML quiz from ready test")
+            print("    [S] Start local web server to browse quizzes")
         print("    [Q] Quit\n")
 
         choice = input("   [?] Your choice: ").strip()
@@ -223,13 +230,13 @@ def interactive_wizard():
             input("   Press Enter to stop the web server and return to menu...")
             continue
         elif choice.lower() == 'n':
-            name = input("   [?] Test workspace name [Default: test_1]: ").strip()
+            name = input("   [?] Test workspace name (e.g. 9900, bio_101) [Default: test_1]: ").strip()
             if not name:
                 name = "test_1"
             name = name.replace(' ', '_')
             test_dir = os.path.join(TESTS_DIR, name)
             os.makedirs(test_dir, exist_ok=True)
-            print(f"\n  {C_GREEN}[OK] Workspace directory created: {test_dir}{C_RESET}\n")
+            print(f"\n  {C_GREEN}[✔] Workspace directory created: {test_dir}{C_RESET}\n")
             process_workspace(name, test_dir)
         elif choice.lower() == 'b':
             if not workspaces:
@@ -357,10 +364,10 @@ def cleanup_workspace_folder(test_dir):
             except Exception:
                 pass
         else:
-            print(f"  {C_GRAY}[i] Preserved {kept_pages} page image(s) with diagrams/tables in pages_output/{C_RESET}")
+            print(f"  {C_GRAY}[i] Preserved {kept_pages} diagram/table image(s) in pages_output/{C_RESET}")
 
     if cleaned > 0 or deleted_pages > 0:
-        print(f"  {C_GRAY}[i] Cleanup complete: Removed {cleaned} scratch file(s) and {deleted_pages} unused page render(s).{C_RESET}")
+        print(f"  {C_GRAY}[i] Workspace Cleanup: Removed {cleaned} scratch file(s) and {deleted_pages} unused page render(s).{C_RESET}")
 
 def process_workspace(test_name, test_dir):
     # Step 3: Check for source files & launch Explorer
@@ -368,35 +375,33 @@ def process_workspace(test_name, test_dir):
     csv_files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
 
     if not pdf_files:
-        print(f"\n{C_YELLOW}{C_BOLD}{'=' * 75}{C_RESET}")
-        print(f"{C_YELLOW}{C_BOLD}                     ACTION REQUIRED: PLACE EXAM FILES{C_RESET}")
-        print(f"{C_YELLOW}{C_BOLD}{'=' * 75}{C_RESET}\n")
-        print(f"  Please place your exam source files into: {C_BOLD}{test_dir}{C_RESET}")
-        print("  Opening workspace folder in Explorer...\n")
+        print(f"\n{C_YELLOW}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+        print(f"{C_YELLOW}│                   ACTION REQUIRED: PLACE EXAM FILES                      │{C_RESET}")
+        print(f"{C_YELLOW}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
+        print(f"  Please place your exam source files into workspace:")
+        print(f"  📁 {C_BOLD}{test_dir}{C_RESET}\n")
         print("  Required files:")
         print("    1. exam.pdf    - Your exam PDF file")
         print("    2. answers.csv - Answer key (CSV or Excel .xlsx / .xls) [Optional]\n")
-        print("  Press Enter after copying your files to continue.")
-        print(f"{C_YELLOW}{C_BOLD}{'=' * 75}{C_RESET}\n")
-
+        print("  Opening workspace folder in Explorer...")
         open_in_explorer(test_dir)
-        input()
+        input("  Press Enter after copying your files into the workspace folder...")
 
         pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
         csv_files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
 
     if pdf_files:
-        print(f"  {C_GREEN}[OK] PDF File Found: {pdf_files[0]}{C_RESET}")
+        print(f"  {C_GREEN}[✔] PDF File Found: {pdf_files[0]}{C_RESET}")
     else:
         print(f"  {C_YELLOW}[!] WARNING: No PDF file found in {test_dir}{C_RESET}")
 
     if csv_files:
-        print(f"  {C_GREEN}[OK] Answer Key Found: {csv_files[0]}{C_RESET}")
+        print(f"  {C_GREEN}[✔] Answer Key Found: {csv_files[0]}{C_RESET}")
     else:
         print(f"  {C_CYAN}[i] NOTE: No answer key spreadsheet found.{C_RESET}")
 
-    print(f"\n {C_BOLD}[Step 4/6] Document Pre-processing & Analysis{C_RESET}")
-    print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
+    print(f"\n {C_BOLD}[Step 4/6] Document Pre-processing & Format Analysis{C_RESET}")
+    print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
 
     # PDF Type Detection
     is_digital = False
@@ -409,36 +414,36 @@ def process_workspace(test_name, test_dir):
     # Answer Key Form Setup
     form_number = "1"
     if csv_files:
-        print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-        print(f"{C_CYAN}{C_BOLD}   [2/2] ANSWER KEY FORM SETUP{C_RESET}")
+        print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+        print(f"{C_CYAN}│ [2/2] ANSWER KEY FORM SETUP                                              │{C_RESET}")
+        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
         print("   Enter the Form Number corresponding to this answer key.")
-        print("   (e.g., 111, 32, 76, 1, 0). Refer to your PDF title page if unsure.")
-        print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+        print("   (e.g., 111, 32, 76, 1, 0). Refer to your PDF title page if unsure.\n")
         fn_input = input("   [?] Form Number [Default: 1]: ").strip()
         if fn_input:
             form_number = fn_input
-        print(f"\n  {C_CYAN}[i] Extracting answers for Form {form_number}...{C_RESET}")
+        print(f"\n  {C_CYAN}[i] Extracting answer key for Form {form_number}...{C_RESET}")
         ans_file = os.path.join(test_dir, csv_files[0])
         out_ans = os.path.join(test_dir, 'answers.json')
         run_script('4_extract_csv_answers.py', [ans_file, form_number, '-o', out_ans])
     else:
-        print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-        print(f"{C_CYAN}{C_BOLD}   [2/2] FORM NUMBER SETUP (No answer spreadsheet found){C_RESET}")
+        print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+        print(f"{C_CYAN}│ [2/2] FORM NUMBER SETUP (No answer spreadsheet found)                   │{C_RESET}")
+        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
         print("   Is this Form 0 (Master Exam where option 1/א is always the answer)?")
-        print("   - Enter '0' to auto-generate Form Zero answer key")
-        print("   - Enter Form Number (e.g., 111, 32, 1) if adding answers manually later")
-        print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+        print("   • Enter '0' to auto-generate Form Zero answer key")
+        print("   • Enter Form Number (e.g., 111, 32, 1) if adding answers manually later\n")
         fn_input = input("   [?] Form Number [Default: 0 for Form Zero]: ").strip()
         if not fn_input:
             form_number = "0"
         else:
             form_number = fn_input
         if form_number == "0":
-            print(f"\n  {C_GREEN}[OK] Form 0 selected! Auto-generating baseline answer key...{C_RESET}")
+            print(f"\n  {C_GREEN}[✔] Form 0 selected! Auto-generating baseline answer key...{C_RESET}")
             out_ans = os.path.join(test_dir, 'answers.json')
             run_script('4_extract_csv_answers.py', ['none', '0', '-o', out_ans])
 
-    skip_step3 = input("\n   [?] Press Enter to run page rendering/text extraction, or 's' to skip: ").strip().lower()
+    skip_step3 = input("\n   [?] Press Enter to run page rendering & text extraction, or 's' to skip: ").strip().lower()
     if skip_step3 != 's' and pdf_files:
         pdf_path = os.path.join(test_dir, pdf_files[0])
         print("\n  Page Cleaning Options:")
@@ -459,7 +464,7 @@ def process_workspace(test_name, test_dir):
         open_in_explorer(out_pages)
 
         if is_digital:
-            print(f"  {C_GREEN}[OK] DIGITAL PDF DETECTED: Extracting text automatically...{C_RESET}")
+            print(f"  {C_GREEN}[✔] DIGITAL PDF DETECTED: Extracting text automatically...{C_RESET}")
             raw_md = os.path.join(test_dir, 'raw_text.md')
             img_dir = os.path.join(test_dir, 'images')
             page_map = os.path.join(test_dir, 'page_map.json')
@@ -473,7 +478,7 @@ def process_workspace(test_name, test_dir):
 
     # Step 5: AI Agent & Prompt Assistant
     print(f"\n {C_BOLD}[Step 5/6] AI Agent Question Extraction & Proofreading{C_RESET}")
-    print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
+    print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
 
     q_exists = os.path.exists(os.path.join(test_dir, 'questions.json'))
     if q_exists:
@@ -484,20 +489,7 @@ def process_workspace(test_name, test_dir):
             print(f"  {C_CYAN}[i] Skipping AI proofreading pass. Proceeding to post-processing...{C_RESET}")
             q_final = os.path.join(test_dir, 'questions.json')
             # Jump directly to Step 6
-            print(f"\n {C_BOLD}[Step 6/6] Automated Post-Processing & Validation{C_RESET}")
-            print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
-            if os.path.exists(q_final):
-                print(f"  {C_CYAN}[i] Merging answer key into questions.json...{C_RESET}")
-                run_script('6_merge_json_answers.py', [test_dir])
-                print(f"\n  {C_CYAN}[i] Running QA schema validation...{C_RESET}")
-                run_script('7_check_json.py', [q_final])
-                print(f"\n  {C_CYAN}[i] Updating test manifest...{C_RESET}")
-                run_script('8_generate_manifest.py', [])
-                cleanup_workspace_folder(test_dir)
-                print(f"\n  {C_GREEN}[OK] All processing steps finished!{C_RESET}\n")
-                build_opt = input("   [?] Build standalone HTML quiz now? (Y/n) [Default: Y]: ").strip().lower()
-                if build_opt != 'n':
-                    run_script('9_build_single_html.py', [test_dir])
+            run_step6(test_name, test_dir, q_final)
             return
         else:
             print(f"\n  {C_CYAN}[i] Preparing AI proofreading prompt...{C_RESET}")
@@ -516,28 +508,27 @@ def process_workspace(test_name, test_dir):
             break
 
     if agent_found:
-        print(f"  {C_GREEN}[OK] Detected CLI Agent: {agent_found}{C_RESET}")
+        print(f"  {C_GREEN}[✔] Detected CLI Agent: {agent_found}{C_RESET}")
         use_ag = input(f"   [?] Launch {agent_found} automatically? (Y/n) [Default: Y]: ").strip().lower()
         if use_ag != 'n':
             # Generate local prompt on demand
             run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
             if os.path.isfile(local_prompt_path):
-                print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-                print(f"{C_CYAN}{C_BOLD}            LAUNCHING AGENT: {agent_found}{C_RESET}")
-                print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+                print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+                print(f"{C_CYAN}│ LAUNCHING LOCAL AGENT: {agent_found:<49} │{C_RESET}")
+                print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
                 print("   1. Opening agent in a new terminal window with prompt piped.")
                 print("   2. The agent will output/update questions.json automatically.")
-                print("   3. Once finished, return here and press Enter to continue.")
-                print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
+                print("   3. Once finished, return here and press Enter to continue.\n")
                 if sys.platform == 'win32':
                     cmd_str = f'type "{local_prompt_path}" | {agent_found}'
                     subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', cmd_str], shell=True)
                 input("   Press Enter after the AI agent completes...")
 
     mode_title = "PROOFREADING ASSISTANT" if q_exists else "EXTRACTION ASSISTANT"
-    print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}                 AI {mode_title}{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
+    print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+    print(f"{C_CYAN}│ AI {mode_title:<69} │{C_RESET}")
+    print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
     print("  Select a prompt helper option:")
     print("    [1] LOCAL AGENT (agy, gemini, claude, Cursor, Antigravity, VS Code)")
     print("        Generates prompt_local_agent.txt on demand.")
@@ -549,7 +540,7 @@ def process_workspace(test_name, test_dir):
     p_choice = input("   [?] Your choice (1/2/3/S) [Default: 1]: ").strip().lower()
     if p_choice == '2':
         run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'web'])
-        print(f"\n  {C_GREEN}[OK] Created {web_prompt_path}{C_RESET}")
+        print(f"\n  {C_GREEN}[✔] Created {web_prompt_path}{C_RESET}")
         print("  Open a Web AI assistant in browser?")
         print("    [1] ChatGPT (chatgpt.com)")
         print("    [2] Gemini Web (gemini.google.com)")
@@ -571,12 +562,12 @@ def process_workspace(test_name, test_dir):
                 print(f"\n{C_GRAY}--- WEB PROMPT ---{C_RESET}\n{f.read()}\n")
     elif p_choice != 's':
         run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
-        print(f"\n  {C_GREEN}[OK] Created {local_prompt_path}{C_RESET}")
+        print(f"\n  {C_GREEN}[✔] Created {local_prompt_path}{C_RESET}")
 
     if p_choice != 's':
-        print(f"\n{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
-        print(f"{C_CYAN}{C_BOLD}          NEXT STEPS: QUESTION EXTRACTION / PROOFREADING{C_RESET}")
-        print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}")
+        print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+        print(f"{C_CYAN}│          NEXT STEPS: QUESTION EXTRACTION / PROOFREADING                  │{C_RESET}")
+        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
         print("   1. Open the generated prompt file:")
         print(f"      • Local: {local_prompt_path}")
         print(f"      • Web:   {web_prompt_path}")
@@ -585,7 +576,7 @@ def process_workspace(test_name, test_dir):
         print(f"   4. Save the AI's returned JSON array as 'questions.json' into:")
         print(f"      📁 {test_dir}")
         print("   5. Once 'questions.json' is ready, return here and press Enter.")
-        print(f"{C_CYAN}{C_BOLD}{'=' * 75}{C_RESET}\n")
+        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
         input("   [?] Press Enter when questions.json is ready in test folder...")
 
     # Check for candidate JSON files
@@ -600,8 +591,11 @@ def process_workspace(test_name, test_dir):
                 break
 
     # Step 6: Post-processing & Validation
+    run_step6(test_name, test_dir, q_final)
+
+def run_step6(test_name, test_dir, q_final):
     print(f"\n {C_BOLD}[Step 6/6] Automated Post-Processing & Validation{C_RESET}")
-    print(f" {C_GRAY}{'-' * 75}{C_RESET}\n")
+    print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
 
     if os.path.exists(q_final):
         print(f"  {C_CYAN}[i] Merging answer key into questions.json...{C_RESET}")
@@ -616,10 +610,35 @@ def process_workspace(test_name, test_dir):
         # Clean up intermediate scratch files
         cleanup_workspace_folder(test_dir)
 
-        print(f"\n  {C_GREEN}[OK] All processing steps finished!{C_RESET}\n")
+        print(f"\n  {C_GREEN}[✔] All post-processing steps completed successfully!{C_RESET}\n")
         build_opt = input("   [?] Build standalone HTML quiz now? (Y/n) [Default: Y]: ").strip().lower()
         if build_opt != 'n':
             run_script('9_build_single_html.py', [test_dir])
+            
+            # Find generated HTML file
+            html_files = [f for f in os.listdir(test_dir) if f.endswith('.html')]
+            html_name = html_files[0] if html_files else f"{test_name}_interactive_quiz.html"
+            html_path = os.path.join(test_dir, html_name)
+
+            print(f"\n{C_GREEN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+            print(f"{C_GREEN}│                       🎉 QUIZ BUILD COMPLETE!                           │{C_RESET}")
+            print(f"{C_GREEN}├──────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+            print(f"{C_GREEN}│{C_RESET}  📄 Quiz File: {html_name:<57} {C_GREEN}│{C_RESET}")
+            print(f"{C_GREEN}│{C_RESET}  📁 Folder:    {test_dir:<57} {C_GREEN}│{C_RESET}")
+            print(f"{C_GREEN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
+            print("  Options:")
+            print("    [1] Open HTML quiz in default Web Browser")
+            print("    [2] Open test workspace folder in Explorer")
+            print("    [M] Return to Main Menu\n")
+
+            post_choice = input("   [?] Your choice (1/2/M) [Default: 1]: ").strip().lower()
+            if post_choice == '2':
+                open_in_explorer(test_dir)
+            elif post_choice != 'm':
+                if os.path.exists(html_path):
+                    webbrowser.open(html_path)
+                else:
+                    open_in_explorer(test_dir)
     else:
         print(f"  {C_YELLOW}[!] questions.json not found in {test_dir}. Place questions.json to complete building.{C_RESET}\n")
 
