@@ -21,23 +21,39 @@ import sys
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Resolve paths relative to the repo root (parent of python_scripts/)
+# Resolve paths relative to the repo root & PyInstaller _MEIPASS
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(SCRIPT_DIR)
-WEB_DIR = os.path.join(REPO_ROOT, 'web')
+CLI_LEGACY_DIR = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) == 'python_scripts' else SCRIPT_DIR
 
+def resolve_web_asset(filename):
+    """Find template assets (index.html, style.css, app.js) strictly inside cli-legacy/web/."""
+    frozen_base = getattr(sys, '_MEIPASS', None)
+    candidates = []
+    if frozen_base:
+        candidates.extend([
+            os.path.join(frozen_base, 'cli-legacy', 'web', filename),
+            os.path.join(frozen_base, 'web', filename),
+            os.path.join(frozen_base, filename),
+        ])
+    candidates.extend([
+        os.path.join(CLI_LEGACY_DIR, 'web', filename),
+        os.path.join(SCRIPT_DIR, filename),
+    ])
+
+    for cand in candidates:
+        if os.path.isfile(cand):
+            return cand
+    raise FileNotFoundError(f"Template asset '{filename}' not found in bundle or disk.")
 
 def read_file(path, encoding='utf-8'):
     """Read and return file contents as a string."""
     with open(path, 'r', encoding=encoding) as f:
         return f.read()
 
-
 def read_binary(path):
     """Read and return file contents as bytes."""
     with open(path, 'rb') as f:
         return f.read()
-
 
 def image_to_data_uri(image_path):
     """Convert an image file to a base64 data URI."""
@@ -47,7 +63,6 @@ def image_to_data_uri(image_path):
     data = read_binary(image_path)
     b64 = base64.b64encode(data).decode('ascii')
     return f"data:{mime_type};base64,{b64}"
-
 
 def process_questions(questions, test_dir, embed_images=True):
     """
@@ -69,7 +84,7 @@ def process_questions(questions, test_dir, embed_images=True):
                     total_img_bytes += os.path.getsize(abs_path)
                     q[field] = image_to_data_uri(abs_path)
                 else:
-                    print(f"  Warning: image not found: {abs_path}")
+                    print(f"  Warning: image file not found: {abs_path}")
             else:
                 # Strip image fields when --no-images is used
                 q[field] = None
@@ -82,14 +97,13 @@ def process_questions(questions, test_dir, embed_images=True):
 
     return questions, total_img_bytes
 
-
 def build_html(test_dir, embed_images=True, title=None):
     """Build a self-contained HTML string from the web app + test data."""
 
     # ── Read source files ──────────────────────────────────────────────────
-    html_path = os.path.join(WEB_DIR, 'index.html')
-    css_path = os.path.join(WEB_DIR, 'style.css')
-    js_path = os.path.join(WEB_DIR, 'app.js')
+    html_path = resolve_web_asset('index.html')
+    css_path = resolve_web_asset('style.css')
+    js_path = resolve_web_asset('app.js')
     questions_path = os.path.join(test_dir, 'questions.json')
 
     if not os.path.isfile(questions_path):
@@ -111,7 +125,6 @@ def build_html(test_dir, embed_images=True, title=None):
 
     # ── Update title if provided ───────────────────────────────────────────
     if title:
-        # Strip any </title> sequences that would break the HTML structure
         safe_title = title.replace('</title>', '').replace('</TITLE>', '')
         html = re.sub(
             r'<title>.*?</title>',
@@ -126,12 +139,18 @@ def build_html(test_dir, embed_images=True, title=None):
         html
     )
 
-    # ── Inline Cropper.js CSS and JS for offline use ─────────────────────
-    cropper_css_path = os.path.join(WEB_DIR, 'cropper.min.css')
-    cropper_js_path = os.path.join(WEB_DIR, 'cropper.min.js')
+    # ── Inline Cropper.js CSS and JS if available for offline use ─────────
+    try:
+        cropper_css_path = resolve_web_asset('cropper.min.css')
+        cropper_css = read_file(cropper_css_path)
+    except FileNotFoundError:
+        cropper_css = ''
 
-    cropper_css = read_file(cropper_css_path) if os.path.isfile(cropper_css_path) else ''
-    cropper_js = read_file(cropper_js_path) if os.path.isfile(cropper_js_path) else ''
+    try:
+        cropper_js_path = resolve_web_asset('cropper.min.js')
+        cropper_js = read_file(cropper_js_path)
+    except FileNotFoundError:
+        cropper_js = ''
 
     if cropper_css:
         html = re.sub(
@@ -148,35 +167,24 @@ def build_html(test_dir, embed_images=True, title=None):
 
     # ── Inline JS: replace <script src="app.js"></script> ──────────────────
     html = re.sub(
-        r'<script\s+src="app\.js">\s*</script>',
+        r'<script\s+[^>]*src=["\']\.?/?app\.js["\'][^>]*>\s*</script>',
         lambda _: f'{embedded_script}\n<script>\n{js}\n</script>',
         html
     )
 
-    # ── Remove menu screen elements (single-test file) ─────────────────────
-    # Hide menu screen and error back-to-menu via CSS
-    single_test_css = "<style>#menu-screen, #back-to-menu-btn { display: none !important; }</style>"
-    html = html.replace('</head>', f'{single_test_css}\n</head>')
-
-    # ── Make the setup screen active by default ────────────────────────────
-    # The original HTML has setup-screen as active, which is correct
-
     return html, len(questions), img_bytes
-
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build a single self-contained HTML quiz file. "
-                    "Double-click to open — no server needed."
+        description="Build a single self-contained HTML quiz file from a test directory."
     )
     parser.add_argument(
         'test_dir',
-        help="Path to the test directory containing questions.json "
-             "(e.g. tests/2019_a)"
+        help="Path to the test directory containing questions.json"
     )
     parser.add_argument(
         '-o', '--output', default=None,
-        help="Output HTML file path (default: <test_name>_quiz.html)"
+        help="Output HTML file path (default: <test_dir>/<test_name>_interactive_quiz.html)"
     )
     parser.add_argument(
         '--no-images', action='store_true',
@@ -194,12 +202,11 @@ def main():
         print(f"Error: test directory not found: {test_dir}")
         return 1
 
-    # Derive output filename from test directory name
+    # Derive output filename inside test directory
     test_name = os.path.basename(os.path.normpath(test_dir))
-    output_path = args.output or f"{test_name}_quiz.html"
+    output_path = args.output or os.path.join(test_dir, f"{test_name}_interactive_quiz.html")
 
     print(f"Building single-file quiz from: {test_dir}")
-    print(f"  Embedding images: {'No' if args.no_images else 'Yes'}")
 
     try:
         html, q_count, img_bytes = build_html(
@@ -216,7 +223,7 @@ def main():
 
     file_size = os.path.getsize(output_path)
     size_str = format_size(file_size)
-    img_str = format_size(img_bytes) if img_bytes else "0 B"
+    img_str = format_size(img_bytes) if img_bytes else "None (0 images referenced in questions)"
 
     print(f"\n✓ Built successfully: {output_path}")
     print(f"  Questions: {q_count}")
@@ -226,7 +233,6 @@ def main():
 
     return 0
 
-
 def format_size(size_bytes):
     """Format bytes into a human-readable string."""
     if size_bytes < 1024:
@@ -235,7 +241,6 @@ def format_size(size_bytes):
         return f"{size_bytes / 1024:.1f} KB"
     else:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
-
 
 if __name__ == '__main__':
     raise SystemExit(main())

@@ -236,6 +236,40 @@
     </div>
   </div>
 
+  <!-- PRACTICE MODE SELECTION MODAL -->
+  <div id="practice-mode-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>בחירת מצב תרגול</h3>
+        <button id="close-practice-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <p class="modal-subtitle">כיצד תרצה לתרגל את השאלות שנבחרו?</p>
+      <div class="practice-mode-options">
+        <button id="mode-flashcards-btn" class="practice-option-card">
+          <div class="option-icon">📇</div>
+          <div class="option-text">
+            <strong>כרטיסיות תלת-ממדיות (3D Flashcards)</strong>
+            <span>למידה אינטראקטיבית עם הפיכת כרטיסיה לצפייה בתשובה והסבר</span>
+          </div>
+        </button>
+        <button id="mode-quiz-immediate-btn" class="practice-option-card">
+          <div class="option-icon">⚡</div>
+          <div class="option-text">
+            <strong>תרגול כמבחן רגיל - עם משוב מיידי</strong>
+            <span>פתרון שאלות כמבחן רגיל עם גילוי התשובה הנכונה מיד לאחר כל שאלה</span>
+          </div>
+        </button>
+        <button id="mode-quiz-standard-btn" class="practice-option-card">
+          <div class="option-icon">📝</div>
+          <div class="option-text">
+            <strong>תרגול כמבחן רגיל - ללא משוב</strong>
+            <span>סימון תשובות ללא גילוי מיידי, בדיקת ציון ומשוב רק בסיום המבחן</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
