@@ -1,36 +1,28 @@
 # 📝 Interactive Hebrew Quiz Generator & Player
 
-> **Try it live:** [elonuziel.github.io/interactive-test-creator/quiz_generator.html](https://elonuziel.github.io/interactive-test-creator/quiz_generator.html)
+> **Try it live:** [elonuziel.github.io/interactive-test-creator](https://elonuziel.github.io/interactive-test-creator/)
 
 Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading digital quizzes right in your browser — zero backend required. Upload a PDF, extract questions with Gemini OCR, attach an answer key, proofread side-by-side, and export a standalone, portable HTML quiz file.
 
 ---
 
-## 🎯 Quiz Generator (`quiz_generator.html`)
+## 🎯 Quiz Generator (`index.html`)
 
-**`quiz_generator.html`** + **`generator.js`** — the builder UI.
+**`index.html`** + **`generator.js`** — the main builder & creator UI (GitHub Pages root landing page).
 
 ### Workflow
-1. **Upload PDF**: Select a digital or scanned exam PDF.
+1. **Upload PDF or questions.json**: Select a digital/scanned exam PDF, or upload a `questions.json` file.
 2. **Attach Answer Key** *(Optional)*: Upload a CSV, XLS, or XLSX answer key and select your form number.
-3. **Configure Gemini OCR**: Enter a free API key from [Google AI Studio](https://aistudio.google.com/apikey) or a Cloud API key.
-4. **Run Analysis**: Click **הפעל ניתוח** to automatically extract questions, options, and diagrams.
+3. **Clean PDF & Select Pages**: Discard blank or cover pages using standard presets ("ניקוי סטנדרטי", "הסר ריקים") and download a clean PDF.
+4. **Configure Gemini OCR or External LLM**: Use a free Gemini API key, or copy the extraction prompt to ChatGPT/Claude.
 5. **Edit & Proofread**: Adjust text, options, answer keys, or compare side-by-side with original PDF page snapshots in **Proof Mode**.
 6. **Export & Take**: Click **הורד מבחן עצמאי** to download a single-file HTML quiz, or **פתור מבחן כעת** to start immediately.
 
-### Key Generator Features
-- **OCR Engines**: Gemini Page Chunking (optimized for Hebrew layout) & Gemini Native PDF.
-- **Answer Key Matching**: Parses CSV, XLS, and XLSX files, matching question keys automatically by form number.
-- **Proof Mode**: Visual side-by-side comparison of original PDF pages against generated question cards.
-- **Image Detection**: Auto-detects charts, diagrams, tables, and attaches page images for built-in cropping.
-- **Re-edit Quiz HTML**: Upload previously exported quiz HTML files to resume editing.
-- **File Management**: Independent file clear buttons to change inputs without page refreshes.
-
 ---
 
-## 📝 Quiz Taker (`index.html`)
+## 📝 Quiz Taker (`quiz_player.html`)
 
-**`index.html`** + **`app.js`** + **`style.css`** — The standalone, RTL-native quiz player.
+**`quiz_player.html`** + **`app.js`** + **`style.css`** — The standalone, RTL-native quiz player.
 
 ### Player Features
 - **Native RTL Hebrew**: Purpose-built right-to-left UI with modern Rubik typography.
@@ -52,10 +44,10 @@ Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading di
 
 ```
 interactive-test-creator/
-├── index.html            # Quiz Player Shell (GitHub Pages Root)
-├── app.js                # Quiz Engine & Navigation
-├── quiz_generator.html   # Web Quiz Builder Interface
+├── index.html            # Web Quiz Builder Interface (GitHub Pages Root)
 ├── generator.js          # OCR, Gemini API, & PDF Parser Engine
+├── quiz_player.html      # Standalone Quiz Player Shell
+├── app.js                # Quiz Engine & Navigation
 ├── style.css             # Unified RTL & Theme System
 ├── favicon.svg           # Application SVG Favicon
 ├── vendor/               # Third-party dependencies (PDF.js)

@@ -1295,7 +1295,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const [indexHtml, styleCss, appJs] = await Promise.all([
-                fetch('index.html').then((response) => {
+                fetch('quiz_player.html').then((response) => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     return response.text();
                 }),
@@ -1315,7 +1315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.location.protocol === 'file:') {
                 throw new Error('לא ניתן ליצור קובץ מבחן בעת הרצה ישירה מקובץ מקומי (file://). דפדפנים חוסמים טעינת תבניות מסיבות אבטחה. הפעל שרת מקומי (כגון Live Server או npx serve) ונסה שוב.');
             }
-            throw new Error(`טעינת תבניות המבחן נכשלה (${err.message}). ודא שהקבצים index.html, style.css, app.js קיימים בתיקייה.`);
+            throw new Error(`טעינת תבניות המבחן נכשלה (${err.message}). ודא שהקבצים quiz_player.html, style.css, app.js קיימים בתיקייה.`);
         }
     }
 

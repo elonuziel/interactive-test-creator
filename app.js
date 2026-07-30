@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (welcomeCard) {
                 const errDiv = document.createElement('div');
                 errDiv.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:.75rem;background:var(--error-bg);color:var(--error-color);border:1px solid var(--error-color);font-size:.9rem;';
-                errDiv.innerHTML = '⚠️ לא נמצא קובץ שאלות. פתח מבחן שהורד מ<a href="quiz_generator.html" style="color:inherit;text-decoration:underline;">יוצר המבחן</a> ישירות, או השתמש בכפתור "פתור מבחן כעת".';
+                errDiv.innerHTML = '⚠️ לא נמצא קובץ שאלות. פתח מבחן שהורד מ<a href="index.html" style="color:inherit;text-decoration:underline;">יוצר המבחן</a> ישירות, או השתמש בכפתור "פתור מבחן כעת".';
                 welcomeCard.appendChild(errDiv);
             }
             startBtn.disabled = true;
