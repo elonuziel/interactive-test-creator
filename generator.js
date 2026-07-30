@@ -44,6 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
         pdfTypeNote: document.getElementById('pdf-type-note'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
+        downloadJson: document.getElementById('download-json'),
+        copyJson: document.getElementById('copy-json'),
+        downloadJsonBox: document.getElementById('download-json-box'),
+        copyJsonBox: document.getElementById('copy-json-box'),
+        jsonOutput: document.getElementById('json-output'),
         takeQuiz: document.getElementById('take-quiz'),
         status: document.getElementById('status'),
         preview: document.getElementById('preview'),
@@ -83,6 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function disableOutputActions(disabled) {
         elements.downloadQuiz.disabled = disabled;
+        if (elements.downloadJson) elements.downloadJson.disabled = disabled;
+        if (elements.copyJson) elements.copyJson.disabled = disabled;
+        if (elements.downloadJsonBox) elements.downloadJsonBox.disabled = disabled;
+        if (elements.copyJsonBox) elements.copyJsonBox.disabled = disabled;
         elements.takeQuiz.disabled = disabled;
     }
 
@@ -1272,6 +1281,36 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPreview();
         });
         elements.preview.appendChild(addQBtn);
+
+        updateJsonOutput();
+    }
+
+    function updateJsonOutput() {
+        if (!elements.jsonOutput) return;
+        if (!state.questions || !state.questions.length) {
+            elements.jsonOutput.value = '';
+            if (elements.downloadJson) elements.downloadJson.disabled = true;
+            if (elements.copyJson) elements.copyJson.disabled = true;
+            if (elements.downloadJsonBox) elements.downloadJsonBox.disabled = true;
+            if (elements.copyJsonBox) elements.copyJsonBox.disabled = true;
+            return;
+        }
+
+        const cleanedQuestions = state.questions.map((q) => ({
+            question: normalizeWhitespace(q.question),
+            options: (q.options || []).map((opt) => normalizeWhitespace(opt)),
+            correctIndex: q.correctIndex !== undefined ? q.correctIndex : null,
+            ...(q.pageImage ? { pageImage: q.pageImage } : {}),
+            ...(q.image ? { image: q.image } : {})
+        }));
+
+        const jsonStr = JSON.stringify(cleanedQuestions, null, 2);
+        elements.jsonOutput.value = jsonStr;
+
+        if (elements.downloadJson) elements.downloadJson.disabled = false;
+        if (elements.copyJson) elements.copyJson.disabled = false;
+        if (elements.downloadJsonBox) elements.downloadJsonBox.disabled = false;
+        if (elements.copyJsonBox) elements.copyJsonBox.disabled = false;
     }
 
     async function getTemplateSources() {
@@ -1489,6 +1528,51 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatus(error.message || 'נכשלה יצירת קובץ HTML.', true);
         }
     });
+
+    function getFormattedJsonString() {
+        if (!state.questions || !state.questions.length) return '';
+        const cleanedQuestions = state.questions.map((q) => ({
+            question: normalizeWhitespace(q.question),
+            options: (q.options || []).map((opt) => normalizeWhitespace(opt)),
+            correctIndex: q.correctIndex !== undefined ? q.correctIndex : null,
+            ...(q.pageImage ? { pageImage: q.pageImage } : {}),
+            ...(q.image ? { image: q.image } : {})
+        }));
+        return JSON.stringify(cleanedQuestions, null, 2);
+    }
+
+    function handleDownloadJson() {
+        try {
+            const jsonStr = getFormattedJsonString();
+            if (!jsonStr) return;
+            const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'questions.json';
+            anchor.click();
+            URL.revokeObjectURL(url);
+            setStatus('הורדת קובץ questions.json החלה.');
+        } catch (error) {
+            setStatus(error.message || 'נכשלה הורדת קובץ JSON.', true);
+        }
+    }
+
+    async function handleCopyJson() {
+        try {
+            const jsonStr = getFormattedJsonString();
+            if (!jsonStr) return;
+            await navigator.clipboard.writeText(jsonStr);
+            setStatus('קוד ה-JSON הועתק בהצלחה ללוח!');
+        } catch (error) {
+            setStatus('שגיאה בהעתקת קוד ה-JSON ללוח.', true);
+        }
+    }
+
+    if (elements.downloadJson) elements.downloadJson.addEventListener('click', handleDownloadJson);
+    if (elements.downloadJsonBox) elements.downloadJsonBox.addEventListener('click', handleDownloadJson);
+    if (elements.copyJson) elements.copyJson.addEventListener('click', handleCopyJson);
+    if (elements.copyJsonBox) elements.copyJsonBox.addEventListener('click', handleCopyJson);
 
     elements.takeQuiz.addEventListener('click', async () => {
         try {
