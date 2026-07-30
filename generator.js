@@ -1199,45 +1199,75 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function extractAnswersForForm(rows, formNumber) {
+        if (!rows || !rows.length) return new Map();
+
+        const cleanTarget = String(formNumber || '').trim().toLowerCase();
         let headers = null;
         let selectedRow = null;
 
         for (const row of rows) {
-            if (!row.length) continue;
-            if ((row[0] || '').includes('שאלון')) {
+            if (!row || !row.length) continue;
+            const firstCell = String(row[0] || '').trim().toLowerCase();
+            if (firstCell.includes('שאלון') || firstCell.includes('form')) {
                 headers = row;
                 continue;
             }
-            if (headers && (row[0] || '').trim() === formNumber.trim()) {
+            if (cleanTarget && (firstCell === cleanTarget || firstCell.includes(cleanTarget))) {
                 selectedRow = row;
                 break;
             }
         }
 
-        if (!headers || !selectedRow) {
+        if (!selectedRow && cleanTarget) {
+            for (const row of rows) {
+                if (row.some(cell => String(cell || '').trim().toLowerCase() === cleanTarget)) {
+                    selectedRow = row;
+                    break;
+                }
+            }
+        }
+
+        if (!selectedRow && rows.length > 1 && !cleanTarget) {
+            selectedRow = rows[1];
+        }
+
+        if (!selectedRow) {
             throw new Error(`לא נמצאה שורת שאלון ${formNumber} בקובץ התשובות.`);
         }
 
         const answers = new Map();
 
-        for (let i = 0; i < headers.length; i++) {
-            const header = (headers[i] || '').trim();
-            if (!header.startsWith('שאלה')) continue;
+        if (headers) {
+            for (let i = 0; i < headers.length; i++) {
+                const header = String(headers[i] || '').trim();
+                const qNumMatch = header.match(/\d+/);
+                if (!qNumMatch) continue;
 
-            const qNumMatch = header.match(/\d+/);
-            if (!qNumMatch) continue;
+                const questionNumber = Number(qNumMatch[0]);
+                const rawCell = String(selectedRow[i] || '');
 
-            const questionNumber = Number(qNumMatch[0]);
-            const rawCell = String(selectedRow[i] || '');
+                const answerMatch = rawCell.match(/\((\d+)\)/) || rawCell.match(/^(\d+)$/);
+                if (answerMatch) {
+                    answers.set(questionNumber, Number(answerMatch[1]) - 1);
+                    continue;
+                }
 
-            const answerMatch = rawCell.match(/\((\d+)\)/);
-            if (answerMatch) {
-                answers.set(questionNumber, Number(answerMatch[1]) - 1);
-                continue;
+                if (rawCell.includes('מבוטלת') || rawCell.includes('והת')) {
+                    answers.set(questionNumber, null);
+                }
             }
-
-            if (rawCell.includes('מבוטלת') || rawCell.includes('והת')) {
-                answers.set(questionNumber, null);
+        } else {
+            // Sequential column index mapping (Column 1..N -> Q1..QN)
+            let qIdx = 1;
+            const startCol = (String(selectedRow[0] || '').trim().toLowerCase() === cleanTarget) ? 1 : 0;
+            for (let i = startCol; i < selectedRow.length; i++) {
+                const rawCell = String(selectedRow[i] || '').trim();
+                if (!rawCell) continue;
+                const answerMatch = rawCell.match(/\((\d+)\)/) || rawCell.match(/^(\d+)$/);
+                if (answerMatch) {
+                    answers.set(qIdx, Number(answerMatch[1]) - 1);
+                    qIdx++;
+                }
             }
         }
 
@@ -1973,32 +2003,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions into a clean \`questions.json\` array for an interactive quiz app.
+    const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions from this PDF for an interactive Hebrew quiz app.
+You may output as clean Markdown (questions.md) OR as a JSON array (questions.json).
 
 ---------------------------------------------------------------------------
-EXTRACTION & PROOFREADING RULES:
+FORMAT OPTION 1: MARKDOWN (questions.md - Recommended & Lightweight)
 ---------------------------------------------------------------------------
-1. HEBREW TEXT ORDER:
-   - Extract text in natural, correct Hebrew reading order (sentences left-to-right, Hebrew words right-to-left).
-   - Do NOT reverse word order or letters.
-   - Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
-
-2. OPTIONS FORMATTING:
-   - Extract all choices into the \`options\` array (questions can have 4, 5, 6 or more choices).
-   - Remove option letter prefixes (e.g. convert "א. תגובה מהירה" to "תגובה מהירה").
-
-3. DIAGRAM & IMAGE REFERENCES (\`pageImage\`):
-   - If a question includes or references a visual element (diagram, chart, graph, illustration), set \`"pageImage": "pages_output/page_X.png"\` where X is the page number (e.g., \`"pages_output/page_4.png"\`).
-   - If the question is purely text-based, DO NOT include the \`pageImage\` key.
-
-4. ANSWER KEY (\`correctIndex\`):
-   - Set \`"correctIndex": 0\` by default.
-
-5. SELF-PROOFREADING PASS:
-   - Once extraction is complete, perform a self-proofreading pass to verify Hebrew word order, punctuation, and JSON formatting before outputting.
+### שאלה 1: [Question text in natural Hebrew]
+- א. [Option 1 text]
+- ב. [Option 2 text]
+- ג. [Option 3 text]
+- ד. [Option 4 text]
 
 ---------------------------------------------------------------------------
-REQUIRED JSON SCHEMA:
+FORMAT OPTION 2: JSON SCHEMA (questions.json)
 ---------------------------------------------------------------------------
 [
   {
@@ -2015,10 +2033,11 @@ REQUIRED JSON SCHEMA:
 ]
 
 ---------------------------------------------------------------------------
-OUTPUT & DELIVERABLE REQUIREMENTS:
+EXTRACTION & PROOFREADING RULES:
 ---------------------------------------------------------------------------
-1. Provide your final response either as a downloadable \`questions.json\` file OR as a single clean code block formatted for easy copy-pasting into \`questions.json\`.
-2. Do NOT include conversational commentary or explanation text. Output raw, valid JSON only.`;
+1. HEBREW TEXT ORDER: Extract text in natural, correct Hebrew reading order. Do NOT reverse word order or letters. Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "DNA", "pH") read correctly.
+2. OPTIONS FORMATTING: Extract all choices into options (questions can have 4, 5, 6 or more choices).
+3. DELIVERABLE: Provide output as a downloadable file (questions.md or questions.json) or in a single clean code block ready for upload. Do not include conversational commentary.`;
 
     if (elements.llmPromptBox) {
         elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
@@ -2092,15 +2111,34 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
 
     elements.mergeAnswersBtn?.addEventListener('click', () => tryMergeAnswersFromCsv(true));
 
-    // jsonFile Upload Listener
+    // jsonFile Upload Listener (Supports questions.json and questions.md)
     elements.jsonFile?.addEventListener('change', async () => {
         const file = elements.jsonFile.files?.[0];
         if (!file) return;
         try {
             setStatus(`מעבד קובץ ${file.name}...`);
             const text = await file.text();
-            const rawData = JSON.parse(text);
-            const normalizedQuestions = normalizeQuestionsJson(rawData);
+            let normalizedQuestions = [];
+
+            const trimmed = text.trim();
+            const isJson = trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```json');
+
+            if (isJson) {
+                let cleanJsonText = trimmed;
+                if (cleanJsonText.startsWith('```json')) {
+                    cleanJsonText = cleanJsonText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
+                }
+                const rawData = JSON.parse(cleanJsonText);
+                const arrayData = Array.isArray(rawData) ? rawData : (rawData.questions || rawData.data || []);
+                normalizedQuestions = normalizeQuestionsJson(arrayData);
+            } else {
+                // Parse as Markdown or text format (questions.md)
+                normalizedQuestions = parseQuestionsFromText(text, [], []);
+            }
+
+            if (!normalizedQuestions || !normalizedQuestions.length) {
+                throw new Error('לא פוענחו שאלות מהקובץ שנבחר.');
+            }
 
             state.questions = normalizedQuestions;
             renderPreview();
@@ -2109,7 +2147,7 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
 
             await tryMergeAnswersFromCsv();
         } catch (error) {
-            console.error('Error loading JSON file:', error);
+            console.error('Error loading question file:', error);
             setStatus(error.message || `נכשלה טעינת קובץ ${file.name}.`, true);
         }
     });

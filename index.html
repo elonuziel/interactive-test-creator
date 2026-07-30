@@ -724,10 +724,9 @@
                     </div>
 
                     <div class="field">
-                        <label for="json-file">קובץ שאלות JSON <span class="field-note-inline">אופציונלי / מ-LLM (כמו
-                                ב-cli-legacy)</span></label>
+                        <label for="json-file">קובץ שאלות (JSON / Markdown .md) <span class="field-note-inline">אופציונלי / מ-LLM</span></label>
                         <div class="file-wrap">
-                            <input id="json-file" type="file" accept=".json,application/json">
+                            <input id="json-file" type="file" accept=".json,.md,.txt,text/markdown,text/plain,application/json">
                             <button class="file-clear hidden" data-target="json-file" type="button" title="הסר קובץ">✕
                                 הסר</button>
                         </div>
@@ -765,42 +764,40 @@
                         <hr class="section-divider">
                         <p class="section-label">⚙️&nbsp; הגדרות עיבוד מתקדמות (Gemini API)</p>
 
-                        <div class="field">
-                            <label for="llm-policy">שימוש ב-LLM</label>
-                            <select id="llm-policy">
-                                <option value="auto">אוטומטי — מקומי לדיגיטלי, LLM לסרוק</option>
-                                <option value="force_llm">LLM תמיד (Gemini)</option>
-                                <option value="force_no_llm">ללא LLM — מקומי בלבד</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="ocr-engine">מנוע OCR <span class="field-note-inline">לסרוקים</span></label>
-                            <select id="ocr-engine">
-                                <option value="gemini_native_schema">Gemini — Native PDF + Enforced JSON Schema (1 קריאה — מומלץ וגמיש)</option>
-                                <option value="gemini_native_markdown">Gemini — Native PDF + Clean Markdown (1 קריאה — קל ומהיר)</option>
-                                <option value="gemini_chunked">Gemini — פיצול עמודי תמונה (Chunking)</option>
-                                <option value="offline_local">OCR מקומי חינמי — ללא API Key</option>
-                            </select>
-                            <div class="offline-warning-box">
-                                ⚠️&nbsp; OCR חינמי זה מתבצע בדפדפן, אך דורש חיבור לאינטרנט חד-פעמי להורדת מודל השפה.
-                                בעברית הדיוק נמוך בהרבה מ-Gemini.
+                        <!-- Card 1: Policy & Engine -->
+                        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">1. מנוע ומדיניות LLM</p>
+                            <div class="field">
+                                <label for="llm-policy">שימוש ב-LLM</label>
+                                <select id="llm-policy">
+                                    <option value="auto">אוטומטי — מקומי לדיגיטלי, LLM לסרוק</option>
+                                    <option value="force_llm">LLM תמיד (Gemini)</option>
+                                    <option value="force_no_llm">ללא LLM — מקומי בלבד</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="ocr-engine">מנוע OCR <span class="field-note-inline">לסרוקים</span></label>
+                                <select id="ocr-engine">
+                                    <option value="gemini_native_markdown">Gemini — Native PDF + Clean Markdown (1 קריאה — מהיר וקל, מומלץ)</option>
+                                    <option value="gemini_native_schema">Gemini — Native PDF + Enforced JSON Schema (1 קריאה — מובנה)</option>
+                                    <option value="gemini_chunked">Gemini — פיצול עמודי תמונה (Chunking)</option>
+                                    <option value="offline_local">OCR מקומי חינמי — ללא API Key</option>
+                                </select>
+                                <div class="offline-warning-box">
+                                    ⚠️&nbsp; OCR חינמי זה מתבצע בדפדפן, אך דורש חיבור לאינטרנט חד-פעמי להורדת מודל השפה.
+                                    בעברית הדיוק נמוך בהרבה מ-Gemini.
+                                </div>
                             </div>
                         </div>
 
-                        <div class="field" style="margin-top: 6px;">
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);" title="כאשר מסומן, המערכת תדלג על שלב הגהת השאלות הנוסף מול Gemini כדי לחסוך קריאות API ולהאיץ את העיבוד">
-                                <input type="checkbox" id="skip-llm-verification" style="accent-color: var(--primary-color);">
-                                <span>⚡ דילוג על הגהת LLM (עיבוד קל ומהיר יותר — 1 קריאת API בלבד)</span>
-                            </label>
-                        </div>
-
-                        <div id="llm-auth-section" class="auth-section">
-                            <p class="section-label">🔑&nbsp; אימות Gemini</p>
+                        <!-- Card 2: API Credentials -->
+                        <div id="llm-auth-section" class="auth-section" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">2. 🔑&nbsp; אימות AQ / Gemini API</p>
                             <div class="field">
-                                <label for="api-key">API Key <button id="api-help-btn" class="help-btn" type="button"
+                                <label for="api-key">API Key (AQ... / AIza...) <button id="api-help-btn" class="help-btn" type="button"
                                         title="איך משיגים API Key?">?</button></label>
                                 <div class="password-wrap">
-                                    <input id="api-key" type="password" placeholder="הזן Gemini API Key (AIza...)">
+                                    <input id="api-key" type="password" placeholder="הזן API Key (AQ... או AIza...)">
                                     <button class="eye-btn" type="button" data-target="api-key"
                                         aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
                                 </div>
@@ -813,6 +810,17 @@
                                     <button class="eye-btn" type="button" data-target="passcode"
                                         aria-label="הצג/הסתר קוד" title="הצג/הסתר">👁️</button>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Performance & Options -->
+                        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">3. ⚡ אפשרויות ביצועים</p>
+                            <div class="field" style="margin-top: 4px;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);" title="כאשר מסומן, המערכת תדלג על שלב הגהת השאלות הנוסף מול Gemini כדי לחסוך קריאות API ולהאיץ את העיבוד">
+                                    <input type="checkbox" id="skip-llm-verification" checked style="accent-color: var(--primary-color);">
+                                    <span>⚡ דילוג על הגהת LLM (עיבוד קל ומהיר יותר — 1 קריאת API בלבד)</span>
+                                </label>
                             </div>
                         </div>
 
@@ -864,23 +872,22 @@
     <div id="api-help-popup" class="help-popup">
         <div class="help-popup-content">
             <h3>🔑 איך משיגים API Key?</h3>
-            <p>המערכת תומכת בשני סוגי מפתחות:</p>
+            <p>המערכת תומכת בשני סוגי מפתחות (ברירת המחדל הינה AQ API):</p>
             <p>
-                <span class="key-type">1. Gemini API Key</span> <code>AIza...</code><br>
+                <span class="key-type">1. AQ API Key (ברירת מחדל מומלצת)</span> <code>AQ...</code><br>
+                מפתח מומלץ למודלים מתקדמים (Gemini 2.5 Flash / 2.0 Flash). מתקבל דרך
+                <a href="https://console.cloud.google.com/apis/credentials" target="_blank"
+                    rel="noopener noreferrer">Google Cloud Console</a>.
+            </p>
+            <p>
+                <span class="key-type">2. Gemini API Key</span> <code>AIza...</code><br>
                 חינמי, מתקבל מ־
                 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI
                     Studio</a>.
                 מתאים לשימוש אישי עם מכסה נדיבה.
             </p>
-            <p>
-                <span class="key-type">2. Interactions API Key</span> <code>AQ...</code><br>
-                בתשלום דרך Google Cloud, מתקבל דרך
-                <a href="https://console.cloud.google.com/apis/credentials" target="_blank"
-                    rel="noopener noreferrer">Google Cloud Console</a>.
-                דורש הפעלת Generative Language API.
-            </p>
             <p style="font-size:.82rem;color:var(--text-secondary);">
-                💡 את המפתח מדביקים בשדה API Key — המערכת מזהה את סוגו אוטומטית.
+                💡 את המפתח מדביקים בשדה API Key — המערכת מזהה את סוג המפתח אוטומטית. שרת Elza הישן יצא משימוש והמערכת פועלת כעת ברירת מחדל מול AQ API.
             </p>
             <button id="api-help-close" class="help-popup-close">הבנתי, תודה</button>
         </div>
@@ -900,11 +907,11 @@
 
     <div id="credential-popup" class="help-popup">
         <div class="help-popup-content">
-            <h3>נדרש אימות ל-Gemini</h3>
-            <p>הקובץ דורש עיבוד עם Gemini. אפשר להזין עכשיו API Key או Passcode למפתח המוצפן.</p>
+            <h3>נדרש אימות ל-AQ / Gemini API</h3>
+            <p>הקובץ דורש עיבוד עם LLM. אפשר להזין עכשיו API Key (AQ... / AIza...) או Passcode למפתח המוצפן.</p>
             <div class="field">
-                <label for="credential-api-key">Gemini API Key</label>
-                <input id="credential-api-key" type="password" placeholder="AIza...">
+                <label for="credential-api-key">AQ / Gemini API Key</label>
+                <input id="credential-api-key" type="password" placeholder="AQ... או AIza...">
             </div>
             <div class="field">
                 <label for="credential-passcode">Passcode למפתח מוצפן</label>
