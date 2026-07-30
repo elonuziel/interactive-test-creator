@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         csvFile: document.getElementById('csv-file'),
         formNumber: document.getElementById('form-number'),
         mergeAnswersBtn: document.getElementById('merge-answers-btn'),
+        autoAttachDiagramsBtn: document.getElementById('auto-attach-diagrams-btn'),
         ocrEngine: document.getElementById('ocr-engine'),
         llmPolicy: document.getElementById('llm-policy'),
         apiKey: document.getElementById('api-key'),
@@ -1246,14 +1247,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function extractAnswersForForm(rows, formNumber) {
         if (!rows || !rows.length) return new Map();
 
-        const cleanTarget = String(formNumber || '').trim().toLowerCase();
+        const cleanTarget = String(formNumber || '').trim().toLowerCase().replace(/\.0$/, '');
         let headers = null;
         let selectedRow = null;
 
         for (const row of rows) {
             if (!row || !row.length) continue;
-            const firstCell = String(row[0] || '').trim().toLowerCase();
-            if (firstCell.includes('שאלון') || firstCell.includes('form')) {
+            const firstCellRaw = String(row[0] || '').trim().toLowerCase();
+            const firstCell = firstCellRaw.replace(/\.0$/, '');
+            if (firstCellRaw.includes('שאלון') || firstCellRaw.includes('form')) {
                 headers = row;
                 continue;
             }
@@ -1265,7 +1267,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!selectedRow && cleanTarget) {
             for (const row of rows) {
-                if (row.some(cell => String(cell || '').trim().toLowerCase() === cleanTarget)) {
+                if (row.some(cell => String(cell || '').trim().toLowerCase().replace(/\.0$/, '') === cleanTarget)) {
                     selectedRow = row;
                     break;
                 }
@@ -2388,7 +2390,7 @@ STRICT EXTRACTION & FORMATTING RULES:
 
         if (explicit) {
             if (!state.questions || !state.questions.length) {
-                showToast('יש להעלות קודם קובץ questions.json!', 'error');
+                showToast('יש להעלות קודם קובץ שאלות (JSON או Markdown)!', 'error');
                 return;
             }
             if (!csv) {
@@ -2415,8 +2417,10 @@ STRICT EXTRACTION & FORMATTING RULES:
             }
 
             const answerMap = extractAnswersForForm(answerRows, formNumber);
-            if (explicit && (!answerMap || !Object.keys(answerMap).length)) {
-                showToast(`לא נמצאו תשובות לשאלון ${formNumber} בקובץ שנבחר.`, 'error');
+            if (!answerMap || !answerMap.size) {
+                if (explicit) {
+                    showToast(`לא נמצאו תשובות לשאלון ${formNumber} בקובץ שנבחר.`, 'error');
+                }
                 return;
             }
 
@@ -2431,7 +2435,79 @@ STRICT EXTRACTION & FORMATTING RULES:
         }
     }
 
+    async function autoAttachDiagramPageImages() {
+        if (!state.questions || !state.questions.length) {
+            showToast('יש להעלות קודם קובץ שאלות (JSON או Markdown)!', 'error');
+            return;
+        }
+
+        let pdfBuffer = state.pdfArrayBuffer || state.pdfBytes;
+        if (!pdfBuffer || pdfBuffer.byteLength === 0) {
+            const pdfInput = elements.pdfFile?.files?.[0];
+            if (!pdfInput) {
+                alert('אנא בחר קודם את קובץ ה-PDF של המבחן בשדה "קובץ PDF".');
+                return;
+            }
+            try {
+                pdfBuffer = await pdfInput.arrayBuffer();
+                state.pdfArrayBuffer = pdfBuffer.slice(0);
+            } catch (e) {
+                alert('קריאת קובץ ה-PDF נכשלה. אנא בחר את הקובץ מחדש.');
+                return;
+            }
+        }
+
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+        if (!pdfjs?.getDocument) {
+            alert('ספריית PDF.js לא נטענה בדפדפן. רענן את העמוד ונסה שוב.');
+            return;
+        }
+
+        try {
+            setStatus('מנתח עמודי PDF ומחבר תמונות לשאלות עם תרשימים/טבלאות...');
+            const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBuffer.slice(0)) });
+            const pdfDoc = await loadingTask.promise;
+
+            const imageKeywords = /לפניכם|לפניך|להלן|גרף|תרשים|תמונה|טבלה|לוח|איור|מפה|ציור|דיאגרמה|צילום|סכמה|טבלאות|שרטוט|סרטוט|עקומה|עקומות|ניסוי|מבנה|נוסחה|מולקולה|מיוצג|מוצג|במוצג/;
+            let attachedCount = 0;
+
+            for (let i = 0; i < state.questions.length; i++) {
+                const q = state.questions[i];
+                const questionText = q.question || '';
+                const isDiagramQuestion = imageKeywords.test(questionText);
+                const targetPage = q.sourcePage || 1;
+
+                if ((isDiagramQuestion || q.sourcePage) && targetPage >= 1 && targetPage <= pdfDoc.numPages) {
+                    try {
+                        const page = await pdfDoc.getPage(targetPage);
+                        const viewport = page.getViewport({ scale: 1.3 });
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = Math.floor(viewport.width);
+                        canvas.height = Math.floor(viewport.height);
+                        await page.render({ canvasContext: ctx, viewport }).promise;
+                        q.image = canvas.toDataURL('image/png');
+                        attachedCount++;
+                    } catch (e) {
+                        console.warn(`Could not render page ${targetPage} for question ${i + 1}:`, e);
+                    }
+                }
+            }
+
+            renderPreview();
+            if (attachedCount > 0) {
+                setStatus(`חוברו בהצלחה ${attachedCount} תמונות עמוד לשאלות עם תרשימים/טבלאות!`, false, true);
+            } else {
+                setStatus('לא נמצאו שאלות המפנות לתרשימים/טבלאות לחיבור עמוד.', false, true);
+            }
+        } catch (err) {
+            console.error('Error auto-attaching diagram images:', err);
+            alert(`שגיאה בחיבור תמונות עמוד: ${err.message || err}`);
+        }
+    }
+
     elements.mergeAnswersBtn?.addEventListener('click', () => tryMergeAnswersFromCsv(true));
+    elements.autoAttachDiagramsBtn?.addEventListener('click', autoAttachDiagramPageImages);
 
     // jsonFile Upload Listener (Supports questions.json and questions.md)
     elements.jsonFile?.addEventListener('change', async () => {
@@ -2465,6 +2541,7 @@ STRICT EXTRACTION & FORMATTING RULES:
             state.questions = normalizedQuestions;
             renderPreview();
             disableOutputActions(false);
+            tryMergeAnswersFromCsv(false);
             setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ ${file.name}!`, false, true);
         } catch (error) {
             console.error('Error loading question file:', error);
@@ -2475,9 +2552,12 @@ STRICT EXTRACTION & FORMATTING RULES:
     elements.csvFile?.addEventListener('change', () => {
         const file = elements.csvFile.files?.[0];
         if (file) {
+            tryMergeAnswersFromCsv(false);
             showToast(`קובץ תשובות (${file.name}) נבחר. הזן מספר שאלון ולחץ "🔗 מזג תשובות נכונות לשאלות".`, 'info', 4000);
         }
     });
+
+    elements.formNumber?.addEventListener('input', () => tryMergeAnswersFromCsv(false));
 
     function toggleProcessingSettings(showOnly = false) {
         if (!elements.processingSettingsContainer) return;

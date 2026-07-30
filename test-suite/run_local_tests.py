@@ -231,6 +231,24 @@ def run_all_tests():
         print(" [PASS] Test 8: Gemini Citation Tag Cleanup ([cite: N] Stripped)")
         passed += 1
 
+    # Test 9: XLS Answer Extraction for Form 111 (tests/2022_litoral/מועד א.xls)
+    total += 1
+    xls_path = os.path.join("tests", "2022_litoral", "מועד א.xls")
+    if os.path.exists(xls_path):
+        import xlrd
+        wb = xlrd.open_workbook(xls_path)
+        sheet = wb.sheet_by_index(0)
+        rows = [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(sheet.nrows)]
+        
+        headers = [r for r in rows if r and ('שאלון' in str(r[0]) or 'form' in str(r[0]).lower())][0]
+        selected_row = [r for r in rows if r and str(r[0]).replace('.0', '').strip() == '111'][0]
+        
+        q1_cell = str(selected_row[1]) # '2 (2) [31] {1}'
+        q1_ans_match = re.search(r'\((\d+)\)', q1_cell)
+        assert q1_ans_match and q1_ans_match.group(1) == '2', "Form 111 Q1 correct answer must be option 2"
+        print(" [PASS] Test 9: XLS Answer Extraction for Form 111")
+        passed += 1
+
     print("=" * 65)
     print(f" RESULT: {passed}/{total} Tests Passed Successfully!")
     print("=" * 65)

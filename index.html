@@ -778,9 +778,12 @@
                         <label for="form-number">מספר שאלון <span class="field-note-inline">אופציונלי</span></label>
                         <input id="form-number" type="text" inputmode="numeric" placeholder="לדוגמה: 76">
                     </div>
-                    <div style="margin-top: 10px; margin-bottom: 10px;">
+                    <div style="margin-top: 10px; margin-bottom: 10px; display: grid; gap: 8px;">
                         <button id="merge-answers-btn" type="button" class="primary-btn"
                             style="width: 100%; padding: 12px 18px; font-weight: 700; font-size: .95rem; background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; box-shadow: 0 4px 14px rgba(37,99,235,0.3); border-radius: 10px; color: #ffffff; cursor: pointer; transition: all 0.2s ease;">🔗 מזג תשובות נכונות לשאלות (Merge Official Answers)</button>
+                        <button id="auto-attach-diagrams-btn" type="button" class="secondary-btn"
+                            style="width: 100%; padding: 10px 14px; font-weight: 700; font-size: .88rem; border-radius: 10px; cursor: pointer;"
+                            title="סורק את השאלות ומחבר אוטומטית תמונות עמוד מתוך ה-PDF לשאלות הכוללות תרשימים, גרפים או טבלאות">🖼️ חבר עמודי תרשים/טבלה לשאלות מה-PDF</button>
                     </div>
 
                     <div style="margin-top: 12px; text-align: center;">
@@ -1077,7 +1080,8 @@
                     <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
                         • העלה את קובץ השאלות בשדה <strong>קובץ שאלות (JSON / Markdown .md)</strong> (כל קובץ
                         <code>questions.md</code> או JSON נתמך!).<br>
-                        • 🔑 <strong>מיזוג פתרון רשמי (חשוב מאוד!):</strong> אם העלית קובץ תשובות רשמי (CSV/XLS), הזן את <strong>מספר השאלון</strong> (למשל 76) ולחץ על הכפתור הכחול הבולט <strong>"🔗 מזג תשובות נכונות לשאלות"</strong> כדי להתאים את התשובות הרשמיות לשאלות.<br>
+                        • 🔑 <strong>מיזוג פתרון רשמי (חשוב מאוד!):</strong> אם העלית קובץ תשובות רשמי (CSV/XLS), הזן את <strong>מספר השאלון</strong> (למשל 111 או 76) ולחץ על הכפתור הכחול הבולט <strong>"🔗 מזג תשובות נכונות לשאלות"</strong> כדי להתאים את התשובות הרשמיות לשאלות.<br>
+                        • 🖼️ <strong>שאלות עם גרפים/תרשימים/טבלאות:</strong> לחץ על <strong>"🖼️ חבר עמודי תרשים/טבלה לשאלות מה-PDF"</strong> כדי להצמיד אוטומטית את תמונת עמוד ה-PDF הרלוונטי לכל שאלה הכוללת תרשים או טבלה!<br>
                         • 💡 <strong>מה קורה אם לא לוחצים על מיזוג?</strong> המערכת מניחה שמדובר בטופס 000, מגדירה כברירת מחדל את תשובה <strong>א'</strong> כתשובה הנכונה, ומערבבת אוטומטית את סדר התשובות במבחן האינטראקטיבי!
                     </p>
                 </div>
