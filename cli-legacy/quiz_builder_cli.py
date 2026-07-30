@@ -279,13 +279,16 @@ def is_pdf_digital(pdf_path):
         return False
 
 def cleanup_workspace_folder(test_dir):
-    """Clean up scratch files, prompt txt files, and unused page renders, preserving all assets needed for server/HTML recreation."""
+    """Clean up scratch files, prompt txt files, clean merged PDFs, and unused page renders."""
     scratch_files = [
         'raw_text.md',
         'pdf_type_result.txt',
         'page_map.json',
         'prompt_local_agent.txt',
         'prompt_web_ai.txt',
+        'prompt_proofread.txt',
+        'prompt_proofread_local.txt',
+        'prompt_proofread_web.txt',
         'final_questions.json',
         'output.json',
         'response.json',
@@ -300,6 +303,17 @@ def cleanup_workspace_folder(test_dir):
                 cleaned += 1
             except Exception:
                 pass
+
+    # Delete any clean merged PDFs (*_clean.pdf) and any leftover prompt .txt files
+    for fname in os.listdir(test_dir):
+        if fname.lower().endswith('_clean.pdf') or (fname.lower().startswith('prompt_') and fname.lower().endswith('.txt')):
+            fp = os.path.join(test_dir, fname)
+            if os.path.isfile(fp):
+                try:
+                    os.remove(fp)
+                    cleaned += 1
+                except Exception:
+                    pass
 
     # Check which page images / embedded images are referenced in questions.json
     q_file = os.path.join(test_dir, 'questions.json')
