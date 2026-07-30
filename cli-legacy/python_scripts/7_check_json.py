@@ -63,8 +63,10 @@ def main():
             issues.append("EMPTY question text")
             
         options = q.get('options', [])
-        if len(options) != expected_opts:
-            warns.append(f"Option count: {len(options)} (expected {expected_opts})")
+        if len(options) < 2:
+            issues.append(f"Option count: {len(options)} (fewer than minimum 2 options)")
+        elif args.expected_options is not None and len(options) != args.expected_options:
+            warns.append(f"Option count: {len(options)} (expected {args.expected_options})")
             
         for j, opt in enumerate(options):
             if not opt:

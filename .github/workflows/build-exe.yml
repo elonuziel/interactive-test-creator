@@ -1,0 +1,87 @@
+name: Build & Release Quiz Builder Executable
+
+on:
+  push:
+    branches: [ main, feat/exe-builder ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release Version Tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+      create_release:
+        description: 'Publish a GitHub Release with quiz_builder.exe'
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pymupdf pandas openpyxl pyinstaller
+
+      - name: Determine Release Tag & Version
+        id: tag_name
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [ -n "${{ inputs.release_version }}" ]; then
+            TAG="${{ inputs.release_version }}"
+          else
+            TAG="v1.0.${{ github.run_number }}"
+          fi
+          echo "TAG_NAME=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build Executable with PyInstaller & Embed Version
+        run: |
+          python cli-legacy/build_exe.py --version ${{ steps.tag_name.outputs.TAG_NAME }}
+
+      - name: "Code Sign Executable (Publisher: Elon Uziel)"
+        shell: powershell
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Elon Uziel, O=Elon Uziel" -CertStoreLocation "Cert:\CurrentUser\My"
+          Set-AuthenticodeSignature -FilePath "cli-legacy/dist/quiz_builder.exe" -Certificate $cert -HashAlgorithm SHA256
+
+      - name: Upload Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quiz_builder_exe
+          path: cli-legacy/dist/quiz_builder.exe
+          if-no-files-found: error
+
+      - name: Create GitHub Release & Upload Executable Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+          name: Interactive Quiz Builder ${{ steps.tag_name.outputs.TAG_NAME }}
+          body: |
+            ## 🚀 Interactive Quiz Builder Standalone Executable (${{ steps.tag_name.outputs.TAG_NAME }})
+            
+            Download `quiz_builder.exe` below to run the Quiz Builder and Local HTTP Server offline on Windows with **zero dependencies**.
+            
+            - **Signed Publisher**: Elon Uziel
+            - **No Python required**
+            - **Automatic local server & default browser launching**
+            - **Full PDF extraction & standalone HTML quiz exporting**
+          files: |
+            cli-legacy/dist/quiz_builder.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
