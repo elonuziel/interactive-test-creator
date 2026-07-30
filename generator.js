@@ -24,11 +24,14 @@ document.addEventListener('DOMContentLoaded', () => {
         templateCache: null,
         geminiModelCandidates: null,
         proofPageImages: [],
-        proofMode: true
+        proofMode: true,
+        pdfArrayBuffer: null,
+        pdfPagesState: []
     };
 
     const elements = {
         pdfFile: document.getElementById('pdf-file'),
+        jsonFile: document.getElementById('json-file'),
         csvFile: document.getElementById('csv-file'),
         formNumber: document.getElementById('form-number'),
         ocrEngine: document.getElementById('ocr-engine'),
@@ -42,6 +45,17 @@ document.addEventListener('DOMContentLoaded', () => {
         credentialCancel: document.getElementById('credential-cancel'),
         htmlFile: document.getElementById('html-file'),
         pdfTypeNote: document.getElementById('pdf-type-note'),
+        scannedActionsBox: document.getElementById('scanned-actions-box'),
+        copyPromptBtn: document.getElementById('copy-prompt-btn'),
+        pdfSidebarCard: document.getElementById('pdf-sidebar-card'),
+        builderLayout: document.getElementById('builder-layout'),
+        pageCountBadge: document.getElementById('page-count-badge'),
+        presetStdBtn: document.getElementById('preset-std-btn'),
+        presetBlankBtn: document.getElementById('preset-blank-btn'),
+        presetSelectAllBtn: document.getElementById('preset-select-all-btn'),
+        presetDeselectAllBtn: document.getElementById('preset-deselect-all-btn'),
+        downloadCleanPdf: document.getElementById('download-clean-pdf'),
+        pageThumbnailsContainer: document.getElementById('page-thumbnails-container'),
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
         takeQuiz: document.getElementById('take-quiz'),
@@ -1508,6 +1522,268 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ── Normalization for questions.json ────────────────────────────────────────
+    function normalizeQuestionsJson(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+            throw new Error('קובץ ה-JSON הינו ריק או אינו במבנה מערך.');
+        }
+
+        return data.map((item, index) => {
+            if (typeof item !== 'object' || item === null) {
+                throw new Error(`שאלה מס' ${index + 1} אינה אובייקט תקין.`);
+            }
+
+            const rawQuestion = item.question || item.title || item.text || '';
+            let options = item.options || item.answers || item.choices || [];
+            if (!Array.isArray(options)) options = [];
+
+            options = options.map(opt => (typeof opt === 'object' && opt !== null && opt.text) ? opt.text : String(opt || ''));
+
+            let correctIndex = item.correctIndex !== undefined ? Number(item.correctIndex) : (item.correctAnswerIndex !== undefined ? Number(item.correctAnswerIndex) : undefined);
+            let shuffleOptions = item.shuffleOptions || false;
+
+            if (correctIndex === undefined || isNaN(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
+                if (typeof item.correctAnswer === 'number' && item.correctAnswer >= 1 && item.correctAnswer <= options.length) {
+                    correctIndex = item.correctAnswer - 1;
+                } else {
+                    correctIndex = 0;
+                    shuffleOptions = true;
+                }
+            }
+
+            return {
+                id: item.id || (index + 1),
+                question: rawQuestion,
+                options: options.map((optText, optId) => ({ id: optId, text: optText })),
+                correctIndex: correctIndex,
+                image: item.image || item.pageImage || null,
+                sourcePage: item.sourcePage || item.page || (index + 1),
+                shuffleOptions: shuffleOptions
+            };
+        });
+    }
+
+    // ── PDF Page Sidebar & Thumbnail Generator ─────────────────────────────────
+    async function loadPdfSidebar(pdfBuffer) {
+        state.pdfArrayBuffer = pdfBuffer;
+        state.pdfPagesState = [];
+        if (elements.pageThumbnailsContainer) elements.pageThumbnailsContainer.innerHTML = '';
+
+        if (!pdfBuffer || !window.pdfjsLib) return;
+
+        try {
+            const loadingTask = window.pdfjsLib.getDocument({ data: pdfBuffer.slice(0) });
+            const pdfDoc = await loadingTask.promise;
+            const numPages = pdfDoc.numPages;
+
+            if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.remove('hidden');
+            if (elements.builderLayout) elements.builderLayout.classList.remove('no-sidebar');
+
+            for (let i = 1; i <= numPages; i++) {
+                const page = await pdfDoc.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ').trim();
+                const isBlank = pageText.length < 30;
+
+                const viewport = page.getViewport({ scale: 0.25 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+                state.pdfPagesState.push({
+                    pageNum: i,
+                    keep: true,
+                    text: pageText,
+                    isBlank: isBlank,
+                    thumbnailDataUrl: thumbnailDataUrl
+                });
+            }
+
+            renderSidebarThumbnails();
+            if (elements.downloadCleanPdf) elements.downloadCleanPdf.disabled = false;
+        } catch (err) {
+            console.error('Error rendering PDF sidebar thumbnails:', err);
+        }
+    }
+
+    function renderSidebarThumbnails() {
+        if (!elements.pageThumbnailsContainer) return;
+        elements.pageThumbnailsContainer.innerHTML = '';
+        const total = state.pdfPagesState.length;
+        const kept = state.pdfPagesState.filter(p => p.keep).length;
+
+        if (elements.pageCountBadge) {
+            elements.pageCountBadge.textContent = `${kept} מתוך ${total} עמודים נבחרו`;
+        }
+
+        state.pdfPagesState.forEach((pageState) => {
+            const item = document.createElement('div');
+            item.className = `thumbnail-item ${pageState.keep ? '' : 'disabled-page'}`;
+
+            const img = document.createElement('img');
+            img.src = pageState.thumbnailDataUrl;
+            img.alt = `עמוד ${pageState.pageNum}`;
+
+            const label = document.createElement('label');
+            label.className = 'thumbnail-label';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = pageState.keep;
+            checkbox.addEventListener('change', (e) => {
+                pageState.keep = e.target.checked;
+                item.classList.toggle('disabled-page', !pageState.keep);
+                renderSidebarThumbnailsBadgeOnly();
+            });
+
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(`עמוד ${pageState.pageNum}`));
+
+            item.appendChild(img);
+            item.appendChild(label);
+
+            item.addEventListener('click', (e) => {
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    pageState.keep = checkbox.checked;
+                    item.classList.toggle('disabled-page', !pageState.keep);
+                    renderSidebarThumbnailsBadgeOnly();
+                }
+            });
+
+            elements.pageThumbnailsContainer.appendChild(item);
+        });
+    }
+
+    function renderSidebarThumbnailsBadgeOnly() {
+        const total = state.pdfPagesState.length;
+        const kept = state.pdfPagesState.filter(p => p.keep).length;
+        if (elements.pageCountBadge) {
+            elements.pageCountBadge.textContent = `${kept} מתוך ${total} עמודים נבחרו`;
+        }
+    }
+
+    function applyStandardFilter() {
+        state.pdfPagesState.forEach(p => {
+            if (p.pageNum <= 4) p.keep = false;
+            else if (p.pageNum >= 6 && p.pageNum % 2 === 0) p.keep = false;
+            else p.keep = true;
+        });
+        renderSidebarThumbnails();
+    }
+
+    function applyBlankFilter() {
+        state.pdfPagesState.forEach(p => {
+            if (p.isBlank) p.keep = false;
+        });
+        renderSidebarThumbnails();
+    }
+
+    function selectAllPages(keepState) {
+        state.pdfPagesState.forEach(p => {
+            p.keep = keepState;
+        });
+        renderSidebarThumbnails();
+    }
+
+    async function downloadCleanPdf() {
+        if (!state.pdfArrayBuffer || !window.PDFLib) {
+            setStatus('PDFLib אינו זמין ליצוא קובץ נקי.', true);
+            return;
+        }
+
+        try {
+            setStatus('מייצר PDF נקי...');
+            const srcDoc = await window.PDFLib.PDFDocument.load(state.pdfArrayBuffer);
+            const newDoc = await window.PDFLib.PDFDocument.create();
+
+            const keptIndices = state.pdfPagesState
+                .filter(p => p.keep)
+                .map(p => p.pageNum - 1);
+
+            if (keptIndices.length === 0) {
+                throw new Error('לא נבחרו עמודים להכללה ב-PDF הנקי.');
+            }
+
+            const copiedPages = await newDoc.copyPages(srcDoc, keptIndices);
+            copiedPages.forEach(page => newDoc.addPage(page));
+
+            const pdfBytes = await newDoc.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'cleaned_test.pdf';
+            anchor.click();
+
+            URL.revokeObjectURL(url);
+            setStatus(`PDF נקי נוצר בהצלחה עם ${keptIndices.length} עמודים וההורדה התחילה.`);
+        } catch (err) {
+            console.error('Failed to export clean PDF:', err);
+            setStatus(err.message || 'שגיאה ביצירת PDF נקי.', true);
+        }
+    }
+
+    // Preset buttons & Clean PDF download listeners
+    elements.presetStdBtn?.addEventListener('click', applyStandardFilter);
+    elements.presetBlankBtn?.addEventListener('click', applyBlankFilter);
+    elements.presetSelectAllBtn?.addEventListener('click', () => selectAllPages(true));
+    elements.presetDeselectAllBtn?.addEventListener('click', () => selectAllPages(false));
+    elements.downloadCleanPdf?.addEventListener('click', downloadCleanPdf);
+
+    // jsonFile Upload Listener
+    elements.jsonFile?.addEventListener('change', async () => {
+        const file = elements.jsonFile.files?.[0];
+        if (!file) return;
+        try {
+            setStatus('מעבד קובץ questions.json...');
+            const text = await file.text();
+            const rawData = JSON.parse(text);
+            const normalizedQuestions = normalizeQuestionsJson(rawData);
+
+            state.questions = normalizedQuestions;
+            renderPreview();
+            disableOutputActions(false);
+            setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ JSON!`);
+        } catch (error) {
+            console.error('Error loading questions.json:', error);
+            setStatus(error.message || 'נכשלה טעינת קובץ questions.json.', true);
+        }
+    });
+
+    // Copy prompt helper listener
+    elements.copyPromptBtn?.addEventListener('click', async () => {
+        const promptText = `חבר קובץ questions.json בעברית מתוך שאלות המבחן המצורף.
+פורמט הפלט הנדרש (JSON array בלבד):
+[
+  {
+    "question": "נוסח השאלה",
+    "options": ["תשובה 1", "תשובה 2", "תשובה 3", "תשובה 4"],
+    "correctIndex": 0,
+    "sourcePage": 1
+  }
+]
+הנחיות:
+1. correctIndex הוא אינדקס 0-מבוסס של התשובה הנכונה (0 עבור א', 1 עבור ב', 2 עבור ג', 3 עבור ד').
+2. החזר אך ורק קוד JSON תקין בתוך קוד בלוק clean JSON.`;
+
+        try {
+            await navigator.clipboard.writeText(promptText);
+            const originalText = elements.copyPromptBtn.textContent;
+            elements.copyPromptBtn.textContent = '✓ הפרומפט הועתק ללוח!';
+            setTimeout(() => {
+                elements.copyPromptBtn.textContent = originalText;
+            }, 3000);
+        } catch (e) {
+            setStatus('נכשלה העתקת הפרומפט ללוח.', true);
+        }
+    });
+
     elements.htmlFile.addEventListener('change', async () => {
         const file = elements.htmlFile.files?.[0];
         if (!file) return;
@@ -1534,6 +1810,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = elements.pdfFile.files?.[0];
         if (!file) {
             setPdfTypeNote('');
+            if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
+            if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
+            if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
             return;
         }
 
@@ -1545,6 +1824,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 `${detection.pdfTypeLabel}: ${detection.recommendation}`,
                 detection.isScanned ? 'scanned' : 'digital'
             );
+
+            if (elements.scannedActionsBox) {
+                elements.scannedActionsBox.classList.toggle('hidden', !detection.isScanned);
+            }
+
+            // Load sidebar thumbnails & page selection state
+            await loadPdfSidebar(pdfBuffer);
         } catch (error) {
             setPdfTypeNote(error.message || 'לא ניתן היה לזהות את סוג ה-PDF.', 'error');
         }
@@ -1552,5 +1838,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelector('[data-target="pdf-file"]')?.addEventListener('click', () => {
         setPdfTypeNote('');
+        if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
+        if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
+        if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
     });
 });
