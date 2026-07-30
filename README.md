@@ -10,13 +10,15 @@ Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading di
 
 **`index.html`** + **`generator.js`** — the main builder & creator UI (GitHub Pages root landing page).
 
-### Workflow
+### Generator Features
 1. **Upload PDF or questions.json**: Select a digital/scanned exam PDF, or upload a `questions.json` file.
 2. **Attach Answer Key** *(Optional)*: Upload a CSV, XLS, or XLSX answer key and select your form number.
-3. **Clean PDF & Select Pages**: Discard blank or cover pages using standard presets ("ניקוי סטנדרטי", "הסר ריקים") and download a clean PDF.
-4. **Configure Gemini OCR or External LLM**: Use a free Gemini API key, or copy the extraction prompt to ChatGPT/Claude.
-5. **Edit & Proofread**: Adjust text, options, answer keys, or compare side-by-side with original PDF page snapshots in **Proof Mode**.
-6. **Export & Take**: Click **הורד מבחן עצמאי** to download a single-file HTML quiz, or **פתור מבחן כעת** to start immediately.
+3. **Clean PDF & Select Pages**: Discard blank or cover pages using standard presets ("ניקוי סטנדרטי", "עמודים זוגיים") and download a clean PDF.
+4. **Clean PDF API Integration**: Automatically sends only selected pages to Gemini API / OCR processing to eliminate cover sheet noise.
+5. **Configure Gemini OCR or External LLM**: Use a free Gemini API key with direct structured JSON schema extraction, or copy the extraction prompt to ChatGPT/Claude.
+6. **Edit & Proofread**: Adjust text, options, answer keys, or compare side-by-side with original PDF page snapshots in **Proof Mode**.
+7. **Image Compression Export Toggle**: Compress embedded question diagrams to WebP @ 75% quality, reducing exported HTML file sizes by 80%+ while preserving crisp visual quality.
+8. **Export & Take**: Click **הורד מבחן עצמאי** to download a single-file HTML quiz, or **פתור מבחן כעת** to start immediately.
 
 ---
 
@@ -26,17 +28,28 @@ Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading di
 
 ### Player Features
 - **Native RTL Hebrew**: Purpose-built right-to-left UI with modern Rubik typography.
+- **Question Flagging / Star (⭐)**: Bookmark challenging questions during a test with real-time star badges on the jump bar.
+- **Mix & Match Custom Practice**: Combine categories (`Wrong`, `Unanswered`, `Starred`) and manually cherry-pick question cards in the Review List to launch targeted practice sessions.
 - **Keyboard Navigation**:
   - `1`–`9`: Select answer choices.
   - `←` / `→`: Navigate between questions.
   - `Esc`: Close image zoom overlay.
 - **Immediate Feedback**: Optional toggle to check answers instantaneously.
-- **Progress Jump Bar**: Jump to any question and see real-time answered/correct status.
-- **Auto-Save & Resume**: Per-quiz `LocalStorage` persistence to resume uncompleted sessions.
+- **Progress Jump Bar**: Auto-centering single-line or multi-row jump toolbar showing real-time answered/correct status.
+- **Auto-Save & Resume**: Per-quiz `LocalStorage` persistence saving answers and starred flags to resume uncompleted sessions.
 - **Answer Shuffling**: Randomized options per session for exams without explicit answer keys.
 - **Image Cropper & Fullscreen Zoom**: Crop embedded graphs or tables directly in the quiz card.
-- **Results Dashboard & Review**: Score calculation with filters for **All**, **Wrong Only**, or **Unanswered** questions.
+- **Results Dashboard & Review**: Score calculation with filters for **All**, **Wrong Only**, **Unanswered**, or **Starred** questions.
 - **Dark & Light Themes**: Seamless theme switching with system preference support.
+
+---
+
+## 🧪 Development Server & Component Test Suite
+
+- **Local Development Launcher (`start_test_server.bat`)**: Double-click to automatically launch a local HTTP server on port 8080 (detects Python or Node), open the browser, and present an interactive CLI menu.
+- **In-Browser Test Runner (`test-suite/test_runner.html`)**: English component test suite with real-time execution timing (`ms`), performance metric cards, and payload inspection.
+- **Node.js CLI Unit Tests (`test-suite/run_tests.js`)**: Headless unit test script using `node:assert` for local terminal verification.
+- **Automated GitHub Actions CI (`.github/workflows/deploy-pages.yml`)**: Automated CI pipeline running unit tests on every push before publishing to GitHub Pages.
 
 ---
 
@@ -50,11 +63,12 @@ interactive-test-creator/
 ├── app.js                # Quiz Engine & Navigation
 ├── style.css             # Unified RTL & Theme System
 ├── favicon.svg           # Application SVG Favicon
+├── start_test_server.bat # Local HTTP Server & Test Launcher
+├── test-suite/           # In-Browser & Node.js Component Unit Tests
 ├── vendor/               # Third-party dependencies (PDF.js)
-├── .github/workflows/    # GitHub Pages deployment workflow
+├── .github/workflows/    # Automated CI/CD Pages deployment workflow
 ├── cli-legacy/           # Legacy Python scripts & batch wizard
-├── deal-with-later/      # Preserved research guides, scripts & proposals
-
+└── deal-with-later/      # Preserved research guides, scripts & proposals
 ```
 
 ---
