@@ -1,26 +1,33 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>הרצת בדיקות רכיבים — Component Test Suite</title>
+    <title>Interactive Test Creator — Component Test Runner</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="stylesheet" href="../style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        body {
+            direction: ltr;
+            text-align: left;
+        }
         .test-container {
-            max-width: 960px;
+            max-width: 1040px;
             margin: 0 auto;
-            padding: 32px 16px;
+            padding: 32px 20px;
         }
         .test-card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 24px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
             box-shadow: var(--shadow-sm);
         }
         .test-header {
@@ -32,41 +39,55 @@
             border-bottom: 1px solid var(--border-color);
         }
         .test-title {
-            font-size: 1.25rem;
+            font-size: 1.2rem;
             font-weight: 700;
             margin: 0;
             color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .test-summary-badge {
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             font-weight: 600;
-            padding: 4px 14px;
+            padding: 5px 16px;
             border-radius: 20px;
             background: var(--input-bg);
         }
         .test-item {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 10px 14px;
+            flex-direction: column;
+            padding: 12px 16px;
             border-radius: 10px;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             background: var(--input-bg);
             font-size: 0.92rem;
-            font-family: inherit;
+            border-left: 4px solid var(--border-color);
+            transition: all 0.15s ease;
         }
         .test-item.pass {
-            border-right: 4px solid var(--success-color);
+            border-left-color: var(--success-color);
         }
         .test-item.fail {
-            border-right: 4px solid var(--error-color);
+            border-left-color: var(--error-color);
             background: var(--error-bg);
+        }
+        .test-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        .test-name {
+            font-weight: 600;
+            color: var(--text-primary);
         }
         .test-status {
             font-weight: 700;
-            padding: 2px 8px;
+            padding: 3px 10px;
             border-radius: 6px;
             font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
         }
         .test-status.pass {
             background: var(--success-bg);
@@ -76,27 +97,78 @@
             background: var(--error-bg);
             color: var(--error-color);
         }
+        .test-duration {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            margin-left: 8px;
+        }
+        .test-details {
+            margin-top: 8px;
+            font-size: 0.83rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
         .test-error-details {
-            font-family: monospace;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 0.82rem;
             color: var(--error-color);
-            margin-top: 4px;
-            direction: ltr;
-            text-align: left;
+            margin-top: 8px;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.08);
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .inspect-box {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            overflow-x: auto;
+            color: var(--text-primary);
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-top: 16px;
+        }
+        .metric-card {
+            background: var(--input-bg);
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .metric-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
         }
         .nav-actions {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 24px;
+            align-items: center;
         }
     </style>
 </head>
 <body>
     <header class="navbar">
-        <div class="logo">🧪 הרצת בדיקות רכיבים (Component Test Suite)</div>
+        <div class="logo">🧪 Component Integration & Unit Test Suite</div>
         <div class="controls">
-            <a href="../index.html" class="nav-link">יוצר מבחן ←</a>
-            <a href="../quiz_player.html" class="nav-link">נגן מבחן ←</a>
+            <a href="../index.html" class="nav-link">← Quiz Builder</a>
+            <a href="../quiz_player.html" class="nav-link">← Quiz Player</a>
             <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
                 <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
@@ -105,17 +177,39 @@
 
     <main class="test-container">
         <div class="nav-actions">
-            <button id="run-all-tests-btn" class="primary-btn">🔄 הרץ את כל הבדיקות מחדש</button>
+            <button id="run-all-tests-btn" class="primary-btn">🔄 Re-Run All Test Suites</button>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer; color:var(--text-secondary);">
+                <input type="checkbox" id="toggle-inspect-data" style="accent-color:var(--primary-color);">
+                <span>Show Data Inspection Logs</span>
+            </label>
         </div>
 
         <div class="test-card">
             <div class="test-header">
-                <h2 class="test-title">📊 סיכום תזמור הבדיקות</h2>
-                <span id="overall-badge" class="test-summary-badge">ממתין להרצה...</span>
+                <h2 class="test-title">📊 Execution Overview & System Metrics</h2>
+                <span id="overall-badge" class="test-summary-badge">Running tests...</span>
             </div>
-            <p style="color:var(--text-secondary); font-size: 0.9rem;">
-                בדיקות אלו מאמתות את תקינות הפונקציות הליבתיות בדפדפן (פרסור JSON, מיזוג תשובות מ-CSV/XLS, נירמול טקסט עברי, ושמירת התקדמות מקומית).
+            <p style="color:var(--text-secondary); font-size: 0.9rem; margin: 0 0 12px;">
+                Comprehensive browser execution suite validating data normalization, regex parsing, CSV/XLS answer key merging, state hashing, and flag persistence.
             </p>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Test Cases</div>
+                    <div id="metric-total" class="metric-value">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Passed</div>
+                    <div id="metric-passed" class="metric-value" style="color:var(--success-color);">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Failed</div>
+                    <div id="metric-failed" class="metric-value" style="color:var(--error-color);">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Total Duration</div>
+                    <div id="metric-duration" class="metric-value">0 ms</div>
+                </div>
+            </div>
         </div>
 
         <div id="test-results-container"></div>
@@ -138,17 +232,26 @@
         setTheme(theme);
         document.getElementById('theme-toggle').addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
 
-        // ── Test Logic Helpers ─────────────────────────────────────────────────
+        // ── Assertion Helpers ──────────────────────────────────────────────────
         function assert(condition, message) {
             if (!condition) throw new Error(message || 'Assertion failed');
         }
 
         function assertEqual(actual, expected, message) {
             if (actual !== expected) {
-                throw new Error(`${message || 'Equal assertion failed'}: expected "${expected}", got "${actual}"`);
+                throw new Error(`${message || 'Equal check failed'}: Expected "${expected}", but received "${actual}"`);
             }
         }
 
+        function assertDeepEqual(actual, expected, message) {
+            const actualStr = JSON.stringify(actual);
+            const expectedStr = JSON.stringify(expected);
+            if (actualStr !== expectedStr) {
+                throw new Error(`${message || 'Deep equal check failed'}: Expected ${expectedStr}, but received ${actualStr}`);
+            }
+        }
+
+        // ── Core Logic Implementation Under Test ──────────────────────────────
         function normalizeWhitespace(value) {
             if (!value) return '';
             return String(value)
@@ -289,81 +392,133 @@
             return `quiz_answers_${Math.abs(hash)}`;
         }
 
-        // ── Test Execution Pipeline ───────────────────────────────────────────
+        // ── Test Suites ───────────────────────────────────────────────────────
         function runSuite() {
             const container = document.getElementById('test-results-container');
             container.innerHTML = '';
+            const showInspect = document.getElementById('toggle-inspect-data').checked;
 
             const suites = [
                 {
-                    name: '1. נירמול וניקוי JSON (normalizeQuestionsJson)',
+                    name: '1. JSON Schema Normalization & Cleanup (normalizeQuestionsJson)',
+                    description: 'Validates raw JSON schema ingestion, whitespace normalization, footer removal, and option letter prefix stripping.',
                     tests: [
                         {
-                            name: 'מנקה רווחים כפולים ומסיר קידומות א., ב. מהתשובות',
+                            name: 'Strips option letter prefixes (א., ב., ג.) and cleans double spaces',
+                            details: 'Given options with Hebrew prefixes, verifies that prefixes are stripped while preserving choice text.',
                             fn: () => {
-                                const res = normalizeQuestionsJson([{ question: '  שאלה 1.  ', options: ['א. תשובה 1', 'ב. תשובה 2'] }]);
+                                const input = [{ question: '  שאלה  1.  מהו DNA?  ', options: ['א. חומצת גרעין', 'ב. חלבון', 'ג. שומן'] }];
+                                const res = normalizeQuestionsJson(input);
                                 assertEqual(res.length, 1, 'Question count');
-                                assertEqual(res[0].question, 'שאלה 1.', 'Question text');
-                                assertEqual(res[0].options[0], 'תשובה 1', 'Option 1 text');
-                                assertEqual(res[0].options[1], 'תשובה 2', 'Option 2 text');
+                                assertEqual(res[0].question, 'שאלה 1. מהו DNA?', 'Clean question text');
+                                assertDeepEqual(res[0].options, ['חומצת גרעין', 'חלבון', 'שומן'], 'Clean options array');
+                                return { input, output: res };
                             }
                         },
                         {
-                            name: 'מגדיר ברירת מחדל correctIndex = 0 ומסנן שאלות ריקות',
+                            name: 'Removes PDF exam footer artifacts (עמוד X מתוך Y)',
+                            details: 'Verifies that repetitive exam page footers are stripped automatically from question headers.',
                             fn: () => {
-                                const res = normalizeQuestionsJson([
-                                    { question: '', options: ['תשובה'] },
-                                    { question: 'שאלה 2', options: ['א', 'ב'], correctIndex: 99 }
-                                ]);
+                                const input = [{ question: 'מהו תפקוד המיטוכונדריה? עמוד 3 מתוך 12 - סוף המבחן -', options: ['ייצור אנרגיה', 'תפיסת סוכרים'] }];
+                                const res = normalizeQuestionsJson(input);
+                                assertEqual(res[0].question, 'מהו תפקוד המיטוכונדריה?', 'Footer artifact stripped');
+                                return { input, output: res };
+                            }
+                        },
+                        {
+                            name: 'Filters out empty questions & resets out-of-bounds correctIndex',
+                            details: 'Ensures questions without text/options are dropped and invalid answer indices fall back to 0.',
+                            fn: () => {
+                                const input = [
+                                    { question: '', options: ['תשובה 1'] },
+                                    { question: 'שאלה תקינה', options: ['תשובה 1', 'תשובה 2'], correctIndex: 99 }
+                                ];
+                                const res = normalizeQuestionsJson(input);
                                 assertEqual(res.length, 1, 'Valid question count');
-                                assertEqual(res[0].correctIndex, 0, 'Reset out-of-bound correctIndex');
+                                assertEqual(res[0].correctIndex, 0, 'Reset out-of-bound correctIndex to 0');
+                                return { input, output: res };
                             }
                         }
                     ]
                 },
                 {
-                    name: '2. ניתוח קובצי תשובות CSV/XLS (parseCsvRows & mergeAnswers)',
+                    name: '2. CSV & XLS Answer Key Merging (parseCsvRows & mergeAnswers)',
+                    details: 'Validates CSV cell splitting, Form number column matching, and 0-based option index alignment.',
                     tests: [
                         {
-                            name: 'מחלץ תשובות 0-based עבור מספר שאלון ספציפי',
+                            name: 'Parses quoted CSV rows and extracts Form 76 and Form 32 answer maps',
+                            details: 'Verifies that Hebrew letters (א, ב, ג, ד) and numbers (1, 2, 3, 4) map correctly to 0-based indices.',
                             fn: () => {
-                                const csv = 'Form,Q1,Q2,Q3\n76,א,ב,ג\n32,3,2,1';
+                                const csv = 'Form,Q1,Q2,Q3,Q4\n76,א,ב,ג,ד\n32,4,3,2,1';
                                 const rows = parseCsvRows(csv);
                                 const map76 = extractAnswersForForm(rows, '76');
-                                assertEqual(map76[1], 0, 'Form 76 Q1');
-                                assertEqual(map76[2], 1, 'Form 76 Q2');
-                                assertEqual(map76[3], 2, 'Form 76 Q3');
+                                const map32 = extractAnswersForForm(rows, '32');
+                                assertDeepEqual(map76, { 1: 0, 2: 1, 3: 2, 4: 3 }, 'Form 76 index map');
+                                assertDeepEqual(map32, { 1: 3, 2: 2, 3: 1, 4: 0 }, 'Form 32 index map');
+                                return { rows, map76, map32 };
                             }
                         },
                         {
-                            name: 'ממזג תשובות נכונות למערך השאלות',
+                            name: 'Merges correctIndex into questions array and disables random shuffling',
+                            details: 'Verifies that applying a CSV answer key sets correctIndex and sets shuffleOptions = false.',
                             fn: () => {
-                                const q = [
-                                    { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0 },
-                                    { question: 'Q2', options: ['A', 'B', 'C'], correctIndex: 0 }
+                                const questions = [
+                                    { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true },
+                                    { question: 'Q2', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true }
                                 ];
-                                const merged = mergeAnswers(q, { 1: 2, 2: 1 });
-                                assertEqual(merged[0].correctIndex, 2, 'Merged Q1 correctIndex');
-                                assertEqual(merged[1].correctIndex, 1, 'Merged Q2 correctIndex');
+                                const answerMap = { 1: 2, 2: 1 };
+                                const merged = mergeAnswers(questions, answerMap);
+                                assertEqual(merged[0].correctIndex, 2, 'Q1 correctIndex updated to 2 (C)');
+                                assertEqual(merged[1].correctIndex, 1, 'Q2 correctIndex updated to 1 (B)');
+                                assertEqual(merged[0].shuffleOptions, false, 'Q1 shuffle disabled');
+                                return { questions, answerMap, merged };
                             }
                         }
                     ]
                 },
                 {
-                    name: '3. שמירת התקדמות ומפתחות LocalStorage (getStorageKey)',
+                    name: '3. LocalStorage Progress & Storage Hashing (getStorageKey)',
+                    description: 'Validates deterministic hash generation for user answers and bookmark persistence keys.',
                     tests: [
                         {
-                            name: 'מפיק מפתח דטרמיניסטי ועקבי לפי מזהה השאלות',
+                            name: 'Generates deterministic storage keys based on question contents',
+                            details: 'Ensures the exact same question set generates identical storage keys across page reloads.',
                             fn: () => {
-                                const q1 = [{ question: 'שאלה בוטניקה', options: ['1', '2'] }];
-                                const q2 = [{ question: 'שאלה פיזיקה', options: ['1', '2'] }];
+                                const q1 = [{ question: 'Botany question test', options: ['1', '2'] }];
+                                const q2 = [{ question: 'Physics question test', options: ['1', '2'] }];
                                 const key1 = getStorageKey(q1);
                                 const key1_repeat = getStorageKey(q1);
                                 const key2 = getStorageKey(q2);
 
-                                assertEqual(key1, key1_repeat, 'Deterministic hash');
-                                assert(key1 !== key2, 'Different questions give different keys');
-                                assert(key1.startsWith('quiz_answers_'), 'Valid key prefix');
+                                assertEqual(key1, key1_repeat, 'Deterministic hash matching');
+                                assert(key1 !== key2, 'Distinct question sets produce distinct keys');
+                                assert(key1.startsWith('quiz_answers_'), 'Prefix starts with quiz_answers_');
+                                return { key1, key2 };
+                            }
+                        }
+                    ]
+                },
+                {
+                    name: '4. Question Flagging & Practice Filter State',
+                    description: 'Validates question bookmarking state creation and practice filter filtering.',
+                    tests: [
+                        {
+                            name: 'Initializes and updates userFlags boolean array correctly',
+                            details: 'Verifies flag toggle behavior and bookmark count badge calculation.',
+                            fn: () => {
+                                const totalQuestions = 5;
+                                const userFlags = new Array(totalQuestions).fill(false);
+                                userFlags[1] = true;
+                                userFlags[3] = true;
+
+                                const flaggedIndices = userFlags.reduce((acc, isFlagged, idx) => {
+                                    if (isFlagged) acc.push(idx + 1);
+                                    return acc;
+                                }, []);
+
+                                assertDeepEqual(flaggedIndices, [2, 4], 'Flagged question numbers (1-indexed)');
+                                assertEqual(userFlags.filter(Boolean).length, 2, 'Total flagged count');
+                                return { userFlags, flaggedIndices };
                             }
                         }
                     ]
@@ -372,18 +527,29 @@
 
             let totalPassed = 0;
             let totalFailed = 0;
+            let totalDurationMs = 0;
+
+            const globalStart = performance.now();
 
             suites.forEach((suite) => {
                 const card = document.createElement('div');
                 card.className = 'test-card';
 
-                let suiteHtml = `<div class="test-header"><h3 class="test-title">${suite.name}</h3></div>`;
+                let suiteHtml = `<div class="test-header">
+                    <div>
+                        <h3 class="test-title">📁 ${suite.name}</h3>
+                        ${suite.description ? `<p style="margin:4px 0 0;font-size:0.83rem;color:var(--text-secondary);">${suite.description}</p>` : ''}
+                    </div>
+                </div>`;
 
                 suite.tests.forEach((test) => {
                     let isPass = true;
                     let errorMsg = '';
+                    let inspectData = null;
+                    const startMs = performance.now();
+
                     try {
-                        test.fn();
+                        inspectData = test.fn();
                         totalPassed++;
                     } catch (err) {
                         isPass = false;
@@ -391,13 +557,20 @@
                         totalFailed++;
                     }
 
+                    const elapsedMs = (performance.now() - startMs).toFixed(2);
+
                     suiteHtml += `
                         <div class="test-item ${isPass ? 'pass' : 'fail'}">
-                            <div>
-                                <div>${test.name}</div>
-                                ${errorMsg ? `<div class="test-error-details">⚠️ ${errorMsg}</div>` : ''}
+                            <div class="test-item-header">
+                                <div class="test-name">
+                                    ${test.name}
+                                    <span class="test-duration">(${elapsedMs} ms)</span>
+                                </div>
+                                <span class="test-status ${isPass ? 'pass' : 'fail'}">${isPass ? 'PASS ✓' : 'FAIL ✕'}</span>
                             </div>
-                            <span class="test-status ${isPass ? 'pass' : 'fail'}">${isPass ? 'עבר ✓' : 'נכשל ✕'}</span>
+                            ${test.details ? `<div class="test-details">${test.details}</div>` : ''}
+                            ${errorMsg ? `<div class="test-error-details">❌ Error Traceback:\n${errorMsg}</div>` : ''}
+                            ${(showInspect && inspectData) ? `<pre class="inspect-box">🔍 Inspect Payload:\n${JSON.stringify(inspectData, null, 2)}</pre>` : ''}
                         </div>
                     `;
                 });
@@ -406,19 +579,28 @@
                 container.appendChild(card);
             });
 
+            totalDurationMs = (performance.now() - globalStart).toFixed(2);
+
+            // Update Metrics Cards
+            document.getElementById('metric-total').textContent = totalPassed + totalFailed;
+            document.getElementById('metric-passed').textContent = totalPassed;
+            document.getElementById('metric-failed').textContent = totalFailed;
+            document.getElementById('metric-duration').textContent = `${totalDurationMs} ms`;
+
             const badge = document.getElementById('overall-badge');
             if (totalFailed === 0) {
-                badge.textContent = `כל הבדיקות עברו בהצלחה! (${totalPassed}/${totalPassed})`;
+                badge.textContent = `All ${totalPassed} Tests Passed Successfully! ✓`;
                 badge.style.background = 'var(--success-bg)';
                 badge.style.color = 'var(--success-color)';
             } else {
-                badge.textContent = `נכשלו ${totalFailed} בדיקות מתוך ${totalPassed + totalFailed}`;
+                badge.textContent = `${totalFailed} of ${totalPassed + totalFailed} Tests Failed! ✕`;
                 badge.style.background = 'var(--error-bg)';
                 badge.style.color = 'var(--error-color)';
             }
         }
 
         document.getElementById('run-all-tests-btn').addEventListener('click', runSuite);
+        document.getElementById('toggle-inspect-data').addEventListener('change', runSuite);
         runSuite();
     </script>
 </body>

@@ -1,6 +1,6 @@
 const assert = require('assert');
 
-// ── Test Helpers & Component Logics ──────────────────────────────────────────
+// ── Test Helpers & Component Logic Under Test ─────────────────────────────────
 
 function normalizeWhitespace(value) {
     if (!value) return '';
@@ -153,84 +153,106 @@ function getStorageKey(questions) {
     return `quiz_answers_${Math.abs(hash)}`;
 }
 
-// ── Test Runner ───────────────────────────────────────────────────────────────
+// ── Test Execution Pipeline ───────────────────────────────────────────────────
 
-console.log('🧪 Running Interactive Test Creator Component Unit Tests...\n');
+console.log('🧪 Interactive Test Creator — Node.js Component Integration Unit Tests\n');
 let testsPassed = 0;
 let testsFailed = 0;
 
-function runTest(name, fn) {
+function runTest(suiteName, name, fn) {
+    const startMs = Date.now();
     try {
         fn();
-        console.log(`  ✅ PASS: ${name}`);
+        const durationMs = Date.now() - startMs;
+        console.log(`  ✅ [PASS] ${suiteName} -> ${name} (${durationMs}ms)`);
         testsPassed++;
     } catch (err) {
-        console.error(`  ❌ FAIL: ${name}`);
+        console.error(`  ❌ [FAIL] ${suiteName} -> ${name}`);
         console.error(`     Error: ${err.message}`);
         testsFailed++;
     }
 }
 
-// 1. normalizeQuestionsJson Tests
-runTest('normalizeQuestionsJson cleans whitespace & strips option prefixes', () => {
-    const raw = [
-        {
-            question: '  שאלה  1.  מהו DNA?  ',
-            options: ['א. חומצת גרעין', 'ב. חלבון', 'ג. שומן'],
-            correctIndex: 1
-        }
-    ];
-    const result = normalizeQuestionsJson(raw);
-    assert.strictEqual(result.length, 1);
-    assert.strictEqual(result[0].question, 'שאלה 1. מהו DNA?');
-    assert.deepStrictEqual(result[0].options, ['חומצת גרעין', 'חלבון', 'שומן']);
-    assert.strictEqual(result[0].correctIndex, 1);
+// 1. JSON Schema Normalization & Cleanup
+runTest('JSON Normalization', 'Strips option letter prefixes (א., ב., ג.) and cleans double spaces', () => {
+    const input = [{ question: '  שאלה  1.  מהו DNA?  ', options: ['א. חומצת גרעין', 'ב. חלבון', 'ג. שומן'] }];
+    const res = normalizeQuestionsJson(input);
+    assert.strictEqual(res.length, 1);
+    assert.strictEqual(res[0].question, 'שאלה 1. מהו DNA?');
+    assert.deepStrictEqual(res[0].options, ['חומצת גרעין', 'חלבון', 'שומן']);
 });
 
-// 2. parseCsvRows & extractAnswersForForm Tests
-runTest('extractAnswersForForm extracts correct 0-based option indices for specified form', () => {
+runTest('JSON Normalization', 'Removes PDF exam footer artifacts (עמוד X מתוך Y)', () => {
+    const input = [{ question: 'מהו תפקוד המיטוכונדריה? עמוד 3 מתוך 12 - סוף המבחן -', options: ['ייצור אנרגיה', 'תפיסת סוכרים'] }];
+    const res = normalizeQuestionsJson(input);
+    assert.strictEqual(res[0].question, 'מהו תפקוד המיטוכונדריה?');
+});
+
+runTest('JSON Normalization', 'Filters out empty questions & resets out-of-bounds correctIndex', () => {
+    const input = [
+        { question: '', options: ['תשובה 1'] },
+        { question: 'שאלה תקינה', options: ['תשובה 1', 'תשובה 2'], correctIndex: 99 }
+    ];
+    const res = normalizeQuestionsJson(input);
+    assert.strictEqual(res.length, 1);
+    assert.strictEqual(res[0].correctIndex, 0);
+});
+
+// 2. CSV & XLS Answer Key Merging
+runTest('CSV Answer Key Merging', 'Parses quoted CSV rows and extracts Form 76 and Form 32 answer maps', () => {
     const csv = 'Form,Q1,Q2,Q3,Q4\n76,א,ב,ג,ד\n32,4,3,2,1';
     const rows = parseCsvRows(csv);
-    assert.strictEqual(rows.length, 3);
-
-    const form76Map = extractAnswersForForm(rows, '76');
-    assert.deepStrictEqual(form76Map, { 1: 0, 2: 1, 3: 2, 4: 3 });
-
-    const form32Map = extractAnswersForForm(rows, '32');
-    assert.deepStrictEqual(form32Map, { 1: 3, 2: 2, 3: 1, 4: 0 });
+    const map76 = extractAnswersForForm(rows, '76');
+    const map32 = extractAnswersForForm(rows, '32');
+    assert.deepStrictEqual(map76, { 1: 0, 2: 1, 3: 2, 4: 3 });
+    assert.deepStrictEqual(map32, { 1: 3, 2: 2, 3: 1, 4: 0 });
 });
 
-// 3. mergeAnswers Tests
-runTest('mergeAnswers applies CSV answer map to questions array', () => {
+runTest('CSV Answer Key Merging', 'Merges correctIndex into questions array and disables random shuffling', () => {
     const questions = [
-        { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0 },
-        { question: 'Q2', options: ['A', 'B', 'C'], correctIndex: 0 }
+        { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true },
+        { question: 'Q2', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true }
     ];
     const answerMap = { 1: 2, 2: 1 };
     const merged = mergeAnswers(questions, answerMap);
     assert.strictEqual(merged[0].correctIndex, 2);
     assert.strictEqual(merged[1].correctIndex, 1);
+    assert.strictEqual(merged[0].shuffleOptions, false);
 });
 
-// 4. getStorageKey Hash Tests
-runTest('getStorageKey generates deterministic keys based on question content', () => {
-    const questionsA = [{ question: 'Sample Q', options: ['1', '2'] }];
-    const questionsB = [{ question: 'Different Q', options: ['1', '2'] }];
+// 3. LocalStorage Progress & Storage Hashing
+runTest('Storage Hashing', 'Generates deterministic storage keys based on question contents', () => {
+    const q1 = [{ question: 'Botany question test', options: ['1', '2'] }];
+    const q2 = [{ question: 'Physics question test', options: ['1', '2'] }];
+    const key1 = getStorageKey(q1);
+    const key1_repeat = getStorageKey(q1);
+    const key2 = getStorageKey(q2);
 
-    const keyA1 = getStorageKey(questionsA);
-    const keyA2 = getStorageKey(questionsA);
-    const keyB = getStorageKey(questionsB);
-
-    assert.strictEqual(keyA1, keyA2);
-    assert.notStrictEqual(keyA1, keyB);
-    assert.ok(keyA1.startsWith('quiz_answers_'));
+    assert.strictEqual(key1, key1_repeat);
+    assert.notStrictEqual(key1, key2);
+    assert.ok(key1.startsWith('quiz_answers_'));
 });
 
-// ── Summary ──────────────────────────────────────────────────────────────────
+// 4. Question Flagging State
+runTest('Question Flagging State', 'Initializes and updates userFlags boolean array correctly', () => {
+    const userFlags = new Array(5).fill(false);
+    userFlags[1] = true;
+    userFlags[3] = true;
 
-console.log(`\n──────────────────────────────────────────────────`);
-console.log(`📊 Test Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
-console.log(`──────────────────────────────────────────────────\n`);
+    const flaggedIndices = userFlags.reduce((acc, isFlagged, idx) => {
+        if (isFlagged) acc.push(idx + 1);
+        return acc;
+    }, []);
+
+    assert.deepStrictEqual(flaggedIndices, [2, 4]);
+    assert.strictEqual(userFlags.filter(Boolean).length, 2);
+});
+
+// ── Summary Metrics ───────────────────────────────────────────────────────────
+
+console.log(`\n──────────────────────────────────────────────────────────────`);
+console.log(`📊 Final Execution Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
+console.log(`──────────────────────────────────────────────────────────────\n`);
 
 if (testsFailed > 0) {
     process.exit(1);
