@@ -17,6 +17,14 @@ datas = [
     (python_scripts_src, 'cli-legacy/python_scripts'),
 ]
 
+# Include web app assets in bundle
+for web_asset in ['index.html', 'style.css', 'app.js', 'generator.js', 'quiz_generator.html', 'favicon.svg']:
+    asset_path = os.path.join(repo_root, web_asset)
+    if os.path.isfile(asset_path):
+        datas.append((asset_path, '.'))
+        datas.append((asset_path, 'web'))
+        datas.append((asset_path, 'cli-legacy'))
+
 a = Analysis(
     [os.path.join(spec_dir, 'quiz_builder_cli.py')],
     pathex=[repo_root, spec_dir],

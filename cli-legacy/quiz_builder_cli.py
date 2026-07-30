@@ -610,6 +610,18 @@ def run_step6(test_name, test_dir, q_final):
     print(f"\n {C_BOLD}[Step 6/6] Automated Post-Processing & Validation{C_RESET}")
     print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
 
+    # Auto-detect any exported JSON file that is not answers.json / page_map.json
+    if not os.path.exists(q_final):
+        other_jsons = [
+            f for f in os.listdir(test_dir)
+            if f.lower().endswith('.json') and f.lower() not in ['answers.json', 'page_map.json', 'pdf_type_result.json', 'manifest.json', 'questions.json']
+        ]
+        if other_jsons:
+            target_json = other_jsons[0]
+            cand_p = os.path.join(test_dir, target_json)
+            print(f"  {C_CYAN}[i] Auto-detected question JSON file ({target_json}). Renaming to questions.json...{C_RESET}\n")
+            shutil.move(cand_p, q_final)
+
     if os.path.exists(q_final):
         print(f"  {C_CYAN}[i] Merging answer key into questions.json...{C_RESET}")
         run_script('6_merge_json_answers.py', [test_dir])
