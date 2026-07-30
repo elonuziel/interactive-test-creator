@@ -938,7 +938,7 @@
             <div style="display: grid; gap: 10px; margin-bottom: 14px;">
                 <div
                     style="background: var(--input-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-size: .84rem;">
-                    <strong style="color: var(--primary-color);">🧹 ניקוי סטנדרטי (cli-legacy):</strong>
+                    <strong style="color: var(--primary-color);">🧹 ניקוי סטנדרטי (ניקוי אוטומטי למבחנים):</strong>
                     <span style="display: block; margin-top: 2px; color: var(--text-secondary);">מבטל אוטומטית עמודי שער
                         והוראות (עמודים 1-4) ועמודים זוגיים (שבדרך כלל ריקים בטפסי מבחן).</span>
                 </div>
@@ -999,7 +999,7 @@
                     <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
                         1. לחץ על הכפתור הכחול <strong>"📋 העתק ללוח"</strong> כדי להעתיק את ההוראות האוטומטיות.<br>
                         2. פתח את ChatGPT או Claude, צרף את קובץ ה-<strong>PDF הנקי</strong> שהורדת, והדבק את ההוראות שהעתקת.<br>
-                        3. ה-AI יפיק עבורך קובץ שאלות מוכן (<code>.json</code>). הורד אותו למחשב.
+                        3. ה-AI יפיק עבורך קובץ שאלות מוכן בפורמט Markdown (<code>questions.md</code>) או <code>.json</code>. הורד או העתק אותו למחשב.
                     </p>
                 </div>
 
@@ -1007,8 +1007,8 @@
                 <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
                     <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 3: טעינת השאלות ומיזוג פתרון התשובות 🔗</h4>
                     <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
-                        • העלה את קובץ השאלות שקיבלת מה-AI בשדה <strong>קובץ שאלות JSON</strong> (כל קובץ JSON נתמך!).<br>
-                        • <strong>מיזוג פתרון רשמי:</strong> אם יש לך קובץ תשובות רשמי (Excel/CSV), העלה אותו בשדה <strong>קובץ תשובות</strong>, הזן את מספר השאלון (למשל 32), ולחץ על <strong>"🔗 מזג תשובות נכונות לשאלות"</strong>.
+                        • העלה את קובץ השאלות בשדה <strong>קובץ שאלות (JSON / Markdown .md)</strong> (כל קובץ <code>questions.md</code> או JSON נתמך!).<br>
+                        • <strong>מיזוג פתרון רשמי:</strong> אם יש לך קובץ תשובות רשמי (Excel/CSV), העלה אותו בשדה <strong>קובץ תשובות</strong>, הזן את מספר השאלון (למשל 76), ולחץ על <strong>"🔗 מזג תשובות נכונות לשאלות"</strong>.
                     </p>
                 </div>
 
