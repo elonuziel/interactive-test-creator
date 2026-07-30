@@ -634,7 +634,8 @@
     <header class="navbar">
         <div class="logo">יוצר מבחן אינטראקטיבי</div>
         <div class="navbar-center">
-            <button id="full-guide-btn" type="button" class="guide-welcome-btn" title="לחץ לצפייה במדריך המלא צעד אחר צעד">
+            <button id="full-guide-btn" type="button" class="guide-welcome-btn"
+                title="לחץ לצפייה במדריך המלא צעד אחר צעד">
                 ✨ 📖 איך זה עובד? מדריך מקיף למתחילים
             </button>
         </div>
@@ -674,7 +675,8 @@
                         <button id="preset-std-btn" type="button" class="sm-btn secondary-btn"
                             title="מבטל עמודי שער/הוראות 1-4 ועמודים זוגיים">🧹 ניקוי סטנדרטי</button>
                         <button id="preset-even-odd-btn" type="button" class="sm-btn secondary-btn"
-                            title="בלחיצה ראשונה מסמן עמודים זוגיים, בלחיצה שנייה מסמן עמודים אי-זוגיים">📄 עמודים זוגיים</button>
+                            title="בלחיצה ראשונה מסמן עמודים זוגיים, בלחיצה שנייה מסמן עמודים אי-זוגיים">📄 עמודים
+                            זוגיים</button>
                         <button id="preset-select-all-btn" type="button" class="sm-btn secondary-btn">☑️ בחר
                             הכל</button>
                         <button id="preset-deselect-all-btn" type="button" class="sm-btn secondary-btn">☐ בטל
@@ -684,8 +686,11 @@
                     <button id="download-clean-pdf" type="button" class="success-btn sm-btn"
                         style="width:100%; margin: 8px 0 6px;" disabled>📥 הורד PDF נקי</button>
 
-                    <label style="display: flex; align-items: center; gap: 6px; font-size: .78rem; margin: 0 0 10px; cursor: pointer; color: var(--text-primary);" title="כאשר מסומן, ניתוח ה-API והפענוח האוטומטי ישלחו רק את העמודים שנבחרו בסרגל זה">
-                        <input type="checkbox" id="use-clean-pdf-for-api" checked style="accent-color: var(--primary-color);">
+                    <label
+                        style="display: flex; align-items: center; gap: 6px; font-size: .78rem; margin: 0 0 10px; cursor: pointer; color: var(--text-primary);"
+                        title="כאשר מסומן, ניתוח ה-API והפענוח האוטומטי ישלחו רק את העמודים שנבחרו בסרגל זה">
+                        <input type="checkbox" id="use-clean-pdf-for-api" checked
+                            style="accent-color: var(--primary-color);">
                         <span>⚡ השתמש בעמודים המסומנים בלבד בניתוח Gemini</span>
                     </label>
 
@@ -724,9 +729,11 @@
                     </div>
 
                     <div class="field">
-                        <label for="json-file">קובץ שאלות (JSON / Markdown .md) <span class="field-note-inline">אופציונלי / מ-LLM</span></label>
+                        <label for="json-file">קובץ שאלות (JSON / Markdown .md) <span
+                                class="field-note-inline">אופציונלי / מ-LLM</span></label>
                         <div class="file-wrap">
-                            <input id="json-file" type="file" accept=".json,.md,.txt,text/markdown,text/plain,application/json">
+                            <input id="json-file" type="file"
+                                accept=".json,.md,.txt,text/markdown,text/plain,application/json">
                             <button class="file-clear hidden" data-target="json-file" type="button" title="הסר קובץ">✕
                                 הסר</button>
                         </div>
@@ -765,7 +772,8 @@
                         <p class="section-label">⚙️&nbsp; הגדרות עיבוד מתקדמות (Gemini API)</p>
 
                         <!-- Card 1: Policy & Engine -->
-                        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                        <div
+                            style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
                             <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">1. מנוע ומדיניות LLM</p>
                             <div class="field">
                                 <label for="llm-policy">שימוש ב-LLM</label>
@@ -778,8 +786,10 @@
                             <div class="field">
                                 <label for="ocr-engine">מנוע OCR <span class="field-note-inline">לסרוקים</span></label>
                                 <select id="ocr-engine">
-                                    <option value="gemini_native_markdown">Gemini — Native PDF + Clean Markdown (1 קריאה — מהיר וקל, מומלץ)</option>
-                                    <option value="gemini_native_schema">Gemini — Native PDF + Enforced JSON Schema (1 קריאה — מובנה)</option>
+                                    <option value="gemini_native_markdown">Gemini — Native PDF + Clean Markdown (1 קריאה
+                                        — מהיר וקל, מומלץ)</option>
+                                    <option value="gemini_native_schema">Gemini — Native PDF + Enforced JSON Schema (1
+                                        קריאה — מובנה)</option>
                                     <option value="gemini_chunked">Gemini — פיצול עמודי תמונה (Chunking)</option>
                                     <option value="offline_local">OCR מקומי חינמי — ללא API Key</option>
                                 </select>
@@ -791,13 +801,16 @@
                         </div>
 
                         <!-- Card 2: API Credentials -->
-                        <div id="llm-auth-section" class="auth-section" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
-                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">2. 🔑&nbsp; אימות AQ / Gemini API</p>
+                        <div id="llm-auth-section" class="auth-section"
+                            style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">2. 🔑&nbsp; אימות
+                                Gemini API</p>
                             <div class="field">
-                                <label for="api-key">API Key (AQ... / AIza...) <button id="api-help-btn" class="help-btn" type="button"
-                                        title="איך משיגים API Key?">?</button></label>
+                                <label for="api-key">API Key <span dir="ltr"
+                                        style="font-size: .8rem; opacity: .8;"></span> <button id="api-help-btn"
+                                        class="help-btn" type="button" title="איך משיגים API Key?">?</button></label>
                                 <div class="password-wrap">
-                                    <input id="api-key" type="password" placeholder="הזן API Key (AQ... או AIza...)">
+                                    <input id="api-key" type="password" placeholder="AQ...">
                                     <button class="eye-btn" type="button" data-target="api-key"
                                         aria-label="הצג/הסתר מפתח" title="הצג/הסתר">👁️</button>
                                 </div>
@@ -814,11 +827,16 @@
                         </div>
 
                         <!-- Card 3: Performance & Options -->
-                        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
-                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">3. ⚡ אפשרויות ביצועים</p>
+                        <div
+                            style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                            <p style="font-weight: 600; font-size: .85rem; margin-bottom: 8px;">3. ⚡ אפשרויות ביצועים
+                            </p>
                             <div class="field" style="margin-top: 4px;">
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);" title="כאשר מסומן, המערכת תדלג על שלב הגהת השאלות הנוסף מול Gemini כדי לחסוך קריאות API ולהאיץ את העיבוד">
-                                    <input type="checkbox" id="skip-llm-verification" checked style="accent-color: var(--primary-color);">
+                                <label
+                                    style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);"
+                                    title="כאשר מסומן, המערכת תדלג על שלב הגהת השאלות הנוסף מול Gemini כדי לחסוך קריאות API ולהאיץ את העיבוד">
+                                    <input type="checkbox" id="skip-llm-verification" checked
+                                        style="accent-color: var(--primary-color);">
                                     <span>⚡ דילוג על הגהת LLM (עיבוד קל ומהיר יותר — 1 קריאת API בלבד)</span>
                                 </label>
                             </div>
@@ -846,8 +864,11 @@
                         <button id="take-quiz" class="secondary-btn" disabled>▶ פתור מבחן כעת</button>
                     </div>
                     <div style="margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);" title="כאשר מסומן, תמונות השאלות יידחסו אוטומטית בפורמט WebP 75% בתוך קובץ ה-HTML המיוצא לצמצום משמעותי של גודל הקובץ">
-                            <input type="checkbox" id="compress-export-images" checked style="accent-color: var(--primary-color);">
+                        <label
+                            style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);"
+                            title="כאשר מסומן, תמונות השאלות יידחסו אוטומטית בפורמט WebP 75% בתוך קובץ ה-HTML המיוצא לצמצום משמעותי של גודל הקובץ">
+                            <input type="checkbox" id="compress-export-images" checked
+                                style="accent-color: var(--primary-color);">
                             <span>⚡ דחוס תמונות בייצוא (WebP 75% — קובץ קטן ומהיר)</span>
                         </label>
                     </div>
@@ -870,26 +891,54 @@
     </main>
 
     <div id="api-help-popup" class="help-popup">
-        <div class="help-popup-content">
+        <div class="help-popup-content" style="max-width: 520px;">
             <h3>🔑 איך משיגים API Key?</h3>
-            <p>המערכת תומכת בשני סוגי מפתחות (שרת Elza בביטול / Phasing Out — ברירת המחדל הינה AQ API):</p>
-            <p>
-                <span class="key-type">1. AQ API Key (ברירת מחדל מומלצת)</span> <code>AQ...</code><br>
-                מפתח מומלץ למודלים מתקדמים (Gemini 2.5 Flash / 2.0 Flash). מתקבל דרך
-                <a href="https://console.cloud.google.com/apis/credentials" target="_blank"
-                    rel="noopener noreferrer">Google Cloud Console</a>.
+            <p style="font-size: .88rem; color: var(--text-secondary); margin-bottom: 12px;">
+                המערכת פועלת כעת ברירת מחדל מול <strong>AQ API</strong> (שרת Elza הישן בביטול):
             </p>
-            <p>
-                <span class="key-type">2. Gemini API Key</span> <code>AIza...</code><br>
-                חינמי, מתקבל מ־
-                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI
-                    Studio</a>.
-                מתאים לשימוש אישי עם מכסה נדיבה.
+
+            <div style="display: grid; gap: 10px; margin-bottom: 14px;">
+                <div
+                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <strong style="color: var(--primary-color); font-size: .92rem;">1. AQ API Key (ברירת מחדל
+                            מומלצת)</strong>
+                        <span
+                            style="font-family: monospace; font-size: .82rem; background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color);"
+                            dir="ltr">AQ...</span>
+                    </div>
+                    <p style="margin: 0; font-size: .83rem; color: var(--text-secondary); line-height: 1.4;">
+                        מפתח מומלץ למודלים מתקדמים (Gemini 2.5 Flash / 2.0 Flash). מתקבל דרך
+                        <a href="https://console.cloud.google.com/apis/credentials" target="_blank"
+                            rel="noopener noreferrer">Google Cloud Console</a>.
+                    </p>
+                </div>
+
+                <div
+                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <strong style="color: var(--primary-color); font-size: .92rem;">2. Gemini API Key</strong>
+                        <span
+                            style="font-family: monospace; font-size: .82rem; background: var(--card-bg); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color);"
+                            dir="ltr">AIza...</span>
+                    </div>
+                    <p style="margin: 0; font-size: .83rem; color: var(--text-secondary); line-height: 1.4;">
+                        חינמי, מתקבל מ־
+                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI
+                            Studio</a>.
+                        מתאים לשימוש אישי עם מכסה נדיבה.
+                    </p>
+                </div>
+            </div>
+
+            <p style="font-size: .82rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.4;">
+                💡 את המפתח מדביקים בשדה API Key — המערכת מזהה את סוג המפתח אוטומטית. ⚠️ <strong>שימו לב:</strong> שרת
+                Elza הישן בביטול (Phasing Out), והמערכת פועלת ברירת מחדל מול AQ API.
             </p>
-            <p style="font-size:.82rem;color:var(--text-secondary);">
-                💡 את המפתח מדביקים בשדה API Key — המערכת מזהה את סוג המפתח אוטומטית. ⚠️ <strong>שימו לב:</strong> שרת Elza הישן יוצא משימוש (Phasing Out), והמערכת פועלת כעת ברירת מחדל מול AQ API.
-            </p>
-            <button id="api-help-close" class="help-popup-close">הבנתי, תודה</button>
+
+            <button id="api-help-close" class="help-popup-close" type="button" style="width: 100%;">הבנתי, תודה</button>
         </div>
     </div>
 
@@ -908,10 +957,10 @@
     <div id="credential-popup" class="help-popup">
         <div class="help-popup-content">
             <h3>נדרש אימות ל-AQ / Gemini API</h3>
-            <p>הקובץ דורש עיבוד עם LLM. אפשר להזין עכשיו API Key (AQ... / AIza...) או Passcode למפתח המוצפן.</p>
+            <p>הקובץ דורש עיבוד עם LLM. אפשר להזין עכשיו API Key או Passcode למפתח המוצפן.</p>
             <div class="field">
                 <label for="credential-api-key">AQ / Gemini API Key</label>
-                <input id="credential-api-key" type="password" placeholder="AQ... או AIza...">
+                <input id="credential-api-key" type="password" placeholder="AQ...">
             </div>
             <div class="field">
                 <label for="credential-passcode">Passcode למפתח מוצפן</label>
@@ -946,7 +995,8 @@
                 <div
                     style="background: var(--input-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); font-size: .84rem;">
                     <strong style="color: var(--primary-color);">📄 עמודים זוגיים / אי-זוגיים:</strong>
-                    <span style="display: block; margin-top: 2px; color: var(--text-secondary);">בלחיצה ראשונה מסמן אך ורק עמודים זוגיים (2, 4, 6...), ובלחיצה שנייה מסמן אך ורק עמודים אי-זוגיים (1, 3, 5...).</span>
+                    <span style="display: block; margin-top: 2px; color: var(--text-secondary);">בלחיצה ראשונה מסמן אך
+                        ורק עמודים זוגיים (2, 4, 6...), ובלחיצה שנייה מסמן אך ורק עמודים אי-זוגיים (1, 3, 5...).</span>
                 </div>
 
                 <div
@@ -985,45 +1035,62 @@
 
             <div style="display: grid; gap: 14px;">
                 <!-- Step 1 -->
-                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 1: העלאת PDF וסינון עמודי שער 📄🧹</h4>
+                <div
+                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 1: העלאת PDF וסינון
+                        עמודי שער 📄🧹</h4>
                     <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
                         • העלה את קובץ ה-PDF של המבחן בשדה <strong>קובץ מבחן (PDF)</strong>.<br>
-                        • 💡 <strong>מומלץ בחום למבחנים סרוקים:</strong> בסרגל העמודים מימין, לחץ על <strong>"🧹 ניקוי סטנדרטי"</strong> או בטל עמודי שער והוראות באופן ידני, ואז לחץ <strong>"📥 הורד PDF נקי"</strong>. קובץ ממוקד זה יעניק לך דיוק מקסימלי בחילוץ השאלות!
+                        • 💡 <strong>מומלץ בחום למבחנים סרוקים:</strong> בסרגל העמודים מימין, לחץ על <strong>"🧹 ניקוי
+                            סטנדרטי"</strong> או בטל עמודי שער והוראות באופן ידני, ואז לחץ <strong>"📥 הורד PDF
+                            נקי"</strong>. קובץ ממוקד זה יעניק לך דיוק מקסימלי בחילוץ השאלות!
                     </p>
                 </div>
 
                 <!-- Step 2 -->
-                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 2: חילוץ השאלות בעזרת ChatGPT / Claude 🤖</h4>
+                <div
+                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 2: חילוץ השאלות בעזרת
+                        ChatGPT / Claude 🤖</h4>
                     <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
                         1. לחץ על הכפתור הכחול <strong>"📋 העתק ללוח"</strong> כדי להעתיק את ההוראות האוטומטיות.<br>
-                        2. פתח את ChatGPT או Claude, צרף את קובץ ה-<strong>PDF הנקי</strong> שהורדת, והדבק את ההוראות שהעתקת.<br>
-                        3. ה-AI יפיק עבורך קובץ שאלות מוכן בפורמט Markdown (<code>questions.md</code>) או <code>.json</code>. הורד או העתק אותו למחשב.
+                        2. פתח את ChatGPT או Claude, צרף את קובץ ה-<strong>PDF הנקי</strong> שהורדת, והדבק את ההוראות
+                        שהעתקת.<br>
+                        3. ה-AI יפיק עבורך קובץ שאלות מוכן בפורמט Markdown (<code>questions.md</code>) או
+                        <code>.json</code>. הורד או העתק אותו למחשב.
                     </p>
                 </div>
 
                 <!-- Step 3 -->
-                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 3: טעינת השאלות ומיזוג פתרון התשובות 🔗</h4>
+                <div
+                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 3: טעינת השאלות
+                        ומיזוג פתרון התשובות 🔗</h4>
                     <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
-                        • העלה את קובץ השאלות בשדה <strong>קובץ שאלות (JSON / Markdown .md)</strong> (כל קובץ <code>questions.md</code> או JSON נתמך!).<br>
-                        • <strong>מיזוג פתרון רשמי:</strong> אם יש לך קובץ תשובות רשמי (Excel/CSV), העלה אותו בשדה <strong>קובץ תשובות</strong>, הזן את מספר השאלון (למשל 76), ולחץ על <strong>"🔗 מזג תשובות נכונות לשאלות"</strong>.
+                        • העלה את קובץ השאלות בשדה <strong>קובץ שאלות (JSON / Markdown .md)</strong> (כל קובץ
+                        <code>questions.md</code> או JSON נתמך!).<br>
+                        • <strong>מיזוג פתרון רשמי:</strong> אם יש לך קובץ תשובות רשמי (Excel/CSV), העלה אותו בשדה
+                        <strong>קובץ תשובות</strong>, הזן את מספר השאלון (למשל 76), ולחץ על <strong>"🔗 מזג תשובות
+                            נכונות לשאלות"</strong>.
                     </p>
                 </div>
 
                 <!-- Step 4 -->
-                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 4: תרגול וייצוא מבחן עצמאי 🚀</h4>
+                <div
+                    style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 4: תרגול וייצוא מבחן
+                        עצמאי 🚀</h4>
                     <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
                         • תוכל לערוך כל שאלה או תשובה בתצוגה המקדימה שבתחתית העמוד.<br>
-                        • לחץ <strong>"▶ פתור מבחן כעת"</strong> לתרגול מיידי בדפדפן, או <strong>"📥 הורד מבחן עצמאי (HTML)"</strong> כדי לקבל מבחן אינטראקטיבי שעובד 100% אופליין בכל מכשיר וטלפון!
+                        • לחץ <strong>"▶ פתור מבחן כעת"</strong> לתרגול מיידי בדפדפן, או <strong>"📥 הורד מבחן עצמאי
+                            (HTML)"</strong> כדי לקבל מבחן אינטראקטיבי שעובד 100% אופליין בכל מכשיר וטלפון!
                     </p>
                 </div>
             </div>
 
             <div style="margin-top: 18px; text-align: center;">
-                <button id="full-guide-close" class="primary-btn" type="button" style="padding: 10px 36px; font-weight: 700;">הבנתי, בוא נתחיל! 🚀</button>
+                <button id="full-guide-close" class="primary-btn" type="button"
+                    style="padding: 10px 36px; font-weight: 700;">הבנתי, בוא נתחיל! 🚀</button>
             </div>
         </div>
     </div>
