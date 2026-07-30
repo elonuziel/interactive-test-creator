@@ -6,34 +6,23 @@ block_cipher = None
 
 # Directory containing this spec file
 spec_dir = SPECPATH
-repo_root = os.path.dirname(spec_dir)
 
 python_scripts_src = os.path.join(spec_dir, 'python_scripts')
-if not os.path.isdir(python_scripts_src):
-    python_scripts_src = os.path.join(repo_root, 'python_scripts')
+web_dir_src = os.path.join(spec_dir, 'web')
 
 datas = [
     (python_scripts_src, 'python_scripts'),
     (python_scripts_src, 'cli-legacy/python_scripts'),
 ]
 
-# Include web app assets in bundle
-web_dir_src = os.path.join(spec_dir, 'web')
 if os.path.isdir(web_dir_src):
     datas.append((web_dir_src, 'cli-legacy/web'))
     datas.append((web_dir_src, 'web'))
     datas.append((web_dir_src, '.'))
 
-for web_asset in ['index.html', 'style.css', 'app.js', 'generator.js', 'quiz_generator.html', 'favicon.svg']:
-    asset_path = os.path.join(repo_root, web_asset)
-    if os.path.isfile(asset_path):
-        datas.append((asset_path, '.'))
-        datas.append((asset_path, 'web'))
-        datas.append((asset_path, 'cli-legacy'))
-
 a = Analysis(
     [os.path.join(spec_dir, 'quiz_builder_cli.py')],
-    pathex=[repo_root, spec_dir],
+    pathex=[spec_dir],
     binaries=[],
     datas=datas,
     hiddenimports=[

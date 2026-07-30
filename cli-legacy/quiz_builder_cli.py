@@ -57,20 +57,17 @@ C_WHITE = "\033[97m"
 
 # Path setup: Resolve actual directory where the .exe or script is executed
 if getattr(sys, 'frozen', False):
-    REPO_ROOT = os.path.dirname(os.path.abspath(sys.executable))
-    MEI_DIR = getattr(sys, '_MEIPASS', REPO_ROOT)
+    CLI_ROOT = os.path.dirname(os.path.abspath(sys.executable))
+    MEI_DIR = getattr(sys, '_MEIPASS', CLI_ROOT)
     PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'python_scripts')
     if not os.path.isdir(PYTHON_SCRIPTS_DIR):
         PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'cli-legacy', 'python_scripts')
 else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    REPO_ROOT = os.path.dirname(BASE_DIR) if os.path.basename(BASE_DIR) == 'cli-legacy' else BASE_DIR
-    MEI_DIR = BASE_DIR
-    PYTHON_SCRIPTS_DIR = os.path.join(REPO_ROOT, 'cli-legacy', 'python_scripts')
-    if not os.path.isdir(PYTHON_SCRIPTS_DIR):
-        PYTHON_SCRIPTS_DIR = os.path.join(REPO_ROOT, 'python_scripts')
+    CLI_ROOT = os.path.dirname(os.path.abspath(__file__))
+    MEI_DIR = CLI_ROOT
+    PYTHON_SCRIPTS_DIR = os.path.join(CLI_ROOT, 'python_scripts')
 
-TESTS_DIR = os.path.join(REPO_ROOT, 'tests')
+TESTS_DIR = os.path.join(CLI_ROOT, 'tests')
 
 def copy_to_clipboard(text):
     if sys.platform == 'win32':
@@ -119,7 +116,7 @@ def check_prerequisites():
     else:
         print(f"  {C_GREEN}[✔] Python Core Environment & Libraries are ready.{C_RESET}\n")
 
-def format_size(size_bytes):
+def format_bytes(size_bytes):
     if size_bytes < 1024:
         return f"{size_bytes} B"
     elif size_bytes < 1024 * 1024:
@@ -133,9 +130,7 @@ def run_script(script_name, args):
         os.path.join(PYTHON_SCRIPTS_DIR, script_name),
         os.path.join(MEI_DIR, 'python_scripts', script_name),
         os.path.join(MEI_DIR, 'cli-legacy', 'python_scripts', script_name),
-        os.path.join(REPO_ROOT, 'cli-legacy', 'python_scripts', script_name),
-        os.path.join(REPO_ROOT, 'python_scripts', script_name),
-        os.path.join(REPO_ROOT, script_name),
+        os.path.join(CLI_ROOT, 'python_scripts', script_name),
     ]
 
     script_path = None
@@ -145,7 +140,7 @@ def run_script(script_name, args):
             break
 
     if not script_path:
-        print(f"  {C_RED}[✘] Error: Script {script_name} not found in bundle or disk.{C_RESET}")
+        print(f"  {C_RED}[✘] Script {script_name} not found in {PYTHON_SCRIPTS_DIR}{C_RESET}")
         return 1
 
     old_argv = sys.argv
@@ -162,7 +157,13 @@ def run_script(script_name, args):
         sys.argv = old_argv
 
 def start_local_server(port=8000):
-    os.chdir(REPO_ROOT)
+    web_dir = os.path.join(MEI_DIR, 'web')
+    if not os.path.isdir(web_dir):
+        web_dir = os.path.join(CLI_ROOT, 'web')
+    if not os.path.isdir(web_dir):
+        web_dir = CLI_ROOT
+
+    os.chdir(web_dir)
     handler = http.server.SimpleHTTPRequestHandler
     httpd = socketserver.TCPServer(("", port), handler)
     print(f"\n  {C_GREEN}[✔] Local Web Server active at http://localhost:{port}/{C_RESET}")
@@ -175,7 +176,7 @@ def start_local_server(port=8000):
     t.start()
     
     time.sleep(0.5)
-    target_url = f"http://localhost:{port}/quiz_generator.html" if os.path.isfile(os.path.join(REPO_ROOT, 'quiz_generator.html')) else f"http://localhost:{port}/"
+    target_url = f"http://localhost:{port}/index.html" if os.path.isfile(os.path.join(web_dir, 'index.html')) else f"http://localhost:{port}/"
     webbrowser.open(target_url)
 
 def interactive_wizard():
