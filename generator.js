@@ -1715,6 +1715,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyStandardFilter() {
         if (!state.pdfPagesState || !state.pdfPagesState.length) return;
+        state.evenOddMode = null;
+        const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
+        if (btn) btn.textContent = '📄 עמודים זוגיים';
         state.pdfPagesState.forEach(p => {
             if (p.pageNum <= 4) p.keep = false;
             else if (p.pageNum >= 6 && p.pageNum % 2 === 0) p.keep = false;
@@ -1751,6 +1754,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function selectAllPages(keepState) {
         if (!state.pdfPagesState || !state.pdfPagesState.length) return;
+        state.evenOddMode = null;
+        const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
+        if (btn) btn.textContent = '📄 עמודים זוגיים';
         state.pdfPagesState.forEach(p => {
             p.keep = keepState;
         });
@@ -1779,7 +1785,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bytes = state.pdfBytes;
             }
 
-            const freshCopy = new Uint8Array(bytes);
+            const freshCopy = new Uint8Array(bytes.buffer.slice(0));
             const srcDoc = await window.PDFLib.PDFDocument.load(freshCopy);
             const newDoc = await window.PDFLib.PDFDocument.create();
 

@@ -398,11 +398,33 @@ input:checked + .slider:before {
 /* ── Question Jump Bar ───────────────────────────────────────────────────── */
 .jump-bar {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-    padding: 0.625rem 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.5rem;
+    padding: 0.625rem 0.25rem;
     margin-bottom: 1rem;
     justify-content: flex-start;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-color) transparent;
+}
+
+.jump-bar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.jump-bar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.jump-bar::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.jump-bar::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
 }
 
 .jump-btn {
