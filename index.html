@@ -642,6 +642,84 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        #download-quiz:disabled,
+        #take-quiz:disabled,
+        .success-btn:disabled,
+        .secondary-btn:disabled,
+        button:disabled {
+            background-color: #cbd5e1 !important;
+            background: #cbd5e1 !important;
+            color: #64748b !important;
+            border-color: #cbd5e1 !important;
+            opacity: 0.55 !important;
+            cursor: not-allowed !important;
+            box-shadow: none !important;
+            transform: none !important;
+            filter: grayscale(100%) !important;
+        }
+
+        [data-theme="dark"] #download-quiz:disabled,
+        [data-theme="dark"] #take-quiz:disabled,
+        [data-theme="dark"] .success-btn:disabled,
+        [data-theme="dark"] .secondary-btn:disabled,
+        [data-theme="dark"] button:disabled {
+            background-color: #334155 !important;
+            background: #334155 !important;
+            color: #64748b !important;
+            border-color: #475569 !important;
+        }
+
+        .nav-toggle-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .nav-toggle-pill:hover:not(.disabled):not(:has(input:disabled)) {
+            border-color: var(--primary-color);
+            background: var(--card-bg);
+        }
+
+        .nav-toggle-pill:has(input:disabled),
+        .nav-toggle-pill.disabled {
+            opacity: 0.55 !important;
+            cursor: not-allowed !important;
+            background: #cbd5e1 !important;
+            color: #64748b !important;
+            border-color: #cbd5e1 !important;
+            filter: grayscale(100%) !important;
+        }
+
+        [data-theme="dark"] .nav-toggle-pill:has(input:disabled),
+        [data-theme="dark"] .nav-toggle-pill.disabled {
+            background: #334155 !important;
+            color: #64748b !important;
+            border-color: #475569 !important;
+        }
+
+        .nav-toggle-pill input[type="checkbox"] {
+            accent-color: var(--primary-color);
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            margin: 0;
+        }
+
+        .nav-toggle-pill input[type="checkbox"]:disabled {
+            cursor: not-allowed !important;
+        }
     </style>
 </head>
 
@@ -656,6 +734,11 @@
         </div>
         <div class="controls">
             <button id="download-quiz" class="success-btn sm-btn" disabled title="הורד מבחן עצמאי (HTML)">📥 הורד מבחן עצמאי (HTML)</button>
+            <label class="nav-toggle-pill"
+                title="כאשר מסומן, תמונות השאלות יידחסו אוטומטית בפורמט WebP 75% בתוך קובץ ה-HTML המיוצא לצמצום משמעותי של גודל הקובץ">
+                <input type="checkbox" id="compress-export-images" disabled>
+                <span>⚡ דחוס WebP</span>
+            </label>
             <button id="take-quiz" class="secondary-btn sm-btn" disabled title="פתור מבחן כעת בלשונית חדשה">▶ פתור מבחן כעת</button>
             <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
                 <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
@@ -893,15 +976,6 @@
                         </div>
                     </div>
 
-                    <div style="margin-top: 8px;">
-                        <label
-                            style="display: flex; align-items: center; gap: 6px; font-size: .82rem; cursor: pointer; color: var(--text-primary);"
-                            title="כאשר מסומן, תמונות השאלות יידחסו אוטומטית בפורמט WebP 75% בתוך קובץ ה-HTML המיוצא לצמצום משמעותי של גודל הקובץ">
-                            <input type="checkbox" id="compress-export-images" checked
-                                style="accent-color: var(--primary-color);">
-                            <span>⚡ דחוס תמונות בייצוא (WebP 75% — קובץ קטן ומהיר)</span>
-                        </label>
-                    </div>
                     <div class="proof-row">
                         <label for="proof-mode-toggle" class="proof-label">מצב הגהה</label>
                         <span class="proof-note">הצגת עמוד מקור לכל שאלה</span>

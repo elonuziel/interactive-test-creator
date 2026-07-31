@@ -88,12 +88,10 @@ body {
 }
 
 .navbar-center {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0 10px;
 }
 
 .guide-welcome-btn {
@@ -263,6 +261,57 @@ input:checked + .slider:before {
     border-color: var(--primary-color);
 }
 
+.nav-toggle-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.nav-toggle-pill:hover:not(.disabled):not(:has(input:disabled)) {
+    border-color: var(--primary-color);
+    background: var(--card-bg);
+}
+
+.nav-toggle-pill:has(input:disabled),
+.nav-toggle-pill.disabled {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+    background: #cbd5e1 !important;
+    color: #64748b !important;
+    border-color: #cbd5e1 !important;
+    filter: grayscale(100%) !important;
+}
+
+[data-theme="dark"] .nav-toggle-pill:has(input:disabled),
+[data-theme="dark"] .nav-toggle-pill.disabled {
+    background: #334155 !important;
+    color: #64748b !important;
+    border-color: #475569 !important;
+}
+
+.nav-toggle-pill input[type="checkbox"] {
+    accent-color: var(--primary-color);
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+}
+
+.nav-toggle-pill input[type="checkbox"]:disabled {
+    cursor: not-allowed !important;
+}
+
 /* ── Main Container ──────────────────────────────────────────────────────── */
 .container {
     flex: 1;
@@ -395,21 +444,35 @@ input:checked + .slider:before {
     filter: brightness(0.95);
 }
 
+#download-quiz:disabled,
+#take-quiz:disabled,
 button:disabled,
 button[disabled],
 .primary-btn:disabled,
 .secondary-btn:disabled,
 .success-btn:disabled,
 .warning-btn:disabled {
-    opacity: 0.45 !important;
+    opacity: 0.55 !important;
     cursor: not-allowed !important;
     box-shadow: none !important;
     transform: none !important;
-    background: var(--input-bg) !important;
-    background-color: var(--input-bg) !important;
-    color: var(--text-secondary) !important;
-    border: 1px solid var(--border-color) !important;
+    background: #cbd5e1 !important;
+    background-color: #cbd5e1 !important;
+    color: #64748b !important;
+    border: 1px solid #cbd5e1 !important;
     filter: grayscale(100%) !important;
+}
+
+[data-theme="dark"] #download-quiz:disabled,
+[data-theme="dark"] #take-quiz:disabled,
+[data-theme="dark"] button:disabled,
+[data-theme="dark"] button[disabled],
+[data-theme="dark"] .success-btn:disabled,
+[data-theme="dark"] .secondary-btn:disabled {
+    background: #334155 !important;
+    background-color: #334155 !important;
+    color: #64748b !important;
+    border-color: #475569 !important;
 }
 
 .lg-btn {

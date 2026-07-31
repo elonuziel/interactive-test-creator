@@ -273,8 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function disableOutputActions(disabled) {
-        elements.downloadQuiz.disabled = disabled;
-        elements.takeQuiz.disabled = disabled;
+        if (elements.downloadQuiz) elements.downloadQuiz.disabled = disabled;
+        if (elements.takeQuiz) elements.takeQuiz.disabled = disabled;
+        if (elements.compressExportImages) elements.compressExportImages.disabled = disabled;
     }
 
     function setPdfTypeNote(message = '', tone = 'neutral') {
