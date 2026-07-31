@@ -1066,9 +1066,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        const qPattern = /(?:^#*\s*(?:\*\*)?שאלה\s+(?:מספר\s*)?:?\s*\d+\s*:?|^#*\s*(?:\*\*)?\d+\s*:?\s*מספר\s+שאלה|^\.?\s*#*\s*(?:\*\*)?\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*#*\s*(?:\*\*)?\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/i;
-        // Matches: '- א. text', '- **א.** text', '* א. text', '(א) text', 'א. text', '1. text'
-        const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?(?:\*\*)?[\(\[]?([אבגדהוזחטיa-e1-9])[\)\]\.]\s*(?:\*\*)?\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/i;
+        const qPattern = /(?:^#*\s*(?:\*\*)?שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|^#*\s*(?:\*\*)?:?\d+\s*:?\s*מספר\s+שאלה|^\.?\s*#*\s*(?:\*\*)?:?\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*#*\s*(?:\*\*)?:?\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/i;
+        // Matches: '- א. text', '- **א.** text', '* א. text', '(א) text', 'א. text', '1. text', 'א . text'
+        const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?(?:\*\*)?[\(\[]?([אבגדהוזחטיa-e1-9])\s*[\)\]\.]\s*(?:\*\*)?\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/i;
         // Matches: 'text א.' or 'text .א' at end of line
         const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$|^(.*)\s+[\.]\s*([אבגדהוזחטי])$/;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
@@ -1107,7 +1107,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // ansPatternStart captures: (1,2) => 'א. text', (3,4) => 'א) text', (5,6) => '. א text'.
+            const isLineStartMatch = ansPatternStart.test(line);
             let match = line.match(ansPatternStart) || reversedLine.match(ansPatternStart);
+            const isLineEndMatch = !match && ansPatternEnd.test(line);
             let endMatch = (!match) && (line.match(ansPatternEnd) || reversedLine.match(ansPatternEnd));
 
             if (match || endMatch) {
@@ -1116,9 +1118,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (match) {
                     letter = match[1] || match[3] || match[5];
                     answerText = (match[2] || match[4] || match[6] || '').trim();
+                    if (!isLineStartMatch && answerText) {
+                        answerText = answerText.split(/\s+/).reverse().join(' ');
+                    }
                 } else {
                     letter = endMatch[2] || endMatch[4];
-                    answerText = (endMatch[1] || '').trim();
+                    answerText = (endMatch[1] || endMatch[3] || '').trim();
+                    if (!isLineEndMatch && answerText) {
+                        answerText = answerText.split(/\s+/).reverse().join(' ');
+                    }
                 }
 
                 if (!letter) {
