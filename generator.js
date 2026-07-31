@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         formNumber: document.getElementById('form-number'),
         mergeAnswersBtn: document.getElementById('merge-answers-btn'),
         autoAttachDiagramsBtn: document.getElementById('auto-attach-diagrams-btn'),
+        stripQuestionHeadersBtn: document.getElementById('strip-question-headers-btn'),
+        stripQuestionHeadersBtnPreview: document.getElementById('strip-question-headers-btn-preview'),
         ocrEngine: document.getElementById('ocr-engine'),
         llmPolicy: document.getElementById('llm-policy'),
         apiKey: document.getElementById('api-key'),
@@ -344,6 +346,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return value
             .replace(/\[cite:\s*\d+\]/gi, '')
             .replace(/-+\s*סוף\s+המבחן\s*-+/g, ' ');
+    }
+
+    function stripQuestionHeaderPrefix(value) {
+        if (!value) return '';
+        let t = value.replace(/^#+\s*/, '').trim();
+        const prefixPattern = /^(?:(?:שאלה(?:\s+מספר)?\s*:?\s*:?\d+\s*:?|:?\d+\s*:?\s*(?:שאלה(?:\s+מספר)?|מספר\s+שאלה)|מספר\s+שאלה\s*:?\s*:?\d+\s*:?|\d+\s*[\.\)-])\s*)+:?\s*/i;
+        const cleaned = t.replace(prefixPattern, '').trim();
+        return cleaned || t;
     }
 
     function fixHebrewWordOrder(text) {
@@ -1151,15 +1161,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const formatted = rawQuestions
             .map((q, idx) => {
                 let rawQuestionText = normalizeWhitespace(stripExamFooterArtifacts(q.text.join(' ')));
-                // Clean leading Markdown heading syntax (e.g. ### שאלה 1:)
-                rawQuestionText = rawQuestionText.replace(/^#+\s*/, '').trim();
+                // Clean leading Markdown heading syntax & question header prefixes (e.g. ### שאלה 1:, שאלה מספר :1)
+                rawQuestionText = stripQuestionHeaderPrefix(rawQuestionText);
 
                 let pageIdx = filteredLinePageMap[q.lineIdx] ?? 0;
                 const pageMatch = rawQuestionText.match(/\((?:עמוד|עמ'|page)\s*(\d+)\)/i);
                 if (pageMatch) {
                     pageIdx = Math.max(0, parseInt(pageMatch[1], 10) - 1);
                 }
-                const cleanQuestionText = rawQuestionText.replace(/\s*\((?:עמוד|עמ'|page)\s*\d+\)$/i, '').trim();
+                const cleanQuestionText = stripQuestionHeaderPrefix(rawQuestionText.replace(/\s*\((?:עמוד|עמ'|page)\s*\d+\)$/i, '')).trim();
 
                 const options = q.answers
                     .map((a) => normalizeWhitespace(stripExamFooterArtifacts(a.text.join(' '))))
@@ -2063,6 +2073,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const rawQuestion = item.question || item.title || item.text || '';
+            const cleanQuestion = stripQuestionHeaderPrefix(normalizeWhitespace(rawQuestion));
             let options = item.options || item.answers || item.choices || [];
             if (!Array.isArray(options)) options = [];
 
@@ -2082,7 +2093,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return {
                 id: item.id || (index + 1),
-                question: rawQuestion,
+                question: cleanQuestion,
                 options: options,
                 correctIndex: correctIndex,
                 image: item.image || item.pageImage || null,
@@ -2516,8 +2527,32 @@ STRICT EXTRACTION & FORMATTING RULES:
         }
     }
 
+    function stripAllQuestionHeaderPrefixes() {
+        if (!state.questions || state.questions.length === 0) {
+            showToast('אין שאלות טעונות במערכת לניקוי.', 'info');
+            return;
+        }
+        let count = 0;
+        state.questions.forEach((q) => {
+            const original = q.question;
+            const cleaned = stripQuestionHeaderPrefix(original);
+            if (cleaned !== original) {
+                q.question = cleaned;
+                count++;
+            }
+        });
+        renderPreview();
+        if (count > 0) {
+            showToast(`נוקו כותרות 'שאלה מספר X' מ-${count} שאלות בהצלחה!`, 'success');
+        } else {
+            showToast('כל השאלות כבר נקיות מכותרות.', 'info');
+        }
+    }
+
     elements.mergeAnswersBtn?.addEventListener('click', () => tryMergeAnswersFromCsv(true));
     elements.autoAttachDiagramsBtn?.addEventListener('click', autoAttachDiagramPageImages);
+    elements.stripQuestionHeadersBtn?.addEventListener('click', stripAllQuestionHeaderPrefixes);
+    elements.stripQuestionHeadersBtnPreview?.addEventListener('click', stripAllQuestionHeaderPrefixes);
 
     // jsonFile Upload Listener (Supports questions.json and questions.md)
     elements.jsonFile?.addEventListener('change', async () => {
