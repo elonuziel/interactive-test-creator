@@ -66,13 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const feedbackToggle = document.getElementById('immediate-feedback-toggle');
     const themeIcon      = document.getElementById('theme-icon');
     const filterBtns     = document.querySelectorAll('.filter-btn');
-    const builderNavLink = document.getElementById('builder-nav-link');
-
-    // A live quiz is opened from a blob URL, so a relative `index.html` link
+    // A live quiz is opened via window.open, so a relative `index.html` link
     // cannot resolve back to the builder. Return through the opener instead.
     // For downloaded standalone quizzes (or direct quiz_player.html visits),
     // there is no opener and the normal link remains available.
-    builderNavLink?.addEventListener('click', (event) => {
+    function returnToBuilder(event) {
         if (!window.opener || window.opener.closed) return;
 
         event.preventDefault();
@@ -96,6 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Keep the page usable if the browser blocks opener inspection.
             }
         }, 100);
+    }
+
+    document.querySelectorAll('#builder-nav-link, #builder-nav-error-link').forEach(link => {
+        link.addEventListener('click', returnToBuilder);
     });
 
     // ── Theme ────────────────────────────────────────────────────────────────
@@ -201,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (welcomeCard) {
                 const errDiv = document.createElement('div');
                 errDiv.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:.75rem;background:var(--error-bg);color:var(--error-color);border:1px solid var(--error-color);font-size:.9rem;';
-                errDiv.innerHTML = '⚠️ לא נמצא קובץ שאלות. פתח מבחן שהורד מ<a href="index.html" style="color:inherit;text-decoration:underline;">יוצר המבחן</a> ישירות, או השתמש בכפתור "פתור מבחן כעת".';
+                errDiv.innerHTML = '⚠️ לא נמצא קובץ שאלות. <a href="#" id="builder-nav-error-link" style="color:inherit;text-decoration:underline;">פתח את יוצר המבחן</a> כדי לטעון שאלות, או השתמש בכפתור "פתור מבחן כעת".';
                 welcomeCard.appendChild(errDiv);
             }
             startBtn.disabled = true;

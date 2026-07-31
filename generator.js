@@ -2188,6 +2188,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // Write a minimal loading page immediately so the tab shows a spinner
+            // instead of blank while createStandaloneQuizHtml() runs (can be slow
+            // for large quizzes with image compression).
+            previewWindow.document.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>מכין מבחן...</title><style>body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:Rubik,system-ui,sans-serif;background:#f8fafc;color:#0f172a;direction:rtl}@keyframes bspin{to{transform:rotate(360deg)}}.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:bspin .7s linear infinite;margin-bottom:16px}.wr{text-align:center}p{font-size:1.1rem;margin:0}</style></head><body><div class="wr"><div class="sp"></div><p>מכין מבחן...</p></div></body></html>');
             previewWindow.document.title = 'מכין מבחן...';
             setStatus('פותח תצוגת מבחן...');
             const html = await createStandaloneQuizHtml();
