@@ -145,7 +145,15 @@ body {
 .controls {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 0.65rem;
+}
+
+button:disabled,
+button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
 }
 
 /* ── Toggle Switch ───────────────────────────────────────────────────────── */
