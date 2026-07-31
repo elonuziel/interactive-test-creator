@@ -626,6 +626,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateCustomPracticeSelection();
 
+        const scoreText = document.getElementById('score-text');
+        if (scoreText) {
+            scoreText.textContent = `ענית נכונה על ${correctCount} מתוך ${total} שאלות.`;
+        }
+
         const circle = document.querySelector('.score-circle');
         const scoreEl = document.getElementById('final-score');
 

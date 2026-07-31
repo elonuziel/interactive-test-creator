@@ -218,14 +218,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.body.style.overflow = '';
                 }
             });
-            document.addEventListener('keydown', function onKey(e) {
-                if (e.key === 'Escape') {
+            document.body.appendChild(overlay);
+            // Single persistent Escape handler — registered once on the overlay element
+            overlay._keyHandler = (e) => {
+                if (e.key === 'Escape' && overlay.style.display !== 'none') {
                     overlay.style.display = 'none';
                     document.body.style.overflow = '';
-                    document.removeEventListener('keydown', onKey);
                 }
-            });
-            document.body.appendChild(overlay);
+            };
+            document.addEventListener('keydown', overlay._keyHandler);
         }
 
         const zoomImg = document.getElementById('gen-zoom-img');
@@ -895,13 +896,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         const promptFeedback = payload.promptFeedback?.blockReason || 'NONE';
                         throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}, Prompt Blocked: ${promptFeedback}. Raw: ${JSON.stringify(payload)}`);
                     }
-                    // Split the text by the delimiter to return an array of pages
-                    const extractedPages = text.split(/---PAGE_BOUNDARY---/i).map(s => s.trim());
-                    // Pad with empty strings if Gemini returned fewer pages than expected
-                    while (extractedPages.length < imageDatas.length) {
-                        extractedPages.push('');
-                    }
-                    return extractedPages;
+                    // The OCR prompt requests a JSON array (responseMimeType: "application/json"),
+                    // so Gemini never emits PAGE_BOUNDARY separators. Return the full response
+                    // as a single element; the caller joins all chunks before parseQuestionsFromText
+                    // which handles JSON-first parsing.
+                    return [text];
                 }
 
                 const errorText = await response.text();
@@ -1958,6 +1957,7 @@ document.addEventListener('DOMContentLoaded', () => {
         disableOutputActions(true);
         elements.preview.innerHTML = '';
         state.proofPageImages = [];
+        state.pdfBytes = null; // will be set below after reading the file
         let apiKey = '';
 
         const pdf = elements.pdfFile.files?.[0];
@@ -1974,6 +1974,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let pdfFileToParse = pdf;
         let pdfBufferForParse = (await pdf.arrayBuffer()).slice(0);
+        // Store raw bytes so hi-res lightbox zoom works regardless of whether the
+        // sidebar was previously loaded (state.pdfBytes may still be null).
+        if (!state.pdfBytes || state.pdfBytes.length === 0) {
+            state.pdfBytes = new Uint8Array(pdfBufferForParse.slice(0));
+        }
 
         const useCleanPdf = elements.useCleanPdfForApi ? elements.useCleanPdfForApi.checked : true;
         if (useCleanPdf) {
@@ -2077,13 +2082,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (q._needsPageRender && !q.image && extracted.pdf && q.sourcePage) {
                 try {
                     const page = await extracted.pdf.getPage(q.sourcePage);
-                    const viewport = page.getViewport({ scale: 1.3 });
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = Math.floor(viewport.width);
-                    canvas.height = Math.floor(viewport.height);
-                    await page.render({ canvasContext: ctx, viewport }).promise;
-                    q.image = canvas.toDataURL('image/png');
+                    // Use same 2.5 scale as renderPageImageData for consistent quality.
+                    const imageData = await renderPageImageData(page, 2.5);
+                    q.image = `data:image/png;base64,${imageData}`;
                 } catch { /* skip if render fails */ }
             }
             delete q._needsPageRender;
@@ -2596,13 +2597,9 @@ STRICT EXTRACTION & FORMATTING RULES:
                 if (shouldAttachImage && pdfDoc.numPages >= 1) {
                     try {
                         const page = await pdfDoc.getPage(targetPage);
-                        const viewport = page.getViewport({ scale: 1.3 });
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        canvas.width = Math.floor(viewport.width);
-                        canvas.height = Math.floor(viewport.height);
-                        await page.render({ canvasContext: ctx, viewport }).promise;
-                        q.image = canvas.toDataURL('image/png');
+                        // Use same 2.5 scale as renderPageImageData for consistent quality.
+                        const imageData = await renderPageImageData(page, 2.5);
+                        q.image = `data:image/png;base64,${imageData}`;
                         attachedCount++;
                     } catch (e) {
                         console.warn(`Could not render page ${targetPage} for question ${i + 1}:`, e);
