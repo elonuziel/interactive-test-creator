@@ -778,15 +778,9 @@
                         <label for="form-number">מספר שאלון <span class="field-note-inline">אופציונלי</span></label>
                         <input id="form-number" type="text" inputmode="numeric" placeholder="לדוגמה: 76">
                     </div>
-                    <div style="margin-top: 10px; margin-bottom: 10px; display: grid; gap: 8px;">
+                    <div style="margin-top: 10px; margin-bottom: 10px;">
                         <button id="merge-answers-btn" type="button" class="primary-btn"
                             style="width: 100%; padding: 12px 18px; font-weight: 700; font-size: .95rem; background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; box-shadow: 0 4px 14px rgba(37,99,235,0.3); border-radius: 10px; color: #ffffff; cursor: pointer; transition: all 0.2s ease;">🔗 מזג תשובות נכונות לשאלות (Merge Official Answers)</button>
-                        <button id="auto-attach-diagrams-btn" type="button" class="secondary-btn"
-                            style="width: 100%; padding: 10px 14px; font-weight: 700; font-size: .88rem; border-radius: 10px; cursor: pointer;"
-                            title="סורק את השאלות ומחבר אוטומטית תמונות עמוד מתוך ה-PDF לשאלות הכוללות תרשימים, גרפים או טבלאות">🖼️ חבר עמודי תרשים/טבלה לשאלות מה-PDF</button>
-                        <button id="strip-question-headers-btn" type="button" class="secondary-btn"
-                            style="width: 100%; padding: 10px 14px; font-weight: 700; font-size: .88rem; border-radius: 10px; cursor: pointer;"
-                            title="מנקה ומסיר כותרות כמו 'שאלה מספר :1' או '1.' מראש כל השאלות">✂️ הסר כותרות "שאלה מספר X" מכל השאלות</button>
                     </div>
 
                     <div style="margin-top: 12px; text-align: center;">
@@ -917,14 +911,19 @@
                 </section>
 
                 <section class="builder-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
                         <div>
                             <h2 style="margin: 0;">תצוגה מקדימה ועריכה</h2>
                             <p class="muted" style="margin: 4px 0 0;">לאחר הפעלת הניתוח ניתן לערוך טקסט/תשובות לפני ייצוא.</p>
                         </div>
-                        <button id="strip-question-headers-btn-preview" type="button" class="secondary-btn sm-btn"
-                            style="white-space: nowrap; font-weight: 700; padding: 6px 12px; font-size: .83rem; cursor: pointer;"
-                            title="מנקה ומסיר כותרות כמו 'שאלה מספר :1' או '1.' מראש כל השאלות">✂️ הסר כותרות "שאלה מספר X"</button>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button id="auto-attach-diagrams-btn" type="button" class="secondary-btn sm-btn"
+                                style="white-space: nowrap; font-weight: 700; padding: 6px 12px; font-size: .83rem; cursor: pointer;"
+                                title="סורק את השאלות ומחבר אוטומטית תמונות עמוד מתוך ה-PDF לשאלות הכוללות תרשימים, גרפים או טבלאות">🖼️ חבר עמודי תרשים/טבלה</button>
+                            <button id="strip-question-headers-btn-preview" type="button" class="secondary-btn sm-btn"
+                                style="white-space: nowrap; font-weight: 700; padding: 6px 12px; font-size: .83rem; cursor: pointer;"
+                                title="מנקה ומסיר כותרות כמו 'שאלה מספר :1' או '1.' מראש כל השאלות">✂️ הסר כותרות "שאלה מספר X"</button>
+                        </div>
                     </div>
                     <div id="preview" class="preview-list"></div>
                 </section>
