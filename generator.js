@@ -167,6 +167,101 @@ document.addEventListener('DOMContentLoaded', () => {
         }, duration);
     }
 
+    // ── Image Lightbox ──
+    // Shows an image in a fullscreen overlay. If pageNum is provided and
+    // PDF bytes are available, re-renders the page at high resolution
+    // (scale 2.5) and swaps the image in once ready.
+    async function showImageZoom(src, pageNum = null) {
+        let overlay = document.getElementById('gen-zoom-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'gen-zoom-overlay';
+            overlay.style.cssText = [
+                'position:fixed;inset:0;z-index:99999',
+                'background:rgba(0,0,0,0.88)',
+                'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px',
+                'cursor:zoom-out;padding:24px;box-sizing:border-box'
+            ].join(';');
+
+            const spinner = document.createElement('div');
+            spinner.id = 'gen-zoom-spinner';
+            spinner.style.cssText = [
+                'width:40px;height:40px',
+                'border:4px solid rgba(255,255,255,0.2)',
+                'border-top-color:#fff',
+                'border-radius:50%',
+                'animation:gen-spin 0.7s linear infinite',
+                'display:none'
+            ].join(';');
+            if (!document.getElementById('gen-spin-style')) {
+                const s = document.createElement('style');
+                s.id = 'gen-spin-style';
+                s.textContent = '@keyframes gen-spin{to{transform:rotate(360deg)}}';
+                document.head.appendChild(s);
+            }
+
+            const zoomImg = document.createElement('img');
+            zoomImg.id = 'gen-zoom-img';
+            zoomImg.style.cssText = [
+                'max-width:100%;max-height:88vh',
+                'border-radius:10px',
+                'box-shadow:0 8px 40px rgba(0,0,0,0.7)',
+                'object-fit:contain'
+            ].join(';');
+
+            overlay.appendChild(spinner);
+            overlay.appendChild(zoomImg);
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay || e.target === zoomImg) {
+                    overlay.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            });
+            document.addEventListener('keydown', function onKey(e) {
+                if (e.key === 'Escape') {
+                    overlay.style.display = 'none';
+                    document.body.style.overflow = '';
+                    document.removeEventListener('keydown', onKey);
+                }
+            });
+            document.body.appendChild(overlay);
+        }
+
+        const zoomImg = document.getElementById('gen-zoom-img');
+        const spinner = document.getElementById('gen-zoom-spinner');
+
+        // Show placeholder (low-res thumbnail) immediately
+        zoomImg.src = src;
+        zoomImg.style.opacity = '1';
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        // If we have the PDF and a page number, render hi-res in the background
+        if (pageNum && state.pdfBytes && state.pdfBytes.length > 0) {
+            const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+            if (pdfjs?.getDocument) {
+                spinner.style.display = 'block';
+                zoomImg.style.opacity = '0.4';
+                try {
+                    const pdfDoc = await pdfjs.getDocument({ data: new Uint8Array(state.pdfBytes) }).promise;
+                    const page = await pdfDoc.getPage(pageNum);
+                    const hiResSrc = 'data:image/png;base64,' + await renderPageImageData(page);
+                    // Only update if overlay is still open
+                    if (overlay.style.display !== 'none') {
+                        zoomImg.src = hiResSrc;
+                        zoomImg.style.opacity = '1';
+                    }
+                } catch (err) {
+                    console.warn('Hi-res zoom render failed:', err);
+                } finally {
+                    spinner.style.display = 'none';
+                    zoomImg.style.opacity = '1';
+                }
+            }
+        }
+    }
+
     function setStatus(message, isError = false, triggerToast = false) {
         elements.status.textContent = message;
         elements.status.classList.toggle('muted', !isError);
@@ -500,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    async function renderPageImageData(page, scale = 1.3) {
+    async function renderPageImageData(page, scale = 2.5) {
         const viewport = page.getViewport({ scale });
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
@@ -1656,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 thumb.src = question.image;
                 thumb.style.cssText = 'max-height:140px;max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;';
                 thumb.title = 'לחץ להצגה בגודל מלא';
-                thumb.addEventListener('click', () => window.open(question.image, '_blank'));
+                thumb.addEventListener('click', () => showImageZoom(question.image));
                 imgWrap.appendChild(thumb);
                 card.appendChild(imgWrap);
             }
@@ -1700,7 +1795,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     sourceImg.src = sourcePageImage;
                     sourceImg.alt = `עמוד מקור ${question.sourcePage}`;
                     sourceImg.style.cssText = 'max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;';
-                    sourceImg.addEventListener('click', () => window.open(sourcePageImage, '_blank'));
+                    sourceImg.addEventListener('click', () => showImageZoom(sourcePageImage, Number(question.sourcePage)));
                     proofWrap.appendChild(sourceImg);
 
                     card.appendChild(proofWrap);
