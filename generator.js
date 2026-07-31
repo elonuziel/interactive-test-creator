@@ -1137,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         pushCurrent();
 
-        const imageKeywords = /לפניכם|לפניך|להלן|גרף|תרשים|תמונה|טבלה|לוח|איור|מפה|ציור|דיאגרמה|צילום|סכמה|טבלאות|שרטוט|סרטוט|עקומה|עקומות|ניסוי|מבנה|נוסחה|מולקולה|מיוצג|מוצג|במוצג/;
+        const imageKeywords = /(?:^|[\s\(\[\:\,\"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
 
         const diagnostics = [];
         const formatted = rawQuestions
@@ -2468,17 +2468,18 @@ STRICT EXTRACTION & FORMATTING RULES:
             const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBuffer.slice(0)) });
             const pdfDoc = await loadingTask.promise;
 
-            const imageKeywords = /לפניכם|לפניך|להלן|גרף|תרשים|תמונה|טבלה|לוח|איור|מפה|ציור|דיאגרמה|צילום|סכמה|טבלאות|שרטוט|סרטוט|עקומה|עקומות|ניסוי|מבנה|נוסחה|מולקולה|מיוצג|מוצג|במוצג/;
+            const imageKeywords = /(?:^|[\s\(\[\:\,\"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
             let attachedCount = 0;
 
             for (let i = 0; i < state.questions.length; i++) {
                 const q = state.questions[i];
                 const questionText = q.question || '';
                 const isDiagramQuestion = imageKeywords.test(questionText);
-                const targetPage = q.sourcePage || 1;
+                const requestedPage = q.sourcePage || 1;
+                const targetPage = Math.min(Math.max(1, requestedPage), pdfDoc.numPages);
 
                 const shouldAttachImage = isDiagramQuestion || q.hasVisualElement || q._needsPageRender;
-                if (shouldAttachImage && targetPage >= 1 && targetPage <= pdfDoc.numPages) {
+                if (shouldAttachImage && pdfDoc.numPages >= 1) {
                     try {
                         const page = await pdfDoc.getPage(targetPage);
                         const viewport = page.getViewport({ scale: 1.3 });

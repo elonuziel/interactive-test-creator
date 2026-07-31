@@ -249,6 +249,19 @@ def run_all_tests():
         print(" [PASS] Test 9: XLS Answer Extraction for Form 111")
         passed += 1
 
+    # Test 10: Diagram Keyword Precision (Delimiters & Bounds)
+    total += 1
+    diagram_kw_re = re.compile(
+        r'(?:^|[\s\(\[\:\,\"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"\'\-])',
+        re.I
+    )
+    assert not diagram_kw_re.search("זן האצה שלוחית הוא מין פולש"), "Substring 'לוח' inside 'שלוחית' must NOT match"
+    assert not diagram_kw_re.search("שימוש במודל קופסא לאגן הים התיכון"), "Text-only Question 4 must NOT match"
+    assert diagram_kw_re.search("מבין דפוסי הקשר המוצגים בתרשים"), "Question 25 with 'בתרשים' MUST match"
+    assert diagram_kw_re.search("לפניכם גרף המציג את ההשפעה"), "Question 33 with 'לפניכם גרף' MUST match"
+    print(" [PASS] Test 10: Refined Diagram Keyword Matching Precision")
+    passed += 1
+
     print("=" * 65)
     print(f" RESULT: {passed}/{total} Tests Passed Successfully!")
     print("=" * 65)
