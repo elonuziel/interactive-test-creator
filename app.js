@@ -97,7 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function getStorageKey() {
         if (!questions || !questions.length) return 'quiz_answers_v1';
         let hash = 0;
-        const sampleText = (questions[0].question || '') + questions.length;
+        const lastIdx = questions.length - 1;
+        const midIdx = Math.floor(questions.length / 2);
+        const sampleText = (questions[0]?.question || '') + (questions[midIdx]?.question || '') + (questions[lastIdx]?.question || '') + questions.length;
         for (let i = 0; i < sampleText.length; i++) {
             hash = ((hash << 5) - hash) + sampleText.charCodeAt(i);
             hash |= 0;
@@ -594,13 +596,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const total = questions.length;
         const percentage = Math.round((correctCount / total) * 100);
 
-        const incorrectCount = total - correctCount;
+        const wrongOrUnansweredCount = total - correctCount;
         const retryBtn = document.getElementById('retry-incorrect-btn');
         const badge = document.getElementById('incorrect-count-badge');
         if (retryBtn && badge) {
-            if (incorrectCount > 0) {
+            if (wrongOrUnansweredCount > 0) {
                 retryBtn.classList.remove('hidden');
-                badge.textContent = incorrectCount;
+                badge.textContent = wrongOrUnansweredCount;
             } else {
                 retryBtn.classList.add('hidden');
             }

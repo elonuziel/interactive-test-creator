@@ -21,7 +21,11 @@
             console.warn('Local ES module PDF.js load deferred/failed. Enabling fallback loader...', e);
         }
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        if (!window.pdfjsLib) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+        }
+    </script>
     <script>
         if (!window.pdfjsLib && window['pdfjs-dist/build/pdf']) {
             window.pdfjsLib = window['pdfjs-dist/build/pdf'];

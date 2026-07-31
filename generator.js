@@ -496,13 +496,13 @@ document.addEventListener('DOMContentLoaded', () => {
             .map((item) => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }));
 
         normalized.sort((a, b) => {
-            if (Math.abs(a.y - b.y) > 2) return b.y - a.y;
+            if (Math.abs(a.y - b.y) > 4) return b.y - a.y;
             return a.x - b.x;
         });
 
         const lines = [];
         for (const item of normalized) {
-            const line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 2);
+            const line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 4);
             if (!line) {
                 lines.push({ y: item.y, chunks: [item] });
             } else {
@@ -1471,7 +1471,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate page select dropdown
         if (cropElements.pageSelect) {
             cropElements.pageSelect.innerHTML = '';
-            const totalPages = state.pdfPagesState?.length || state.proofPageImages?.length || 30;
+            const totalPages = state.pdfPagesState?.length || state.proofPageImages?.length || 0;
+            if (!totalPages) {
+                showToast('לא נמצאו עמודי PDF זמינים לחיתוך תמונה.', 'error');
+                closeCropModal();
+                return;
+            }
             for (let i = 1; i <= totalPages; i++) {
                 const opt = document.createElement('option');
                 opt.value = i;
@@ -1686,7 +1691,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const p = parseInt(pageInput.value, 10);
                 if (p && p >= 1) {
                     state.questions[index].sourcePage = p;
-                    renderPreview();
+                    const card = pageInput.closest('.question-card');
+                    if (card) {
+                        const summary = card.querySelector('details summary');
+                        if (summary) summary.textContent = `מצב הגהה: עמוד מקור ${p}`;
+                        const sourceImg = card.querySelector('details img');
+                        const sourcePageIndex = p - 1;
+                        const newSrc = state.proofPageImages[sourcePageIndex] || state.pdfPagesState[sourcePageIndex]?.thumbnailDataUrl;
+                        if (sourceImg && newSrc) {
+                            sourceImg.src = newSrc;
+                            sourceImg.alt = `עמוד מקור ${p}`;
+                        }
+                    }
                 }
             });
             leftBox.append(pageLabel, pageInput);
@@ -2753,9 +2769,15 @@ STRICT EXTRACTION & FORMATTING RULES:
         try {
             setStatus('טוען מבחן קיים...');
             const html = await file.text();
-            const match = html.match(/window\.__INLINE_QUESTIONS__\s*=\s*(\[[\s\S]*?\])\s*;/);
-            if (!match) throw new Error('לא נמצאו שאלות מוטמעות בקובץ.');
-            const questions = JSON.parse(match[1]);
+            const marker = 'window.__INLINE_QUESTIONS__=';
+            const startIdx = html.indexOf(marker);
+            if (startIdx < 0) throw new Error('לא נמצאו שאלות מוטמעות בקובץ.');
+            const jsonStart = startIdx + marker.length;
+            const endMarker = ';(function()';
+            const jsonEnd = html.indexOf(endMarker, jsonStart);
+            if (jsonEnd < 0) throw new Error('פורמט השאלות המוטמעות בקובץ אינו תקין.');
+            const jsonText = html.substring(jsonStart, jsonEnd).trim();
+            const questions = JSON.parse(jsonText);
             if (!Array.isArray(questions) || !questions.length || !questions[0].question) {
                 throw new Error('מבנה השאלות בקובץ אינו תקין.');
             }
