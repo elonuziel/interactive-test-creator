@@ -2477,7 +2477,8 @@ STRICT EXTRACTION & FORMATTING RULES:
                 const isDiagramQuestion = imageKeywords.test(questionText);
                 const targetPage = q.sourcePage || 1;
 
-                if ((isDiagramQuestion || q.sourcePage) && targetPage >= 1 && targetPage <= pdfDoc.numPages) {
+                const shouldAttachImage = isDiagramQuestion || q.hasVisualElement || q._needsPageRender;
+                if (shouldAttachImage && targetPage >= 1 && targetPage <= pdfDoc.numPages) {
                     try {
                         const page = await pdfDoc.getPage(targetPage);
                         const viewport = page.getViewport({ scale: 1.3 });
