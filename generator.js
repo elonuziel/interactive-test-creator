@@ -2179,19 +2179,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     elements.takeQuiz.addEventListener('click', async () => {
+        // Open synchronously from the user click so the new tab retains
+        // its opener relationship, enabling the quiz player's back link.
+        const previewWindow = window.open('', '_blank');
+        if (!previewWindow) {
+            setStatus('הדפדפן חסם את פתיחת לשונית המבחן. אפשר חלונות קופצים ונסה שוב.', true);
+            return;
+        }
+
         try {
+            previewWindow.document.title = 'מכין מבחן...';
             setStatus('פותח תצוגת מבחן...');
             const html = await createStandaloneQuizHtml();
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            a.rel = 'noopener';
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            previewWindow.document.open();
+            previewWindow.document.write(html);
+            previewWindow.document.close();
             setStatus('המבחן נפתח בלשונית חדשה.');
         } catch (error) {
+            try {
+                previewWindow.close();
+            } catch {
+                // Ignore browsers that refuse to close the temporary tab.
+            }
             setStatus(error.message || 'לא ניתן היה לפתוח את המבחן.', true);
         }
     });
