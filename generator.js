@@ -77,7 +77,13 @@ document.addEventListener('DOMContentLoaded', () => {
         runParse: document.getElementById('run-parse'),
         downloadQuiz: document.getElementById('download-quiz'),
         takeQuiz: document.getElementById('take-quiz'),
+        confirmDownloadBtn: document.getElementById('confirm-download-btn'),
+        compressSettingsCancel: document.getElementById('compress-settings-cancel'),
+        compressSettingsPopup: document.getElementById('compress-settings-popup'),
         compressExportImages: document.getElementById('compress-export-images'),
+        compressQualitySlider: document.getElementById('compress-quality-slider'),
+        compressQualityVal: document.getElementById('compress-quality-val'),
+        compressSliderWrap: document.getElementById('compress-slider-wrap'),
         status: document.getElementById('status'),
         preview: document.getElementById('preview'),
         proofModeToggle: document.getElementById('proof-mode-toggle'),
@@ -275,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function disableOutputActions(disabled) {
         if (elements.downloadQuiz) elements.downloadQuiz.disabled = disabled;
         if (elements.takeQuiz) elements.takeQuiz.disabled = disabled;
+        if (elements.compressSettingsBtn) elements.compressSettingsBtn.disabled = disabled;
         if (elements.compressExportImages) elements.compressExportImages.disabled = disabled;
     }
 
@@ -1939,12 +1946,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function createStandaloneQuizHtml() {
-        const shouldCompress = elements.compressExportImages ? elements.compressExportImages.checked : true;
+        const shouldCompress = elements.compressExportImages ? elements.compressExportImages.checked : false;
+        const qualityVal = Number(elements.compressQualitySlider?.value) || 75;
+        const quality = Math.min(Math.max(qualityVal, 10), 90) / 100;
 
         const cleanedQuestions = await Promise.all(state.questions.map(async (q) => {
             let img = q.image;
             if (shouldCompress && img) {
-                img = await compressImageBase64(img, 0.75);
+                img = await compressImageBase64(img, quality);
             }
             return {
                 question: normalizeWhitespace(q.question),
@@ -2139,7 +2148,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    elements.downloadQuiz.addEventListener('click', async () => {
+    elements.downloadQuiz.addEventListener('click', () => {
+        if (!state.questions || state.questions.length === 0) {
+            showToast('אין שאלות זמינות ליצירת מבחן.', 'info');
+            return;
+        }
+        if (elements.compressSettingsPopup) {
+            elements.compressSettingsPopup.classList.add('show');
+        }
+    });
+
+    elements.confirmDownloadBtn?.addEventListener('click', async () => {
+        if (elements.compressSettingsPopup) {
+            elements.compressSettingsPopup.classList.remove('show');
+        }
         try {
             setStatus('מכין קובץ HTML להורדה...');
             const html = await createStandaloneQuizHtml();
@@ -2748,6 +2770,27 @@ STRICT EXTRACTION & FORMATTING RULES:
         if (!elements.digitalPromptExpandable) return;
         const isHidden = elements.digitalPromptExpandable.classList.toggle('hidden');
         elements.showDigitalPromptBtn.textContent = isHidden ? '📋 הצג פרומפט ל-AI חיצוני' : '📋 הסתר פרומפט';
+    });
+
+    // Compression Modal Listeners
+    elements.compressSettingsCancel?.addEventListener('click', () => {
+        if (elements.compressSettingsPopup) elements.compressSettingsPopup.classList.remove('show');
+    });
+
+    elements.compressExportImages?.addEventListener('change', (e) => {
+        if (!elements.compressSliderWrap) return;
+        elements.compressSliderWrap.style.opacity = e.target.checked ? '1' : '0.4';
+        elements.compressSliderWrap.style.pointerEvents = e.target.checked ? 'auto' : 'none';
+    });
+
+    elements.compressQualitySlider?.addEventListener('input', (e) => {
+        const val = Number(e.target.value) || 75;
+        if (!elements.compressQualityVal) return;
+        let note = '(מומלץ)';
+        if (val < 40) note = '(דחיסה גבוהה)';
+        else if (val < 70) note = '(איכות בינונית)';
+        else if (val > 80) note = '(איכות גבוהה)';
+        elements.compressQualityVal.textContent = `${val}% ${note}`;
     });
 
     elements.copyDigitalPromptBtn?.addEventListener('click', async () => {
