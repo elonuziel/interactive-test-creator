@@ -66,6 +66,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const feedbackToggle = document.getElementById('immediate-feedback-toggle');
     const themeIcon      = document.getElementById('theme-icon');
     const filterBtns     = document.querySelectorAll('.filter-btn');
+    const builderNavLink = document.getElementById('builder-nav-link');
+
+    // A live quiz is opened from a blob URL, so a relative `index.html` link
+    // cannot resolve back to the builder. Return through the opener instead.
+    // For downloaded standalone quizzes (or direct quiz_player.html visits),
+    // there is no opener and the normal link remains available.
+    builderNavLink?.addEventListener('click', (event) => {
+        if (!window.opener || window.opener.closed) return;
+
+        event.preventDefault();
+        const builderWindow = window.opener;
+        try {
+            builderWindow.focus();
+        } catch {
+            // Focusing another tab can be denied by the browser; closing still works.
+        }
+
+        window.close();
+
+        // Some browsers refuse to close a tab they do not consider script-opened.
+        // In that case, use the opener's current URL rather than resolving the
+        // relative link against the blob URL (which produces about:blank#blocked).
+        setTimeout(() => {
+            if (window.closed) return;
+            try {
+                window.location.replace(builderWindow.location.href);
+            } catch {
+                // Keep the page usable if the browser blocks opener inspection.
+            }
+        }, 100);
+    });
 
     // ── Theme ────────────────────────────────────────────────────────────────
     function setTheme(newTheme) {
