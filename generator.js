@@ -1307,6 +1307,69 @@ document.addEventListener('DOMContentLoaded', () => {
         return parsedQuestions;
     }
 
+    function parseQuestionsFromMarkdown(markdownText) {
+        if (!markdownText) return [];
+
+        let cleanText = String(markdownText).trim();
+        cleanText = cleanText.replace(/^```(?:markdown|md|txt)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        if (!cleanText) return [];
+
+        const lines = cleanText.split(/\r?\n/);
+        const headerRe = /^###\s*שאלה\s*(\d{1,3})\s*:\s*(.+?)\s*(?:\((?:עמוד|עמ'|page)\s*(\d{1,3})\))?\s*$/i;
+        const optionRe = /^[-*+]\s*([אבגדהוזחטי])\.\s*(.+)$/;
+
+        const parsed = [];
+        let current = null;
+
+        function pushCurrentIfValid() {
+            if (!current) return;
+            const questionText = normalizeWhitespace(String(current.question || ''));
+            const options = (current.options || []).map((opt) => normalizeWhitespace(String(opt || ''))).filter(Boolean);
+            if (questionText && options.length >= 2) {
+                parsed.push({
+                    question: questionText,
+                    options,
+                    correctIndex: 0,
+                    sourcePage: current.sourcePage || 1
+                });
+            }
+        }
+
+        for (const rawLine of lines) {
+            const line = String(rawLine || '').trim();
+            if (!line) continue;
+
+            const headerMatch = line.match(headerRe);
+            if (headerMatch) {
+                pushCurrentIfValid();
+                current = {
+                    question: normalizeWhitespace(headerMatch[2] || ''),
+                    options: [],
+                    sourcePage: Number(headerMatch[3]) || 1
+                };
+                continue;
+            }
+
+            if (!current) continue;
+
+            const optionMatch = line.match(optionRe);
+            if (optionMatch) {
+                current.options.push(optionMatch[2] || '');
+                continue;
+            }
+
+            if (current.options.length > 0) {
+                const lastIdx = current.options.length - 1;
+                current.options[lastIdx] = `${current.options[lastIdx]} ${line}`.trim();
+            } else {
+                current.question = `${current.question} ${line}`.trim();
+            }
+        }
+
+        pushCurrentIfValid();
+        return parsed;
+    }
+
     function parseQuestionsFromText(text, rawPages, pageImages) {
         if (!text) return [];
 
@@ -3104,6 +3167,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function normalizeQuestionsFromAnyJson(rawData) {
+        const toQuestionsArray = (input) => {
+            if (!input) return null;
+            if (Array.isArray(input) && input.length > 0) return input;
+            if (typeof input !== 'object') return null;
+
+            const directArray = [input.questions, input.data, input.items, input.quiz, input.test]
+                .find((v) => Array.isArray(v) && v.length > 0);
+            if (directArray) return directArray;
+
+            const objectValues = Object.values(input || {});
+            const nestedArray = objectValues.find((v) => Array.isArray(v) && v.length > 0);
+            if (nestedArray) return nestedArray;
+
+            const numericKeys = Object.keys(input).filter((k) => /^\d+$/.test(k));
+            if (numericKeys.length > 0) {
+                const sortedNumericKeys = numericKeys.sort((a, b) => Number(a) - Number(b));
+                const values = sortedNumericKeys.map((k) => input[k]);
+
+                if (values.every((v) => typeof v === 'number' && Number.isFinite(v))) {
+                    return sortedNumericKeys.map((k) => {
+                        const ansNum = Number(input[k]);
+                        const safeIndex = Math.max(0, Math.min(3, ansNum - 1));
+                        return {
+                            question: `שאלה ${k}`,
+                            options: ['א', 'ב', 'ג', 'ד'],
+                            correctIndex: safeIndex
+                        };
+                    });
+                }
+
+                if (values.every((v) => v && typeof v === 'object')) {
+                    return values;
+                }
+            }
+
+            return null;
+        };
+
+        const asArray = toQuestionsArray(rawData);
+        if (!asArray || !asArray.length) {
+            throw new Error('JSON לא זוהה כמבנה שאלות נתמך.');
+        }
+
+        return normalizeQuestionsJson(asArray);
+    }
+
     // ── PDF Page Sidebar & Thumbnail Generator ─────────────────────────────────
     async function loadPdfSidebar(pdfBytesInput) {
         const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
@@ -3620,16 +3730,37 @@ STRICT EXTRACTION & FORMATTING RULES:
             const isJson = trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```json');
 
             if (isJson) {
+                // Accept any .json input by first trying strict question JSON,
+                // then falling back to the same markdown/text parser flow.
                 let cleanJsonText = trimmed;
                 if (cleanJsonText.startsWith('```json')) {
                     cleanJsonText = cleanJsonText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
                 }
-                const rawData = JSON.parse(cleanJsonText);
-                const arrayData = Array.isArray(rawData) ? rawData : (rawData.questions || rawData.data || []);
-                normalizedQuestions = normalizeQuestionsJson(arrayData);
+
+                let parsedAsStrictJson = false;
+                try {
+                    const rawData = JSON.parse(cleanJsonText);
+                    normalizedQuestions = normalizeQuestionsFromAnyJson(rawData);
+                    if (Array.isArray(normalizedQuestions) && normalizedQuestions.length > 0) {
+                        parsedAsStrictJson = normalizedQuestions.length > 0;
+                    }
+                } catch (jsonErr) {
+                    console.warn('JSON parse failed for uploaded question file. Trying markdown/text fallback.', jsonErr);
+                }
+
+                if (!parsedAsStrictJson) {
+                    const markdownQuestions = parseQuestionsFromMarkdown(text);
+                    normalizedQuestions = markdownQuestions.length > 0
+                        ? markdownQuestions
+                        : parseQuestionsFromText(text, [], []);
+                }
             } else {
-                // Parse as Markdown or text format (questions.md)
-                normalizedQuestions = parseQuestionsFromText(text, [], []);
+                // Prefer strict Markdown parsing for questions.md uploads.
+                // Fall back to the flexible text parser for other plain-text formats.
+                const markdownQuestions = parseQuestionsFromMarkdown(text);
+                normalizedQuestions = markdownQuestions.length > 0
+                    ? markdownQuestions
+                    : parseQuestionsFromText(text, [], []);
             }
 
             if (!normalizedQuestions || !normalizedQuestions.length) {
