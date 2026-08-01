@@ -2815,10 +2815,18 @@ document.addEventListener('DOMContentLoaded', () => {
             `<style>${styleCss}</style>`
         );
 
+        // Ensure exported standalone HTML always points to the online builder,
+        // even if quiz_player.html was cached before a local edit.
+        const onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
+        const standaloneNavHtml = inlinedCssHtml.replace(
+            /<a\s+[^>]*id="builder-nav-link"[^>]*>[\s\S]*?<\/a>/i,
+            `<a href="${onlineBuilderUrl}" id="builder-nav-link" class="nav-link" title="פתח יוצר מבחן אונליין">יוצר מבחן אונליין ←</a>`
+        );
+
         const appScript = appJs.replace(/<\/(script)/gi, '<\\/$1');
         const payload = JSON.stringify(cleanedQuestions, null, 2);
 
-        return inlinedCssHtml.replace(
+        return standaloneNavHtml.replace(
             /<script src="app\.js"><\/script>/,
             `<script>window.__INLINE_QUESTIONS__=${payload};(function(){const originalFetch=window.fetch.bind(window);window.fetch=function(input,init){const url=typeof input==='string'?input:(input&&input.url)||'';if(typeof url==='string'&&/questions\\.json(?:\\?|$)/.test(url)){return Promise.resolve(new Response(JSON.stringify(window.__INLINE_QUESTIONS__),{headers:{'Content-Type':'application/json'}}));}return originalFetch(input,init);};})();</script><script>${appScript}</script>`
         );

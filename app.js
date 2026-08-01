@@ -67,6 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeIcon      = document.getElementById('theme-icon');
     const filterBtns     = document.querySelectorAll('.filter-btn');
     const builderNavLink = document.getElementById('builder-nav-link');
+    const onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
+
+    if (builderNavLink) {
+        builderNavLink.href = onlineBuilderUrl;
+        builderNavLink.textContent = 'יוצר מבחן אונליין ←';
+        builderNavLink.title = 'פתח יוצר מבחן אונליין';
+    }
 
     // A live quiz is opened from a blob URL, so a relative `index.html` link
     // cannot resolve back to the builder. Return through the opener instead.
@@ -201,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (welcomeCard) {
                 const errDiv = document.createElement('div');
                 errDiv.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:.75rem;background:var(--error-bg);color:var(--error-color);border:1px solid var(--error-color);font-size:.9rem;';
-                errDiv.innerHTML = '⚠️ לא נמצא קובץ שאלות. <a href="#" id="builder-nav-error-link" style="color:inherit;text-decoration:underline;">פתח את יוצר המבחן</a> כדי לטעון שאלות, או השתמש בכפתור "פתור מבחן כעת".';
+                errDiv.innerHTML = `⚠️ לא נמצא קובץ שאלות. <a href="${onlineBuilderUrl}" id="builder-nav-error-link" style="color:inherit;text-decoration:underline;">יוצר מבחן אונליין</a> כדי לטעון שאלות, או השתמש בכפתור "פתור מבחן כעת".`;
                 welcomeCard.appendChild(errDiv);
             }
             startBtn.disabled = true;
