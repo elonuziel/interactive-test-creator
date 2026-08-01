@@ -483,6 +483,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // If key phrases are mostly reversed (e.g. "מספר שאלה"), reorder words.
+        // Keep this conservative so digital PDFs that are already logical are
+        // not accidentally flipped.
         let normalSignals = 0;
         let reversedSignals = 0;
 
@@ -495,13 +497,91 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        return reversedSignals > normalSignals ? fixHebrewWordOrder(text) : text;
+        const strongReversedEvidence = reversedSignals >= 4 && reversedSignals >= (normalSignals + 2);
+        return strongReversedEvidence ? fixHebrewWordOrder(text) : text;
+    }
+
+    function hasHebrew(text) {
+        return /[\u0590-\u05FF]/.test(text || '');
+    }
+
+    function detectLineDirection(chunks) {
+        let rtlScore = 0;
+        let ltrScore = 0;
+
+        for (const chunk of chunks) {
+            const t = chunk.text || '';
+            if (!t) continue;
+
+            if (chunk.dir === 'rtl') rtlScore += 2;
+            if (chunk.dir === 'ltr') ltrScore += 2;
+
+            if (hasHebrew(t)) rtlScore += 1;
+            if (/[A-Za-z]/.test(t)) ltrScore += 1;
+            if (/\d/.test(t) && !hasHebrew(t)) ltrScore += 1;
+        }
+
+        return rtlScore > ltrScore ? 'rtl' : 'ltr';
+    }
+
+    function joinChunksByGeometry(chunks, direction) {
+        if (!chunks || !chunks.length) return '';
+        if (chunks.length === 1) return chunks[0].text || '';
+
+        const charWidths = chunks
+            .map((c) => {
+                const t = String(c.text || '');
+                const w = Number(c.w || 0);
+                return (t.length > 0 && w > 0) ? (w / t.length) : 0;
+            })
+            .filter((v) => v > 0 && Number.isFinite(v));
+
+        const avgCharWidth = charWidths.length
+            ? (charWidths.reduce((sum, v) => sum + v, 0) / charWidths.length)
+            : 6;
+
+        const gapThreshold = Math.max(1.2, avgCharWidth * 0.45);
+        let out = String(chunks[0].text || '');
+
+        for (let i = 1; i < chunks.length; i++) {
+            const prev = chunks[i - 1];
+            const curr = chunks[i];
+            const prevText = String(prev.text || '');
+            const currText = String(curr.text || '');
+
+            const prevW = Number(prev.w || 0);
+            const currW = Number(curr.w || 0);
+
+            let gap = gapThreshold + 1;
+            if (prevW > 0 && currW > 0) {
+                if (direction === 'rtl') {
+                    // For RTL sorting (right -> left): gap is distance between
+                    // previous chunk's left edge and current chunk's right edge.
+                    gap = prev.x - (curr.x + currW);
+                } else {
+                    // For LTR sorting (left -> right): gap is distance between
+                    // previous chunk's right edge and current chunk's left edge.
+                    gap = curr.x - (prev.x + prevW);
+                }
+            }
+
+            const needsSpace = gap > gapThreshold;
+            out += (needsSpace ? ' ' : '') + currText;
+        }
+
+        return out.replace(/\s+/g, ' ').trim();
     }
 
     function groupPdfTextItemsToLines(items) {
         const normalized = items
             .filter((item) => item.str && item.str.trim())
-            .map((item) => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }));
+            .map((item) => ({
+                text: item.str.trim(),
+                x: item.transform[4],
+                y: item.transform[5],
+                dir: item.dir || '',
+                w: item.width || 0
+            }));
 
         normalized.sort((a, b) => {
             if (Math.abs(a.y - b.y) > 4) return b.y - a.y;
@@ -520,7 +600,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lines.sort((a, b) => b.y - a.y);
 
-        return lines.map((line) => line.chunks.sort((a, b) => a.x - b.x).map((chunk) => chunk.text).join(' '));
+        return lines.map((line) => {
+            const direction = detectLineDirection(line.chunks);
+            const sorted = [...line.chunks].sort((a, b) => direction === 'rtl' ? b.x - a.x : a.x - b.x);
+            return joinChunksByGeometry(sorted, direction);
+        });
     }
 
     async function extractPageImage(page) {
