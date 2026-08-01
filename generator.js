@@ -455,7 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function stripQuestionHeaderPrefix(value) {
         if (!value) return '';
         let t = value.replace(/^#+\s*/, '').trim();
-        const prefixPattern = /^(?:(?:שאלה(?:\s+מספר)?\s*:?\s*:?\d+\s*:?|:?\d+\s*:?\s*(?:שאלה(?:\s+מספר)?|מספר\s+שאלה)|מספר\s+שאלה\s*:?\s*:?\d+\s*:?|\d+\s*[\.\)-])\s*)+:?\s*/i;
+        const prefixPattern = /^(?:(?:שאלה(?:\s+מספר)?\s*:?\s*:?\d+\s*:?|:?\d+\s*:?\s*(?:שאלה(?:\s+מספר)?|מספר\s+שאלה)|מספר\s+שאלה\s*:?\s*:?\d+\s*:?|\d+\s*[\.\)\(-])\s*)+:?\s*/i;
         const cleaned = t.replace(prefixPattern, '').trim();
         return cleaned || t;
     }
@@ -1178,7 +1178,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        const qPattern = /(?:^#*\s*(?:\*\*)?שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|^#*\s*(?:\*\*)?:?\d+\s*:?\s*מספר\s+שאלה|^\.?\s*#*\s*(?:\*\*)?:?\d+\s*[\.\)]\s+(?![אבגדהוזחטי]\s*$)|^\.?\s*#*\s*(?:\*\*)?:?\d+\s*-\s+(?![אבגדהוזחטי]\s*$))/i;
+        const qPatternTextual = /(?:^#*\s*(?:\*\*)?שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|^#*\s*(?:\*\*)?:?\d+\s*:?\s*מספר\s+שאלה)/i;
+        const qPatternNumeric = /(?:^\.?\s*#*\s*(?:\*\*)?:?\d+\s*[\.\)\(]\s*(?![אבגדהוזחטי]\s*$)|^\.?\s*#*\s*(?:\*\*)?:?\d+\s*-\s*(?![אבגדהוזחטי]\s*$))/i;
         // Matches: '- א. text', '- **א.** text', '* א. text', '(א) text', 'א. text', '1. text', 'א . text'
         const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?(?:\*\*)?[\(\[]?([אבגדהוזחטיa-e1-9])\s*[\)\]\.]\s*(?:\*\*)?\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/i;
         // Matches: 'text א.' or 'text .א' at end of line
@@ -1207,7 +1208,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
 
-            if (qPattern.test(line) || qPattern.test(reversedLine)) {
+            const isQuestionHeader = qPatternTextual.test(line) || qPatternTextual.test(reversedLine) || qPatternNumeric.test(line);
+            if (isQuestionHeader) {
                 pushCurrent();
                 current = { text: [line], answers: [], lineIdx: i }; // use i, not indexOf
                 stateMode = 1;
@@ -1266,9 +1268,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Clean leading Markdown heading syntax & question header prefixes (e.g. ### שאלה 1:, שאלה מספר :1)
                 rawQuestionText = stripQuestionHeaderPrefix(rawQuestionText);
 
-                let pageIdx = filteredLinePageMap[q.lineIdx] ?? 0;
+                const mappedPageIdx = filteredLinePageMap[q.lineIdx];
+                let pageIdx = Number.isInteger(mappedPageIdx) ? mappedPageIdx : 0;
                 const pageMatch = rawQuestionText.match(/\((?:עמוד|עמ'|page)\s*(\d+)\)/i);
-                if (pageMatch) {
+                // Inline markers like "(עמוד 2)" are often logical-section pages, not
+                // physical PDF pages. Use them only when no line-to-page mapping exists.
+                if (pageMatch && !Number.isInteger(mappedPageIdx)) {
                     pageIdx = Math.max(0, parseInt(pageMatch[1], 10) - 1);
                 }
                 const cleanQuestionText = stripQuestionHeaderPrefix(rawQuestionText.replace(/\s*\((?:עמוד|עמ'|page)\s*\d+\)$/i, '')).trim();
@@ -2635,6 +2640,61 @@ STRICT EXTRACTION & FORMATTING RULES:
             const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBuffer.slice(0)) });
             const pdfDoc = await loadingTask.promise;
 
+            // Build a searchable text cache once so we can map each question to
+            // the most likely physical PDF page even when sourcePage is noisy.
+            const normalizeForSearch = (value) => String(value || '')
+                .replace(/\((?:עמוד|עמ'|page)\s*\d+\)/gi, ' ')
+                .replace(/[^\u0590-\u05FFA-Za-z0-9\s]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+
+            const pdfPageTexts = [];
+            for (let p = 1; p <= pdfDoc.numPages; p++) {
+                try {
+                    const page = await pdfDoc.getPage(p);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map((it) => (it && it.str) ? it.str : '').join(' ');
+                    pdfPageTexts.push(normalizeForSearch(pageText));
+                } catch {
+                    pdfPageTexts.push('');
+                }
+            }
+
+            const findBestPageByQuestionText = (questionText, preferredPage) => {
+                if (!questionText || !pdfPageTexts.length) return preferredPage;
+                const normalizedQuestion = normalizeForSearch(questionText);
+                if (!normalizedQuestion) return preferredPage;
+
+                const tokens = normalizedQuestion
+                    .split(' ')
+                    .filter((t) => t.length >= 3)
+                    .slice(0, 24);
+
+                if (!tokens.length) return preferredPage;
+
+                let bestPage = preferredPage;
+                let bestScore = -1;
+
+                for (let idx = 0; idx < pdfPageTexts.length; idx++) {
+                    const pageText = pdfPageTexts[idx];
+                    if (!pageText) continue;
+
+                    let score = 0;
+                    for (const token of tokens) {
+                        if (pageText.includes(token)) score++;
+                    }
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestPage = idx + 1;
+                    }
+                }
+
+                // If we have no lexical signal at all, keep current page assignment.
+                return bestScore > 0 ? bestPage : preferredPage;
+            };
+
             const imageKeywords = /(?:^|[\s\(\[\:\,\"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
             let attachedCount = 0;
 
@@ -2643,7 +2703,8 @@ STRICT EXTRACTION & FORMATTING RULES:
                 const questionText = q.question || '';
                 const isDiagramQuestion = imageKeywords.test(questionText);
                 const requestedPage = q.sourcePage || 1;
-                const targetPage = Math.min(Math.max(1, requestedPage), pdfDoc.numPages);
+                const clampedRequestedPage = Math.min(Math.max(1, requestedPage), pdfDoc.numPages);
+                const targetPage = findBestPageByQuestionText(questionText, clampedRequestedPage);
 
                 const shouldAttachImage = isDiagramQuestion || q.hasVisualElement || q._needsPageRender;
                 if (shouldAttachImage && pdfDoc.numPages >= 1) {
