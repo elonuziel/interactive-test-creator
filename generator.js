@@ -572,6 +572,82 @@ document.addEventListener('DOMContentLoaded', () => {
         return out.replace(/\s+/g, ' ').trim();
     }
 
+    function buildLinesFromStreamOrder(items) {
+        const lines = [];
+        let current = '';
+
+        for (const item of (items || [])) {
+            const raw = item && typeof item.str === 'string' ? item.str : '';
+            const text = raw.replace(/\u00A0/g, ' ').trim();
+            const hasEOL = Boolean(item && item.hasEOL);
+
+            if (text) {
+                if (!current) {
+                    current = text;
+                } else {
+                    const noLeadingSpace = /^[\)\]\}\.,:;!?%]/.test(text);
+                    const noTrailingSpace = /[\(\[\{\-\/]$/.test(current);
+                    current += (noLeadingSpace || noTrailingSpace ? '' : ' ') + text;
+                }
+            }
+
+            if (hasEOL) {
+                if (current.trim()) lines.push(current.trim());
+                current = '';
+            }
+        }
+
+        if (current.trim()) lines.push(current.trim());
+        return lines;
+    }
+
+    function computeHebrewBreakageScore(text) {
+        const tokens = String(text || '').split(/\s+/).filter(Boolean);
+        if (!tokens.length) return 1;
+
+        const hebTokens = tokens.filter((t) => /[\u0590-\u05FF]/.test(t));
+        if (!hebTokens.length) return 1;
+
+        const singleHeb = hebTokens.filter((t) => /^[\u0590-\u05FF]$/.test(t)).length;
+        const tinyHeb = hebTokens.filter((t) => /^[\u0590-\u05FF]{1,2}$/.test(t)).length;
+
+        // Lower is better.
+        return (singleHeb / hebTokens.length) + ((tinyHeb / hebTokens.length) * 0.35);
+    }
+
+    function computeStructureSignal(lines) {
+        const qLike = /(?:^#*\s*שאלה\s+\d+|^#*\s*שאלה\s+מספר\s*:?\d+|^\d+\s*[\)\(\.-]\s*)/;
+        const aLike = /^(?:[-\*\+\u2022]\s*)?[אבגדהוזחטי]\s*[\.)]/;
+
+        let score = 0;
+        for (const line of (lines || [])) {
+            const l = String(line || '').trim();
+            if (!l) continue;
+            if (qLike.test(l)) score += 2;
+            if (aLike.test(l)) score += 1;
+        }
+        return score;
+    }
+
+    function chooseBestPageText(linesA, linesB) {
+        const textA = (linesA || []).join('\n');
+        const textB = (linesB || []).join('\n');
+
+        if (!textA && !textB) return '';
+        if (!textA) return textB;
+        if (!textB) return textA;
+
+        const breakA = computeHebrewBreakageScore(textA);
+        const breakB = computeHebrewBreakageScore(textB);
+        const structA = computeStructureSignal(linesA);
+        const structB = computeStructureSignal(linesB);
+
+        const qualityA = structA - (breakA * 8);
+        const qualityB = structB - (breakB * 8);
+
+        return qualityB > qualityA ? textB : textA;
+    }
+
     function groupPdfTextItemsToLines(items) {
         const normalized = items
             .filter((item) => item.str && item.str.trim())
@@ -633,8 +709,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
             const page = await pdf.getPage(pageNumber);
-            const textContent = await page.getTextContent();
-            const lineText = groupPdfTextItemsToLines(textContent.items).join('\n');
+            const textContent = await page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: false });
+            const geoLines = groupPdfTextItemsToLines(textContent.items);
+            const streamLines = buildLinesFromStreamOrder(textContent.items);
+            const lineText = chooseBestPageText(geoLines, streamLines);
             pages.push(lineText);
             nonWhitespaceChars += lineText.replace(/\s/g, '').length;
 
@@ -1263,90 +1341,580 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         const qPatternTextual = /(?:^#*\s*(?:\*\*)?שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|^#*\s*(?:\*\*)?:?\d+\s*:?\s*מספר\s+שאלה)/i;
-        const qPatternNumeric = /(?:^\.?\s*#*\s*(?:\*\*)?:?\d+\s*[\.\)\(]\s*(?![אבגדהוזחטי]\s*$)|^\.?\s*#*\s*(?:\*\*)?:?\d+\s*-\s*(?![אבגדהוזחטי]\s*$))/i;
+        const qPatternNumeric = /(?:^\.?\s*#*\s*(?:\*\*)?\s*[\(\[]?\s*:?\d+\s*[\.\)\(\-\]]?\s+(?![אבגדהוזחטי]\s*$))/i;
+        const qNumericCapture = /^\.?\s*#*\s*(?:\*\*)?\s*[\(\[]?\s*:?\s*(\d{1,3})\s*[\.\)\(\-\]]?\s+/i;
         // Matches: '- א. text', '- **א.** text', '* א. text', '(א) text', 'א. text', '1. text', 'א . text'
         const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?(?:\*\*)?[\(\[]?([אבגדהוזחטיa-e1-9])\s*[\)\]\.]\s*(?:\*\*)?\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/i;
         // Matches: 'text א.' or 'text .א' at end of line
         const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$|^(.*)\s+[\.]\s*([אבגדהוזחטי])$/;
+        const ansInlineGlobal = /(?:^|[\s\u2022\-\*\+\(\[])([אבגדהוזחטי])\s*[\.\)]\s*/g;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
         const footerPattern = /^-+\s*סוף\s+המבחן\s*-+$/;
+        const qInlineLocator = /\s(#*\s*(?:שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|[\(\[]?\s*:??\d+\s*[\)\(\.-\]]?)\s+)/i;
+        const hebOptionOrder = { 'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5, 'ו': 6, 'ז': 7, 'ח': 8, 'ט': 9 };
 
-        const rawQuestions = [];
-        let current = null;
-        let stateMode = 0;
+        function parseInlineAnswers(lineText) {
+            if (!lineText) return null;
 
-        function pushCurrent() {
-            if (!current) return;
-            rawQuestions.push(current);
-            current = null;
+            const matches = [];
+            ansInlineGlobal.lastIndex = 0;
+            let m;
+            while ((m = ansInlineGlobal.exec(lineText)) !== null) {
+                matches.push({
+                    letter: m[1],
+                    markerStart: m.index,
+                    textStart: ansInlineGlobal.lastIndex
+                });
+            }
+
+            if (!matches.length) return null;
+
+            const prefix = lineText.slice(0, matches[0].markerStart).trim();
+            const hasOnlyTrivialPrefix = /^[-\*\+\u2022\(\[\]\)\.:\s]*$/.test(prefix);
+
+            // For regular lines like "- א. ..." or "א. ...", keep the standard
+            // answer parser path and only use inline parsing for genuine merged
+            // multi-option lines.
+            if (matches.length < 2 && hasOnlyTrivialPrefix) {
+                return null;
+            }
+
+            if (matches.length >= 2) {
+                // Accept only plausible option letter progression (א->ב->ג->ד...).
+                let prevOrder = 0;
+                let jumps = 0;
+                for (const mm of matches) {
+                    const ord = hebOptionOrder[mm.letter] || 0;
+                    if (!ord) return null;
+                    if (prevOrder > 0) {
+                        const delta = ord - prevOrder;
+                        if (delta <= 0) return null;
+                        if (delta > 2) jumps++;
+                    }
+                    prevOrder = ord;
+                }
+                if (jumps > 0) return null;
+            }
+
+            const options = [];
+            for (let k = 0; k < matches.length; k++) {
+                const cur = matches[k];
+                const next = matches[k + 1];
+                const textEnd = next ? next.markerStart : lineText.length;
+                const optionText = lineText.slice(cur.textStart, textEnd).trim();
+                options.push({ letter: cur.letter, text: optionText });
+            }
+
+            // One inline marker with no meaningful prefix is still a normal answer line.
+            if (options.length === 1 && !prefix) {
+                return null;
+            }
+
+            return { prefix, options };
         }
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
+        function splitInlineQuestionHeader(lineText) {
+            if (!lineText) return null;
+            const m = lineText.match(qInlineLocator);
+            if (!m || typeof m.index !== 'number') return null;
+            const markerStart = m.index + 1; // skip the leading whitespace in regex
+            if (markerStart <= 0 || markerStart >= lineText.length) return null;
+            return {
+                before: lineText.slice(0, markerStart).trim(),
+                after: lineText.slice(markerStart).trim()
+            };
+        }
+
+        function splitAnswerLineWithEmbeddedHeader(lineText) {
+            if (!lineText) return null;
+            const ansStart = lineText.match(/^(\s*(?:[-\*\+\u2022]\s*)?[אבגדהוזחטי]\s*[\.)]\s*)(.*)$/);
+            if (!ansStart) return null;
+
+            const prefix = ansStart[1] || '';
+            const body = (ansStart[2] || '').trim();
+            if (!body) return null;
+
+            const headerTailRe1 = /([\?？][^\n]*[\)\(]\s*\d{1,3}\s*)$/;
+            const headerTailRe2 = /((?:על\s+פי|מהו|מה\s+יהיה|איזו|ממה|מטעמי|הינך|היכן|כיצד)[^\n]*[\)\(]\s*\d{1,3}\s*)$/;
+            const m = body.match(headerTailRe1) || body.match(headerTailRe2);
+            if (!m) return null;
+
+            const headerPart = (m[1] || '').trim();
+            if (!headerPart || headerPart.length < 8) return null;
+
+            const cutIdx = body.lastIndexOf(headerPart);
+            if (cutIdx <= 0) return null;
+
+            const optionPart = body.slice(0, cutIdx).trim();
+            if (!optionPart) return null;
+
+            let optionClean = optionPart;
+            let headerRaw = headerPart;
+
+            // If OCR placed part of the next question before the numeric marker,
+            // move suffix from last question-mark into the header fragment.
+            const qMarkIdx = optionClean.lastIndexOf('?');
+            if (qMarkIdx > 0 && (optionClean.length - qMarkIdx) <= 120) {
+                headerRaw = `${optionClean.slice(qMarkIdx).trim()} ${headerRaw}`.trim();
+                optionClean = optionClean.slice(0, qMarkIdx).trim();
+            }
+
+            if (!optionClean) return null;
+
+            let normalizedHeader = headerRaw;
+            if (!extractNumericHeaderNumber(normalizedHeader)) {
+                const rev = normalizedHeader.split(/\s+/).reverse().join(' ');
+                if (extractNumericHeaderNumber(rev) || qPatternNumeric.test(rev) || qPatternTextual.test(rev)) {
+                    normalizedHeader = rev;
+                }
+            }
+
+            return {
+                optionLine: `${prefix}${optionClean}`.trim(),
+                headerLine: normalizedHeader
+            };
+        }
+
+        function preprocessEmbeddedHeaders(inputLines) {
+            const out = [];
+            const source = [];
+            for (let i = 0; i < inputLines.length; i++) {
+                const line = String(inputLines[i] || '').trim();
+                if (!line) continue;
+                const split = splitAnswerLineWithEmbeddedHeader(line);
+                if (split) {
+                    if (split.optionLine) {
+                        out.push(split.optionLine.trim());
+                        source.push(i);
+                    }
+                    if (split.headerLine) {
+                        out.push(split.headerLine.trim());
+                        source.push(i);
+                    }
+                } else {
+                    out.push(line);
+                    source.push(i);
+                }
+            }
+            return { lines: out, sourceIdx: source };
+        }
+
+        function normalizeEmbeddedHeaderText(headerText) {
+            let t = normalizeWhitespace(String(headerText || ''));
+            t = t.replace(/^[:\-–—\s]+/, '').trim();
+
+            let m = t.match(/^(.*?)[\)\(]\s*(\d{1,3})\s*$/);
+            if (m) {
+                return normalizeWhitespace(`${m[2]}) ${m[1].trim()}`);
+            }
+
+            m = t.match(/^(.*?)(\d{1,3})\s*\)\s*$/);
+            if (m) {
+                return normalizeWhitespace(`${m[2]}) ${m[1].trim()}`);
+            }
+
+            m = t.match(/^(.*?)(\d{1,2})\s+(\d{1,2})\s*\)\s*$/);
+            if (m) {
+                return normalizeWhitespace(`${m[2]}${m[3]}) ${m[1].trim()}`);
+            }
+
+            return t;
+        }
+
+        function extractEmbeddedHeaderFromOptionText(optionText) {
+            const t = normalizeWhitespace(String(optionText || ''));
+            if (!t) return null;
+
+            const cueWords = /(?:על\s+פי|מהו|מה\s+יהיה|איזו|ממה|מטעמי|הינך|היכן|כיצד|מהם|מה\s+החשיבות|איזה\s+מערכת)/;
+            const numberMarkers = /(?:\)\s*\d{1,3}|\d{1,3}\s*\)|\d{1,2}\s+\d{1,2}\s*\))/g;
+
+            // 1) Prefer tail-like splits from a numeric marker through the end.
+            let marker;
+            while ((marker = numberMarkers.exec(t)) !== null) {
+                const start = marker.index;
+                const before = normalizeWhitespace(t.slice(0, start));
+                const after = normalizeWhitespace(t.slice(start));
+                if (!before || !after || after.length < 8) continue;
+                if (!/[\?？]/.test(after) && !cueWords.test(after)) continue;
+                const header = normalizeEmbeddedHeaderText(after);
+                if (!header) continue;
+                return { before, header };
+            }
+
+            // 2) Fallback: split before cue words when they appear after a marker.
+            const cueMatch = t.match(/(?:על\s+פי|מהו|מה\s+יהיה|איזו|ממה|מטעמי|הינך|היכן|כיצד|מהם|מה\s+החשיבות|איזה\s+מערכת)/);
+            if (cueMatch && typeof cueMatch.index === 'number' && cueMatch.index > 4) {
+                const before = normalizeWhitespace(t.slice(0, cueMatch.index));
+                const after = normalizeWhitespace(t.slice(cueMatch.index));
+                if (before && after && /(?:\)\s*\d{1,3}|\d{1,3}\s*\)|\d{1,2}\s+\d{1,2}\s*\))/.test(after)) {
+                    const header = normalizeEmbeddedHeaderText(after);
+                    if (header) return { before, header };
+                }
+            }
+
+            return null;
+        }
+
+        function splitMergedQuestions(rawQs) {
+            const out = [];
+
+            for (const q of rawQs) {
+                if (!q || !Array.isArray(q.answers) || q.answers.length <= 6) {
+                    out.push(q);
+                    continue;
+                }
+
+                let current = {
+                    text: Array.isArray(q.text) ? [...q.text] : [String(q.text || '')],
+                    answers: [],
+                    lineIdx: q.lineIdx
+                };
+
+                for (const a of q.answers) {
+                    const optionText = normalizeWhitespace(Array.isArray(a.text) ? a.text.join(' ') : String(a.text || ''));
+                    const split = extractEmbeddedHeaderFromOptionText(optionText);
+
+                    if (split) {
+                        current.answers.push({ text: [split.before] });
+                        out.push(current);
+                        current = {
+                            text: [split.header],
+                            answers: [],
+                            lineIdx: q.lineIdx
+                        };
+                    } else {
+                        current.answers.push({ text: optionText ? [optionText] : [] });
+                    }
+                }
+
+                if (current.text.length || current.answers.length) {
+                    out.push(current);
+                }
+            }
+
+            return out;
+        }
+
+        function splitCorruptedMergedOptions(rawQs) {
+            const out = [];
+
+            for (const q of rawQs) {
+                if (!q || !Array.isArray(q.answers)) {
+                    out.push(q);
+                    continue;
+                }
+
+                const nextAnswers = [];
+                for (const a of q.answers) {
+                    const t = normalizeWhitespace(Array.isArray(a.text) ? a.text.join(' ') : String(a.text || ''));
+                    const m = t.match(/^(.*?[\.!?])\s*\.?\s*\d+\s+(.+?)\s*[\.]\s*([אבגדהוזחטי])\s*$/);
+                    if (m) {
+                        const first = normalizeWhitespace(m[1]);
+                        const second = normalizeWhitespace(m[2]);
+                        if (first) nextAnswers.push({ text: [first] });
+                        if (second) nextAnswers.push({ text: [second] });
+                    } else {
+                        nextAnswers.push({ text: t ? [t] : [] });
+                    }
+                }
+
+                out.push({ ...q, answers: nextAnswers });
+            }
+
+            return out;
+        }
+
+        function expandInlineQuestionLines(inputLines) {
+            const expanded = [];
+            const sourceIdx = [];
+
+            for (let i = 0; i < inputLines.length; i++) {
+                const original = String(inputLines[i] || '').trim();
+                if (!original) continue;
+
+                const embeddedSplit = splitAnswerLineWithEmbeddedHeader(original);
+                if (embeddedSplit) {
+                    const first = embeddedSplit.optionLine.trim();
+                    const second = embeddedSplit.headerLine.trim();
+                    if (first) {
+                        expanded.push(first);
+                        sourceIdx.push(i);
+                    }
+                    if (second) {
+                        expanded.push(second);
+                        sourceIdx.push(i);
+                    }
+                    continue;
+                }
+
+                let segment = original;
+                let guard = 0;
+
+                while (segment && guard < 6) {
+                    guard++;
+                    const split = splitInlineQuestionHeader(segment);
+                    if (!split || !split.after) {
+                        expanded.push(segment.trim());
+                        sourceIdx.push(i);
+                        break;
+                    }
+
+                    const splitRev = split.after.split(/\s+/).reverse().join(' ');
+                    const splitIsHeader = qPatternTextual.test(split.after) || qPatternNumeric.test(split.after)
+                        || qPatternTextual.test(splitRev) || qPatternNumeric.test(splitRev);
+
+                    if (!splitIsHeader) {
+                        expanded.push(segment.trim());
+                        sourceIdx.push(i);
+                        break;
+                    }
+
+                    if (split.before) {
+                        expanded.push(split.before.trim());
+                        sourceIdx.push(i);
+                    }
+
+                    segment = split.after.trim();
+                }
+            }
+
+            return { expanded, sourceIdx };
+        }
+
+        function extractNumericHeaderNumber(lineText) {
+            if (!lineText) return null;
+            const m = lineText.match(qNumericCapture);
+            if (!m) return null;
+            const n = Number(m[1]);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        function buildStrictNumericBlocks(inputLines) {
+            const strictHeaderRe = /^\s*(\d{1,3})\s*[\(\)\.\-]\s*/;
+            const optionStartRe = /^(?:[-\*\+\u2022]\s*)?([אבגדהוזחטי])\s*[\.)]\s*(.*)$/;
+
+            const headers = [];
+            for (let i = 0; i < inputLines.length; i++) {
+                const line = String(inputLines[i] || '').trim();
+                if (!line) continue;
+                const m = line.match(strictHeaderRe);
+                if (m) {
+                    headers.push({ idx: i, num: Number(m[1]) });
+                }
+            }
+
+            if (headers.length < 12) {
+                return null;
+            }
+
+            let sequentialHits = 0;
+            for (let i = 1; i < headers.length; i++) {
+                const d = headers[i].num - headers[i - 1].num;
+                if (d === 1 || d === 2) sequentialHits++;
+            }
+            const sequentialRatio = headers.length > 1 ? (sequentialHits / (headers.length - 1)) : 0;
+            if (sequentialRatio < 0.65) {
+                return null;
+            }
+
+            const out = [];
+            for (let h = 0; h < headers.length; h++) {
+                const start = headers[h].idx;
+                const end = h + 1 < headers.length ? headers[h + 1].idx : inputLines.length;
+                const block = inputLines.slice(start, end).map((l) => String(l || '').trim()).filter(Boolean);
+                if (!block.length) continue;
+
+                const qObj = { text: [block[0]], answers: [], lineIdx: start };
+                for (let bi = 1; bi < block.length; bi++) {
+                    const line = block[bi];
+                    const m = line.match(optionStartRe);
+                    if (m) {
+                        const t = (m[2] || '').trim();
+                        qObj.answers.push({ text: t ? [t] : [] });
+                        continue;
+                    }
+
+                    if (qObj.answers.length > 0) {
+                        qObj.answers[qObj.answers.length - 1].text.push(line);
+                    } else {
+                        qObj.text.push(line);
+                    }
+                }
+
+                out.push(qObj);
+            }
+
+            return out;
+        }
+
+        function detectQuestionHeaderNumber(lineText) {
+            if (!lineText) return null;
+            const textual = lineText.match(/שאלה(?:\s+מספר)?\s*:?[\s:]*?(\d{1,3})/i);
+            if (textual) {
+                const n = Number(textual[1]);
+                if (Number.isFinite(n)) return n;
+            }
+            return extractNumericHeaderNumber(lineText);
+        }
+
+        const preprocessed = preprocessEmbeddedHeaders(lines);
+        const baseLines = preprocessed.lines;
+        const baseSourceIdx = preprocessed.sourceIdx;
+
+        const strictBlocks = buildStrictNumericBlocks(baseLines);
+        const useStrictNumericMode = Array.isArray(strictBlocks) && strictBlocks.length >= 20;
+        const { expanded: workingLines, sourceIdx: workingLineSourceIdx } = useStrictNumericMode
+            ? { expanded: baseLines, sourceIdx: baseSourceIdx }
+            : expandInlineQuestionLines(baseLines);
+
+        const rawQuestions = [];
+        const headerIndices = [];
+
+        if (useStrictNumericMode) {
+            rawQuestions.push(...strictBlocks);
+        } else {
+
+        let lastHeaderNum = null;
+        for (let i = 0; i < workingLines.length; i++) {
+            const line = workingLines[i];
             if (!line || noisePattern.test(line) || line.includes('קוד מבחן') || line.includes("מבחן מס") || line.includes('מבחן מס')) {
                 continue;
             }
-
             const reversedLine = line.split(/\s+/).reverse().join(' ');
             if (footerPattern.test(line) || footerPattern.test(reversedLine)) {
                 continue;
             }
+            const textualHeader = qPatternTextual.test(line) || qPatternTextual.test(reversedLine);
+            const directNumeric = extractNumericHeaderNumber(line);
+            const reverseNumeric = extractNumericHeaderNumber(reversedLine);
 
-            const isQuestionHeader = qPatternTextual.test(line) || qPatternTextual.test(reversedLine) || qPatternNumeric.test(line);
-            if (isQuestionHeader) {
-                pushCurrent();
-                current = { text: [line], answers: [], lineIdx: i }; // use i, not indexOf
-                stateMode = 1;
-                continue;
+            let numericCandidate = directNumeric;
+            if (!Number.isFinite(numericCandidate) && Number.isFinite(reverseNumeric)) {
+                numericCandidate = reverseNumeric;
             }
 
-            if (!current) {
-                continue;
-            }
-
-            // ansPatternStart captures: (1,2) => 'א. text', (3,4) => 'א) text', (5,6) => '. א text'.
-            const isLineStartMatch = ansPatternStart.test(line);
-            let match = line.match(ansPatternStart) || reversedLine.match(ansPatternStart);
-            const isLineEndMatch = !match && ansPatternEnd.test(line);
-            let endMatch = (!match) && (line.match(ansPatternEnd) || reversedLine.match(ansPatternEnd));
-
-            if (match || endMatch) {
-                stateMode = 2;
-                let letter, answerText;
-                if (match) {
-                    letter = match[1] || match[3] || match[5];
-                    answerText = (match[2] || match[4] || match[6] || '').trim();
-                    if (!isLineStartMatch && answerText) {
-                        answerText = answerText.split(/\s+/).reverse().join(' ');
-                    }
+            let numericHeader = false;
+            if (Number.isFinite(numericCandidate) && numericCandidate >= 1 && numericCandidate <= 300) {
+                if (!Number.isFinite(lastHeaderNum)) {
+                    numericHeader = numericCandidate <= 80;
                 } else {
-                    letter = endMatch[2] || endMatch[4];
-                    answerText = (endMatch[1] || endMatch[3] || '').trim();
-                    if (!isLineEndMatch && answerText) {
-                        answerText = answerText.split(/\s+/).reverse().join(' ');
-                    }
+                    const delta = numericCandidate - lastHeaderNum;
+                    numericHeader = delta === 1 || delta === 2;
                 }
-
-                if (!letter) {
-                    continue;
-                }
-                current.answers.push({ text: answerText ? [answerText] : [] });
-                continue;
             }
 
-            if (stateMode === 1) {
-                current.text.push(line);
-            } else if (stateMode === 2 && current.answers.length > 0) {
-                current.answers[current.answers.length - 1].text.push(line);
+            const isQuestionHeader = textualHeader || numericHeader;
+            if (isQuestionHeader) {
+                headerIndices.push(i);
+                const detectedNum = detectQuestionHeaderNumber(line) || detectQuestionHeaderNumber(reversedLine);
+                if (Number.isFinite(detectedNum)) {
+                    lastHeaderNum = detectedNum;
+                }
             }
         }
 
-        pushCurrent();
+        for (let h = 0; h < headerIndices.length; h++) {
+            const startIdx = headerIndices[h];
+            const endIdx = h + 1 < headerIndices.length ? headerIndices[h + 1] : workingLines.length;
+            const blockLines = workingLines.slice(startIdx, endIdx);
+            if (!blockLines.length) continue;
 
-        const imageKeywords = /(?:^|[\s\(\[\:\,\"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
+            const q = {
+                text: [blockLines[0]],
+                answers: [],
+                lineIdx: Number.isInteger(workingLineSourceIdx[startIdx]) ? workingLineSourceIdx[startIdx] : startIdx
+            };
+
+            for (let bi = 1; bi < blockLines.length; bi++) {
+                let line = blockLines[bi];
+                if (!line || noisePattern.test(line) || line.includes('קוד מבחן') || line.includes("מבחן מס") || line.includes('מבחן מס')) {
+                    continue;
+                }
+
+                const reversedLine = line.split(/\s+/).reverse().join(' ');
+                if (footerPattern.test(line) || footerPattern.test(reversedLine)) {
+                    continue;
+                }
+
+                // Within block parser, still guard for accidental inline next question.
+                const qSplit = splitInlineQuestionHeader(line);
+                const qSplitReversed = qSplit && qSplit.after ? qSplit.after.split(/\s+/).reverse().join(' ') : '';
+                const qSplitIsHeader = qSplit && qSplit.after && (
+                    qPatternTextual.test(qSplit.after)
+                    || qPatternTextual.test(qSplitReversed)
+                    || qPatternNumeric.test(qSplit.after)
+                    || qPatternNumeric.test(qSplitReversed)
+                );
+                if (qSplitIsHeader) {
+                    if (qSplit.before) {
+                        if (q.answers.length > 0) {
+                            q.answers[q.answers.length - 1].text.push(qSplit.before);
+                        } else {
+                            q.text.push(qSplit.before);
+                        }
+                    }
+                    break;
+                }
+
+                const inlineParsed = parseInlineAnswers(line);
+                if (inlineParsed && inlineParsed.options.length) {
+                    if (inlineParsed.prefix) {
+                        if (q.answers.length > 0) {
+                            q.answers[q.answers.length - 1].text.push(inlineParsed.prefix);
+                        } else {
+                            q.text.push(inlineParsed.prefix);
+                        }
+                    }
+                    for (const opt of inlineParsed.options) {
+                        q.answers.push({ text: opt.text ? [opt.text] : [] });
+                    }
+                    continue;
+                }
+
+                const isLineStartMatch = ansPatternStart.test(line);
+                let match = line.match(ansPatternStart) || reversedLine.match(ansPatternStart);
+                const isLineEndMatch = !match && ansPatternEnd.test(line);
+                let endMatch = (!match) && (line.match(ansPatternEnd) || reversedLine.match(ansPatternEnd));
+
+                if (match || endMatch) {
+                    let letter, answerText;
+                    if (match) {
+                        letter = match[1] || match[3] || match[5];
+                        answerText = (match[2] || match[4] || match[6] || '').trim();
+                        if (!isLineStartMatch && answerText) {
+                            answerText = answerText.split(/\s+/).reverse().join(' ');
+                        }
+                    } else {
+                        letter = endMatch[2] || endMatch[4];
+                        answerText = (endMatch[1] || endMatch[3] || '').trim();
+                        if (!isLineEndMatch && answerText) {
+                            answerText = answerText.split(/\s+/).reverse().join(' ');
+                        }
+                    }
+
+                    if (letter) {
+                        q.answers.push({ text: answerText ? [answerText] : [] });
+                    }
+                    continue;
+                }
+
+                if (q.answers.length > 0) {
+                    q.answers[q.answers.length - 1].text.push(line);
+                } else {
+                    q.text.push(line);
+                }
+            }
+
+            rawQuestions.push(q);
+        }
+        }
+
+        const normalizedRawQuestions = splitCorruptedMergedOptions(splitMergedQuestions(rawQuestions));
+
+        const imageKeywords = /(?:^|[\s\(\[\:\,"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
 
         const diagnostics = [];
-        const formatted = rawQuestions
+        const formatted = normalizedRawQuestions
             .map((q, idx) => {
                 let rawQuestionText = normalizeWhitespace(stripExamFooterArtifacts(q.text.join(' ')));
                 // Clean leading Markdown heading syntax & question header prefixes (e.g. ### שאלה 1:, שאלה מספר :1)
@@ -1392,6 +1960,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (diagnostics.length) {
             console.warn(`[parseQuestionsFromText] Dropped ${diagnostics.length} question candidate(s).`, diagnostics);
+            const sample = diagnostics
+                .slice(0, 3)
+                .map((d) => `#${d.index}(${d.optionCount})`)
+                .join(', ');
+            setStatus(`זוהו ${formatted.length} שאלות תקינות. ${diagnostics.length} מועמדות הושמטו (דוגמאות: ${sample}).`, true);
+            showToast(`הושמטו ${diagnostics.length} מועמדות שאלה. דוגמאות: ${sample}`, 'error', 7000);
+        }
+
+        const suspicious = formatted
+            .map((q, idx) => ({ idx: idx + 1, n: q.options.length }))
+            .filter((x) => x.n > 6);
+        if (suspicious.length) {
+            const sample = suspicious.slice(0, 3).map((s) => `#${s.idx}(${s.n})`).join(', ');
+            showToast(`זוהו שאלות עם מספר תשובות חריג (חשד למיזוג): ${sample}`, 'error', 8000);
         }
 
         if (!formatted.length) {
