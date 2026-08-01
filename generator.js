@@ -3767,6 +3767,25 @@ STRICT EXTRACTION & FORMATTING RULES:
                 throw new Error('לא פוענחו שאלות מהקובץ שנבחר.');
             }
 
+            const selectedCsv = elements.csvFile?.files?.[0] || null;
+            const currentFormNumber = (elements.formNumber?.value || '').trim();
+            const isFormZero = currentFormNumber === '0';
+            const hasShuffleFlag = normalizedQuestions.some((q) => q && q.shuffleOptions === true);
+            const allAnswersDefaultToAlef = normalizedQuestions.every((q) => q && Number(q.correctIndex) === 0);
+
+            // No answer key file should behave like Form 0: keep correctIndex at א and
+            // randomize option order for solving. This preserves expected behavior when
+            // users upload only questions.json/questions.md from test folders.
+            const shouldAutoEnableFormZeroShuffle = !selectedCsv && !hasShuffleFlag && allAnswersDefaultToAlef;
+            if (isFormZero || shouldAutoEnableFormZeroShuffle) {
+                normalizedQuestions = normalizedQuestions.map((q) => ({ ...q, shuffleOptions: true }));
+
+                if (shouldAutoEnableFormZeroShuffle && elements.formNumber && !currentFormNumber) {
+                    elements.formNumber.value = '0';
+                    showToast('לא זוהה קובץ תשובות. הופעל מצב שאלון 0 עם ערבוב תשובות אוטומטי.', 'info', 5000);
+                }
+            }
+
             state.questions = normalizedQuestions;
             renderPreview();
             disableOutputActions(false);
