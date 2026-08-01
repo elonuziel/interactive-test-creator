@@ -1458,10 +1458,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Interactive PDF Page Crop Modal Controller ───────────────────────────
     let currentCropTargetIndex = null;
+    let currentCropPageNum = 1;
     let cropSelection = { x: 0, y: 0, w: 0, h: 0 };
     let isCroppingDrag = false;
     let cropStartPos = { x: 0, y: 0 };
     let baseCropImage = null;
+    const CROP_RENDER_SCALE = 3.0;
+    const CROP_EXPORT_RENDER_SCALE = 6.0;
+    const CROP_EXPORT_MIN_WIDTH = 2400;
+    const CROP_EXPORT_MAX_DIMENSION = 7000;
+    const CROP_EXPORT_MIME = 'image/png';
 
     const cropElements = {
         modal: document.getElementById('crop-modal'),
@@ -1474,6 +1480,85 @@ document.addEventListener('DOMContentLoaded', () => {
         statusText: document.getElementById('crop-status-text')
     };
 
+    // Keep crop modal at top-level so parent popups/hidden containers cannot
+    // block its visibility when opening from question cards.
+    if (cropElements.modal && cropElements.modal.parentElement !== document.body) {
+        document.body.appendChild(cropElements.modal);
+    }
+
+    async function getPdfBytesForCrop() {
+        if (state.pdfBytes && state.pdfBytes.length > 0) {
+            return new Uint8Array(state.pdfBytes);
+        }
+
+        if (state.pdfArrayBuffer && state.pdfArrayBuffer.byteLength > 0) {
+            state.pdfBytes = new Uint8Array(state.pdfArrayBuffer.slice(0));
+            return new Uint8Array(state.pdfBytes);
+        }
+
+        const pdfInput = elements.pdfFile?.files?.[0];
+        if (pdfInput) {
+            const buffer = await pdfInput.arrayBuffer();
+            state.pdfArrayBuffer = buffer.slice(0);
+            state.pdfBytes = new Uint8Array(buffer);
+            return new Uint8Array(state.pdfBytes);
+        }
+
+        return null;
+    }
+
+    async function resolveCropTotalPages() {
+        const cachedPages = state.pdfPagesState?.length || state.proofPageImages?.length || 0;
+        if (cachedPages > 0) return cachedPages;
+
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+        if (!pdfjs?.getDocument) return 0;
+
+        try {
+            const bytes = await getPdfBytesForCrop();
+            if (!bytes || !bytes.length) return 0;
+            const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
+            return pdfDoc.numPages || 0;
+        } catch (err) {
+            console.warn('Could not resolve PDF page count for crop modal:', err);
+            return 0;
+        }
+    }
+
+    async function attachFullSourcePageImage(questionIndex, pageNum) {
+        if (!state.questions[questionIndex]) return;
+
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+        if (!pdfjs?.getDocument) {
+            showToast('ספריית PDF.js לא נטענה בדפדפן.', 'error');
+            return;
+        }
+
+        try {
+            const bytes = await getPdfBytesForCrop();
+            if (!bytes || !bytes.length) {
+                showToast('לא נמצא PDF זמין. העלה קובץ PDF ונסה שוב.', 'error');
+                return;
+            }
+
+            const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
+            const safePage = Math.min(Math.max(1, Number(pageNum) || 1), pdfDoc.numPages);
+            const page = await pdfDoc.getPage(safePage);
+
+            // Match automatic attachment quality path.
+            const imageData = await renderPageImageData(page, 2.5);
+            state.questions[questionIndex].image = `data:image/png;base64,${imageData}`;
+            state.questions[questionIndex].sourcePage = safePage;
+            state.questions[questionIndex].imageNoCompress = true;
+
+            renderPreview();
+            showToast(`עמוד מקור ${safePage} הוצמד לשאלה באיכות מלאה.`, 'success');
+        } catch (err) {
+            console.error('Failed to attach full source page image:', err);
+            showToast(`שגיאה בהצמדת עמוד מקור: ${err.message || err}`, 'error');
+        }
+    }
+
     async function openCropModal(questionIndex, initialPageNum = 1) {
         currentCropTargetIndex = questionIndex;
         if (!cropElements.modal || !cropElements.canvas) return;
@@ -1484,9 +1569,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate page select dropdown
         if (cropElements.pageSelect) {
             cropElements.pageSelect.innerHTML = '';
-            const totalPages = state.pdfPagesState?.length || state.proofPageImages?.length || 0;
+            const totalPages = await resolveCropTotalPages();
             if (!totalPages) {
-                showToast('לא נמצאו עמודי PDF זמינים לחיתוך תמונה.', 'error');
+                showToast('לא נמצא PDF זמין לחיתוך. העלה קובץ PDF בשדה "קובץ PDF" ונסה שוב.', 'error');
                 closeCropModal();
                 return;
             }
@@ -1505,19 +1590,26 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renderCropCanvasPage(pageNum) {
         const canvas = cropElements.canvas;
         if (!canvas) return;
+        currentCropPageNum = Number(pageNum) || 1;
 
         cropSelection = { x: 0, y: 0, w: 0, h: 0 };
         if (cropElements.statusText) cropElements.statusText.textContent = 'סמן אזור לחיתוך בעכבר';
 
-        if (state.pdfBytes && window.pdfjsLib) {
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+        if (pdfjs?.getDocument) {
             try {
-                const freshCopy = new Uint8Array(state.pdfBytes);
-                const pdfDoc = await window.pdfjsLib.getDocument({ data: freshCopy }).promise;
+            const bytes = await getPdfBytesForCrop();
+            if (!bytes || !bytes.length) throw new Error('Missing PDF bytes for crop render');
+            const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
                 const page = await pdfDoc.getPage(Number(pageNum));
-                const viewport = page.getViewport({ scale: 1.5 });
+                const viewport = page.getViewport({ scale: CROP_RENDER_SCALE });
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                }
                 await page.render({ canvasContext: ctx, viewport }).promise;
 
                 baseCropImage = new Image();
@@ -1552,6 +1644,62 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.textAlign = 'center';
             ctx.fillText('לא נמצא עמוד PDF זמין לחיתוך', 300, 200);
         }
+    }
+
+    async function exportHiResCropFromPdf(pageNum, selection) {
+        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
+        if (!pdfjs?.getDocument) return null;
+
+        const bytes = await getPdfBytesForCrop();
+        if (!bytes || !bytes.length) return null;
+
+        const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
+        const safePage = Math.min(Math.max(1, Number(pageNum) || 1), pdfDoc.numPages);
+        const page = await pdfDoc.getPage(safePage);
+
+        const baseRatio = CROP_EXPORT_RENDER_SCALE / CROP_RENDER_SCALE;
+        const minWidthRatio = CROP_EXPORT_MIN_WIDTH / Math.max(1, selection.w);
+        let ratio = Math.max(baseRatio, minWidthRatio);
+        let exportScale = CROP_RENDER_SCALE * ratio;
+        let outW = Math.max(1, Math.round(selection.w * ratio));
+        let outH = Math.max(1, Math.round(selection.h * ratio));
+
+        const maxSide = Math.max(outW, outH);
+        if (maxSide > CROP_EXPORT_MAX_DIMENSION) {
+            const downscale = CROP_EXPORT_MAX_DIMENSION / maxSide;
+            exportScale = Math.max(CROP_RENDER_SCALE, exportScale * downscale);
+            ratio = exportScale / CROP_RENDER_SCALE;
+            outW = Math.max(1, Math.round(selection.w * ratio));
+            outH = Math.max(1, Math.round(selection.h * ratio));
+        }
+
+        const sx = Math.max(0, selection.x * ratio);
+        const sy = Math.max(0, selection.y * ratio);
+
+        // Render full page at target DPI, then crop. This preserves glyph
+        // layout for Hebrew text better than translated render transforms.
+        const viewport = page.getViewport({ scale: exportScale });
+        const fullCanvas = document.createElement('canvas');
+        fullCanvas.width = Math.max(1, Math.round(viewport.width));
+        fullCanvas.height = Math.max(1, Math.round(viewport.height));
+        const fullCtx = fullCanvas.getContext('2d');
+        if (!fullCtx) return null;
+        fullCtx.imageSmoothingEnabled = true;
+        fullCtx.imageSmoothingQuality = 'high';
+
+        await page.render({ canvasContext: fullCtx, viewport }).promise;
+
+        const offscreen = document.createElement('canvas');
+        offscreen.width = outW;
+        offscreen.height = outH;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return null;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        ctx.drawImage(fullCanvas, sx, sy, outW, outH, 0, 0, outW, outH);
+
+        return offscreen.toDataURL(CROP_EXPORT_MIME);
     }
 
     function redrawCropCanvas() {
@@ -1640,7 +1788,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cropElements.closeBtn?.addEventListener('click', closeCropModal);
     cropElements.cancelBtn?.addEventListener('click', closeCropModal);
 
-    cropElements.saveBtn?.addEventListener('click', () => {
+    cropElements.saveBtn?.addEventListener('click', async () => {
         if (currentCropTargetIndex === null || !state.questions[currentCropTargetIndex]) return;
         const canvas = cropElements.canvas;
         if (!canvas || cropSelection.w < 10 || cropSelection.h < 10) {
@@ -1648,18 +1796,35 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const offscreen = document.createElement('canvas');
-        offscreen.width = cropSelection.w;
-        offscreen.height = cropSelection.h;
-        const ctx = offscreen.getContext('2d');
-        ctx.drawImage(
-            canvas,
-            cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h,
-            0, 0, cropSelection.w, cropSelection.h
-        );
+        let croppedDataUrl = null;
+        try {
+            croppedDataUrl = await exportHiResCropFromPdf(currentCropPageNum, cropSelection);
+        } catch (err) {
+            console.warn('High-resolution crop export failed, falling back to canvas crop:', err);
+        }
 
-        const croppedDataUrl = offscreen.toDataURL('image/webp', 0.85);
+        // Fallback path if high-resolution re-render is unavailable.
+        if (!croppedDataUrl) {
+            const offscreen = document.createElement('canvas');
+            offscreen.width = cropSelection.w;
+            offscreen.height = cropSelection.h;
+            const ctx = offscreen.getContext('2d');
+            if (!ctx) {
+                showToast('לא ניתן היה ליצור תמונת חיתוך.', 'error');
+                return;
+            }
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(
+                canvas,
+                cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h,
+                0, 0, cropSelection.w, cropSelection.h
+            );
+            croppedDataUrl = offscreen.toDataURL(CROP_EXPORT_MIME);
+        }
+
         state.questions[currentCropTargetIndex].image = croppedDataUrl;
+        state.questions[currentCropTargetIndex].imageNoCompress = true;
         if (cropElements.pageSelect) {
             state.questions[currentCropTargetIndex].sourcePage = parseInt(cropElements.pageSelect.value, 10);
         }
@@ -1726,10 +1891,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const cropBtn = document.createElement('button');
             cropBtn.type = 'button';
             cropBtn.className = 'secondary-btn sm-btn';
-            cropBtn.textContent = question.image ? '✂️ חתוך תמונה מחדש' : '🖼️ חתוך תמונה מעמוד מקור';
+            cropBtn.textContent = question.image ? '🖼️ החלף לעמוד מקור מלא' : '🖼️ הוסף עמוד מקור מלא';
             cropBtn.style.cssText = 'font-size:.8rem;padding:4px 10px;';
-            cropBtn.addEventListener('click', () => {
-                openCropModal(index, question.sourcePage || 1);
+            cropBtn.addEventListener('click', async () => {
+                cropBtn.disabled = true;
+                const prevText = cropBtn.textContent;
+                cropBtn.textContent = 'מוסיף עמוד...';
+                await attachFullSourcePageImage(index, question.sourcePage || 1);
+                cropBtn.disabled = false;
+                cropBtn.textContent = prevText;
             });
 
             const fileInput = document.createElement('input');
@@ -1742,6 +1912,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const reader = new FileReader();
                     reader.onload = (ev) => {
                         state.questions[index].image = ev.target.result;
+                        delete state.questions[index].imageNoCompress;
                         renderPreview();
                     };
                     reader.readAsDataURL(f);
@@ -1958,7 +2129,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const cleanedQuestions = await Promise.all(state.questions.map(async (q) => {
             let img = q.image;
             if (shouldCompress && img) {
+                const skipCompression = q.imageNoCompress === true;
+                if (!skipCompression) {
                 img = await compressImageBase64(img, quality);
+                }
             }
             return {
                 question: normalizeWhitespace(q.question),
