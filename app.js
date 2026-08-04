@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
     let userFlags = []; // boolean per question
     let isImmediateFeedback = false;
+    let autoAdvanceTimer = null;
     let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered' | 'flagged'
     let isReviewMode = false; // true when reviewing from results screen
     let theme = localStorage.getItem('theme') || 'light';
@@ -491,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Render Question ───────────────────────────────────────────────────────
     function renderQuestion() {
+        clearTimeout(autoAdvanceTimer);
         const q = questions[currentQuestionIndex];
         const answered = userAnswers[currentQuestionIndex];
 
@@ -600,6 +602,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isImmediateFeedback) {
             // Re-render to apply correct/incorrect styles cleanly
             renderQuestion();
+            if (isCorrect && !isReviewMode) {
+                const isLast = currentQuestionIndex === questions.length - 1;
+                autoAdvanceTimer = setTimeout(() => {
+                    if (isLast) {
+                        submitBtn.click();
+                    } else {
+                        currentQuestionIndex++;
+                        renderQuestion();
+                    }
+                }, 1000);
+            }
         } else {
             // Just update jump bar dot
             renderJumpBar();
