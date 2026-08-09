@@ -25,10 +25,12 @@ The web application (`web/index.html`, `web/app.js`, `style.css` in `web/`) offe
 ### 🧙 Interactive CLI Wizard (`start.bat`)
 A step-by-step Windows wizard (`start.bat`) that automates:
 1. Environment & package prerequisite verification (`pymupdf`, `pandas`, `openpyxl`).
-2. Test folder creation and raw PDF / answer key drop-folder setup.
+2. Test folder creation and exam source drop-folder setup (`.pdf` or `.docx`) plus answer-key sheets.
 3. PDF type detection & page image rendering for Vision LLM extraction.
 4. Automatic answer key merging, schema QA validation (`7_check_json.py`), and test manifest updates (`8_generate_manifest.py`).
 5. Building portable single-file HTML apps or starting local web servers.
+
+If `.docx` files are detected, the wizard asks once whether to convert all DOCX files to PDF. If a local converter backend is available, conversion is attempted automatically. If not, the wizard provides manual export-to-PDF steps and resumes after you place PDFs in the same folder.
 
 ---
 
@@ -92,8 +94,9 @@ Follow the interactive prompts to set up test folders, render pages for LLM proc
 
 ### 2. Manual Workflow & Test Creation
 1. **Create a Test Folder**: Place raw source files under `tests/` (e.g. `tests/botany_2024_a/`):
-   - Exam PDF: `tests/botany_2024_a/exam.pdf`
+   - Exam source: `tests/botany_2024_a/exam.pdf` or `tests/botany_2024_a/exam.docx`
    - Answer key spreadsheet: `tests/botany_2024_a/answers.csv` or `answers.xlsx`
+   - Note: The processing pipeline remains PDF-native. DOCX files should be converted to PDF before extraction (wizard can attempt this automatically when a converter is available).
 2. **Process PDF & Extract Questions**:
    - Follow [LLM_RUNBOOK.md](LLM_RUNBOOK.md) for Vision LLMs or check [python_scripts/README.md](python_scripts/README.md) for script usages (`1_detect_pdf_type.py` through `6_merge_json_answers.py`).
 3. **Validate & Update Manifest**:

@@ -92,6 +92,130 @@ def open_in_explorer(path):
     else:
         subprocess.Popen(['xdg-open', path])
 
+def find_soffice_binary():
+    """Find a LibreOffice soffice executable if available."""
+    cand = shutil.which('soffice')
+    if cand:
+        return cand
+
+    if sys.platform == 'win32':
+        common_paths = [
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ]
+        for p in common_paths:
+            if os.path.isfile(p):
+                return p
+    return None
+
+def has_word_com():
+    """Check whether Microsoft Word COM automation is available on Windows."""
+    if sys.platform != 'win32':
+        return False
+    if not shutil.which('powershell'):
+        return False
+
+    probe_cmd = (
+        "$ErrorActionPreference='Stop';"
+        "$w=New-Object -ComObject Word.Application;"
+        "$w.Quit();"
+        "Write-Output 'ok'"
+    )
+    try:
+        res = subprocess.run(
+            ['powershell', '-NoProfile', '-NonInteractive', '-Command', probe_cmd],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        return res.returncode == 0
+    except Exception:
+        return False
+
+def detect_docx_converter():
+    """Return a converter backend tuple: (backend_name, backend_value)."""
+    soffice_path = find_soffice_binary()
+    if soffice_path:
+        return ('soffice', soffice_path)
+    if has_word_com():
+        return ('wordcom', 'powershell')
+    return (None, None)
+
+def convert_docx_to_pdf_with_soffice(soffice_path, docx_path, output_dir):
+    cmd = [
+        soffice_path,
+        '--headless',
+        '--convert-to',
+        'pdf:writer_pdf_Export',
+        '--outdir',
+        output_dir,
+        docx_path,
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
+    return res.returncode == 0, (res.stderr or res.stdout or '').strip()
+
+def convert_docx_to_pdf_with_wordcom(docx_path, pdf_path):
+    safe_docx = docx_path.replace("'", "''")
+    safe_pdf = pdf_path.replace("'", "''")
+    ps_script = (
+        "$ErrorActionPreference='Stop';"
+        f"$docx='{safe_docx}';"
+        f"$pdf='{safe_pdf}';"
+        "$word=New-Object -ComObject Word.Application;"
+        "$word.Visible=$false;"
+        "$word.DisplayAlerts=0;"
+        "$doc=$word.Documents.Open($docx, $false, $true);"
+        "$doc.SaveAs([ref]$pdf, [ref]17);"
+        "$doc.Close();"
+        "$word.Quit();"
+        "Write-Output 'ok'"
+    )
+    res = subprocess.run(
+        ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps_script],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
+    )
+    return res.returncode == 0, (res.stderr or res.stdout or '').strip()
+
+def convert_docx_batch(docx_files, test_dir, backend_name, backend_value, overwrite_existing=False):
+    """Convert DOCX files to PDFs in-place. Returns summary dict."""
+    converted = []
+    skipped = []
+    failed = []
+
+    for docx_name in docx_files:
+        docx_path = os.path.join(test_dir, docx_name)
+        base_name = os.path.splitext(docx_name)[0]
+        expected_pdf = os.path.join(test_dir, f"{base_name}.pdf")
+
+        if os.path.exists(expected_pdf) and not overwrite_existing:
+            skipped.append((docx_name, 'matching PDF already exists'))
+            continue
+
+        try:
+            if backend_name == 'soffice':
+                ok, msg = convert_docx_to_pdf_with_soffice(backend_value, docx_path, test_dir)
+            elif backend_name == 'wordcom':
+                ok, msg = convert_docx_to_pdf_with_wordcom(docx_path, expected_pdf)
+            else:
+                ok, msg = False, 'no conversion backend configured'
+        except Exception as exc:
+            ok, msg = False, str(exc)
+
+        if ok and os.path.isfile(expected_pdf):
+            converted.append((docx_name, os.path.basename(expected_pdf)))
+        else:
+            failed.append((docx_name, msg or 'unknown conversion error'))
+
+    return {
+        'converted': converted,
+        'skipped': skipped,
+        'failed': failed,
+    }
+
 def print_header():
     print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
     print(f"{C_CYAN}│{C_RESET} {C_BOLD}{C_WHITE}         INTERACTIVE HEBREW QUIZ BUILDER (CLI EXECUTABLE)                 {C_RESET} {C_CYAN}│{C_RESET}")
@@ -373,28 +497,91 @@ def cleanup_workspace_folder(test_dir):
 def process_workspace(test_name, test_dir):
     # Step 3: Check for source files & launch Explorer
     pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
+    docx_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.docx')]
     csv_files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
 
-    if not pdf_files:
+    if not pdf_files and not docx_files:
         print(f"\n{C_YELLOW}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
         print(f"{C_YELLOW}│                   ACTION REQUIRED: PLACE EXAM FILES                      │{C_RESET}")
         print(f"{C_YELLOW}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
         print(f"  Please place your exam source files into workspace:")
         print(f"  📁 {C_BOLD}{test_dir}{C_RESET}\n")
         print("  Required files:")
-        print("    1. exam.pdf    - Your exam PDF file")
+        print("    1. exam.pdf or exam.docx - Your exam source file")
         print("    2. answers.csv - Answer key (CSV or Excel .xlsx / .xls) [Optional]\n")
         print("  Opening workspace folder in Explorer...")
         open_in_explorer(test_dir)
         input("  Press Enter after copying your files into the workspace folder...")
 
         pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
+        docx_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.docx')]
         csv_files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
 
+    converted_pdf_names = []
+    if docx_files:
+        print(f"  {C_CYAN}[i] DOCX File(s) Found: {', '.join(docx_files)}{C_RESET}")
+        convert_choice = input("   [?] Convert all DOCX files to PDF now? (Y/n) [Default: Y]: ").strip().lower()
+        if convert_choice != 'n':
+            overwrite_existing = False
+            matching_existing = []
+            for docx_name in docx_files:
+                base_name = os.path.splitext(docx_name)[0]
+                expected_pdf = os.path.join(test_dir, f"{base_name}.pdf")
+                if os.path.exists(expected_pdf):
+                    matching_existing.append(os.path.basename(expected_pdf))
+
+            if matching_existing:
+                print(f"  {C_YELLOW}[!] Existing matching PDF(s): {', '.join(matching_existing)}{C_RESET}")
+                ow_choice = input("   [?] Overwrite those matching PDFs from DOCX? (y/N) [Default: N]: ").strip().lower()
+                overwrite_existing = (ow_choice == 'y')
+
+            backend_name, backend_value = detect_docx_converter()
+            if backend_name:
+                print(f"  {C_CYAN}[i] Converting DOCX files using backend: {backend_name}{C_RESET}")
+                summary = convert_docx_batch(
+                    docx_files,
+                    test_dir,
+                    backend_name,
+                    backend_value,
+                    overwrite_existing=overwrite_existing,
+                )
+                for src, dst in summary['converted']:
+                    converted_pdf_names.append(dst)
+                    print(f"  {C_GREEN}[✔] Converted: {src} -> {dst}{C_RESET}")
+                for src, reason in summary['skipped']:
+                    print(f"  {C_GRAY}[i] Skipped: {src} ({reason}){C_RESET}")
+                for src, reason in summary['failed']:
+                    print(f"  {C_YELLOW}[!] Failed: {src} ({reason}){C_RESET}")
+            else:
+                print(f"  {C_YELLOW}[!] No local DOCX-to-PDF converter was detected.{C_RESET}")
+                print("      Manual fallback:")
+                print("      1. Open each .docx file in Word/Docs")
+                print("      2. Export/Save As PDF in the same workspace folder")
+                print("      3. Return here and continue")
+                open_in_explorer(test_dir)
+                input("  Press Enter after exporting DOCX files to PDF...")
+
+            pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
+            docx_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.docx')]
+        else:
+            print(f"  {C_GRAY}[i] DOCX conversion skipped by user.{C_RESET}")
+
+    pdf_files = sorted(pdf_files, key=lambda x: x.lower())
+    if converted_pdf_names:
+        preferred = [p for p in converted_pdf_names if p in pdf_files]
+        if preferred:
+            selected_pdf = preferred[0]
+        else:
+            selected_pdf = pdf_files[0] if pdf_files else None
+    else:
+        selected_pdf = pdf_files[0] if pdf_files else None
+
     if pdf_files:
-        print(f"  {C_GREEN}[✔] PDF File Found: {pdf_files[0]}{C_RESET}")
+        print(f"  {C_GREEN}[✔] PDF File Found: {selected_pdf}{C_RESET}")
     else:
         print(f"  {C_YELLOW}[!] WARNING: No PDF file found in {test_dir}{C_RESET}")
+        print("      Please add a PDF file (or convert DOCX to PDF) and run this workspace again.")
+        return
 
     if csv_files:
         print(f"  {C_GREEN}[✔] Answer Key Found: {csv_files[0]}{C_RESET}")
@@ -407,7 +594,7 @@ def process_workspace(test_name, test_dir):
     # PDF Type Detection
     is_digital = False
     if pdf_files:
-        pdf_path = os.path.join(test_dir, pdf_files[0])
+        pdf_path = os.path.join(test_dir, selected_pdf)
         print("  [1/2] Analyzing PDF format (Digital vs Scanned)...")
         run_script('1_detect_pdf_type.py', [pdf_path])
         is_digital = is_pdf_digital(pdf_path)
@@ -446,7 +633,7 @@ def process_workspace(test_name, test_dir):
 
     skip_step3 = input("\n   [?] Press Enter to run page rendering & text extraction, or 's' to skip: ").strip().lower()
     if skip_step3 != 's' and pdf_files:
-        pdf_path = os.path.join(test_dir, pdf_files[0])
+        pdf_path = os.path.join(test_dir, selected_pdf)
         print("\n  Page Cleaning Options:")
         print("    • Press [Enter] for Standard cleaning (skips cover/instructions pages 1-4, 6,8,10...)")
         print("    • Type custom pages to discard (e.g., '1-3, 5')")
