@@ -1,76 +1,25 @@
 @echo off
 setlocal enabledelayedexpansion
+chcp 65001 >nul
 title Interactive Test Creator - Server ^& Test Launcher
 
 cd /d "%~dp0"
-
-echo ===============================================================
-echo   Interactive Hebrew Test Creator - Server ^& Test Suite
-echo ===============================================================
-echo.
-
 set PORT=8080
-set SERVER_STARTED=0
-
-:: Check if port 8080 is already listening
-netstat -aon | findstr :8080 | findstr LISTENING >nul 2>&1
-if !errorlevel! equ 0 (
-    echo [INFO] Local server is already running on http://localhost:%PORT%
-    set SERVER_STARTED=1
-) else (
-    set "SERVER_CMD="
-    where python >nul 2>nul
-    if !errorlevel! equ 0 set "SERVER_CMD=python -m http.server %PORT%"
-    
-    if "!SERVER_CMD!"=="" (
-        where py >nul 2>nul
-        if !errorlevel! equ 0 set "SERVER_CMD=py -m http.server %PORT%"
-    )
-    
-    if "!SERVER_CMD!"=="" (
-        where npx >nul 2>nul
-        if !errorlevel! equ 0 set "SERVER_CMD=npx serve -p %PORT% ."
-    )
-    
-    if not "!SERVER_CMD!"=="" (
-        echo [INFO] Detected server runtime. Starting: !SERVER_CMD! ...
-        start /b "" !SERVER_CMD! >nul 2>&1
-    ) else (
-        echo [WARNING] Neither Python nor Node/npx was found on PATH.
-    )
-    
-    :: Wait 2 seconds using fail-safe ping
-    ping 127.0.0.1 -n 3 >nul
-    
-    :: Re-verify if server actually started
-    netstat -aon | findstr :8080 | findstr LISTENING >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo [INFO] Server launched successfully on http://localhost:%PORT%
-        set SERVER_STARTED=1
-    ) else (
-        echo [WARNING] Local HTTP server is not listening on port %PORT%.
-        echo Opening local files directly in default browser...
-        set SERVER_STARTED=0
-    )
-)
-
-:: Open Test Runner in default browser on first launch
-echo [INFO] Opening Component Test Runner in browser...
-if !SERVER_STARTED! equ 1 (
-    start "" "http://localhost:%PORT%/test-suite/test_runner.html"
-) else (
-    start "" "%~dp0test-suite\test_runner.html"
-)
 
 :MENU
 cls
+:: Re-check if port 8080 is currently listening
+set SERVER_STARTED=0
+netstat -aon | findstr :%PORT% | findstr LISTENING >nul 2>&1
+if !errorlevel! equ 0 set SERVER_STARTED=1
+
 echo ===============================================================
 echo   Interactive Hebrew Test Creator - Server ^& Test Suite Launcher
 echo ===============================================================
 if !SERVER_STARTED! equ 1 (
-    echo   Local Server: http://localhost:%PORT% ^(Active^)
+    echo   Local Server Status: http://localhost:%PORT% ^(Active^)
 ) else (
-    echo   Local Server: Off ^(Opening direct file:// links^)
+    echo   Local Server Status: Off ^(Starts on demand when selecting 1-3^)
 )
 echo ===============================================================
 echo.
@@ -78,12 +27,15 @@ echo   [1] Open In-Browser Component Test Runner (test_runner.html)
 echo   [2] Open Quiz Builder (index.html)
 echo   [3] Open Quiz Player (quiz_player.html)
 echo   [4] Run Local CLI Test Suite (run_local_tests.py)
+echo   [5] Launch Legacy Python CLI Quiz Builder (cli-legacy/start.bat)
+echo   [S] Start / Verify Local HTTP Server Status
 echo   [Q] Stop Server ^& Quit
 echo.
 echo ===============================================================
-set /p CHOICE="Choose an option (1-4, Q): "
+set /p CHOICE="Choose an option (1-5, S, Q): "
 
 if /i "%CHOICE%"=="1" (
+    call :ENSURE_SERVER
     if !SERVER_STARTED! equ 1 (
         start "" "http://localhost:%PORT%/test-suite/test_runner.html"
     ) else (
@@ -92,6 +44,7 @@ if /i "%CHOICE%"=="1" (
     goto MENU
 )
 if /i "%CHOICE%"=="2" (
+    call :ENSURE_SERVER
     if !SERVER_STARTED! equ 1 (
         start "" "http://localhost:%PORT%/index.html"
     ) else (
@@ -100,6 +53,7 @@ if /i "%CHOICE%"=="2" (
     goto MENU
 )
 if /i "%CHOICE%"=="3" (
+    call :ENSURE_SERVER
     if !SERVER_STARTED! equ 1 (
         start "" "http://localhost:%PORT%/quiz_player.html"
     ) else (
@@ -112,12 +66,36 @@ if /i "%CHOICE%"=="4" (
     echo ---------------------------------------------------------------
     echo Running Local CLI Test Suite...
     echo ---------------------------------------------------------------
-    where python >nul 2>nul
-    if !errorlevel! equ 0 (
-        python test-suite\run_local_tests.py
-    ) else (
-        py test-suite\run_local_tests.py
+    set "RUN_PY="
+    if exist "%~dp0.venv\Scripts\python.exe" set "RUN_PY=%~dp0.venv\Scripts\python.exe"
+    if "!RUN_PY!"=="" (
+        where python >nul 2>nul
+        if !errorlevel! equ 0 set "RUN_PY=python"
     )
+    if "!RUN_PY!"=="" (
+        where py >nul 2>nul
+        if !errorlevel! equ 0 set "RUN_PY=py"
+    )
+    
+    if not "!RUN_PY!"=="" (
+        !RUN_PY! test-suite\run_local_tests.py
+    ) else (
+        echo [X] Python runtime not found.
+    )
+    echo.
+    pause
+    goto MENU
+)
+if /i "%CHOICE%"=="5" (
+    echo.
+    echo ---------------------------------------------------------------
+    echo Launching Legacy Python CLI Builder...
+    echo ---------------------------------------------------------------
+    call cli-legacy\start.bat
+    goto MENU
+)
+if /i "%CHOICE%"=="S" (
+    call :ENSURE_SERVER
     echo.
     pause
     goto MENU
@@ -133,5 +111,58 @@ if /i "%CHOICE%"=="Q" (
 )
 
 goto MENU
+
+:: ===============================================================
+:: Subroutine: ENSURE_SERVER
+:: Checks if port 8080 is listening; if not, starts HTTP server.
+:: ===============================================================
+:ENSURE_SERVER
+netstat -aon | findstr :%PORT% | findstr LISTENING >nul 2>&1
+if !errorlevel! equ 0 (
+    set SERVER_STARTED=1
+    exit /b 0
+)
+
+echo.
+echo [INFO] Starting local HTTP server on port %PORT%...
+
+set "SERVER_CMD="
+if exist "%~dp0.venv\Scripts\python.exe" set "SERVER_CMD=%~dp0.venv\Scripts\python.exe -m http.server %PORT%"
+if "!SERVER_CMD!"=="" if exist "%~dp0venv\Scripts\python.exe" set "SERVER_CMD=%~dp0venv\Scripts\python.exe -m http.server %PORT%"
+
+if "!SERVER_CMD!"=="" (
+    where python >nul 2>nul
+    if !errorlevel! equ 0 set "SERVER_CMD=python -m http.server %PORT%"
+)
+
+if "!SERVER_CMD!"=="" (
+    where py >nul 2>nul
+    if !errorlevel! equ 0 set "SERVER_CMD=py -m http.server %PORT%"
+)
+
+if "!SERVER_CMD!"=="" (
+    where npx >nul 2>nul
+    if !errorlevel! equ 0 set "SERVER_CMD=npx serve -p %PORT% ."
+)
+
+if not "!SERVER_CMD!"=="" (
+    echo [INFO] Detected server runtime. Executing: !SERVER_CMD! ...
+    start /b "" !SERVER_CMD! >nul 2>&1
+    ping 127.0.0.1 -n 3 >nul
+    netstat -aon | findstr :%PORT% | findstr LISTENING >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo [INFO] Server launched successfully on http://localhost:%PORT%
+        set SERVER_STARTED=1
+    ) else (
+        echo [WARNING] Local HTTP server is not listening on port %PORT%.
+        set SERVER_STARTED=0
+    )
+) else (
+    echo [WARNING] Neither Python nor Node/npx was found on PATH.
+    set SERVER_STARTED=0
+)
+exit /b 0
+
+
 
 
