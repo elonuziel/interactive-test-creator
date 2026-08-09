@@ -1,11 +1,12 @@
-import os
+﻿import os
 import sys
 import argparse
+
 
 def generate_prompts(test_dir, test_name, form_number, has_answers, target="all"):
     # Ensure test directory exists
     os.makedirs(test_dir, exist_ok=True)
-    
+
     # Check if questions.json already exists (meaning it was auto-extracted from a digital PDF)
     questions_json_path = os.path.join(test_dir, "questions.json")
     is_proofread = os.path.exists(questions_json_path)
@@ -131,17 +132,104 @@ STRICT EXTRACTION & PROOFREADING RULES:
 4. DELIVERABLE FORMAT (CODE BOX & FILE DOWNLOAD): Provide your entire response inside a single, copyable Markdown code block (wrapped in ```markdown ... ```) OR as a downloadable `questions.md` file. Do NOT include conversational explanations, intros, or commentary outside the code box.
 """
 
+    # 3. Enhanced prompts for image-based options (schema-compatible fallback)
+    if is_proofread:
+        local_prompt_enhanced = f"""[TASK: HEBREW EXAM QUESTION PROOFREADING & FORMATTING - IMAGE-OPTION SAFE MODE]
+
+Context:
+Automated extraction produced `{test_dir}/questions.json` for test "{test_name}".
+This exam may include options that are images/graphs/tables/diagrams.
+
+Important schema constraint:
+- Keep the existing schema only: `question`, `options`, `correctIndex`, optional `pageImage`.
+- Do NOT introduce unsupported fields such as optionImages or nested option objects.
+
+Your Instructions:
+1. Open and read `{test_dir}/questions.json`.
+2. Fix Hebrew order/punctuation/parentheses issues.
+3. Preserve option placeholders for visual choices, for example:
+   - "ראה דיאגרמה א"
+   - "ראה גרף ב"
+   - "ראה טבלה ג"
+4. Do NOT replace placeholders with invented visual descriptions.
+5. Preserve existing `correctIndex` and `pageImage` values.
+6. Overwrite `{test_dir}/questions.json` with valid JSON only.
+"""
+
+        web_prompt_enhanced = f"""I am attaching an auto-extracted questions.json for Hebrew test "{test_name}".
+
+Please proofread it while preserving compatibility with this exact schema:
+- question (string)
+- options (string array)
+- correctIndex (number or null)
+- pageImage (optional string)
+
+Rules for visual/image options:
+1. Keep placeholder-style options such as "ראה דיאגרמה א" / "ראה גרף ב".
+2. Do NOT add unsupported fields (no optionImages, no nested option objects).
+3. Keep `pageImage` paths unchanged for visual questions.
+4. Return only valid JSON with no commentary.
+"""
+    else:
+        local_prompt_enhanced = f"""[TASK: HEBREW MULTIPLE-CHOICE EXTRACTION - IMAGE-OPTION SAFE MODE]
+
+Context:
+You are processing test "{test_name}" (Form {form_number}). Source page renders are in `{test_dir}/pages_output/`.
+
+Critical schema constraint:
+- Output must stay compatible with this schema only:
+  `question` (string), `options` (string[]), `correctIndex` (null), optional `pageImage` (string).
+- No per-option image fields are allowed.
+
+Extraction Rules:
+1. Extract every multiple-choice question in order.
+2. Keep natural Hebrew reading order.
+3. For options:
+   - Text option: keep the text.
+   - Image-only option: use placeholder text like "ראה דיאגרמה א", "ראה גרף ב", "ראה טבלה ג".
+   - Mixed text+image option: keep text and append short reference like "(ראה גרף בעמוד זה)".
+4. Set `correctIndex` to null.
+5. Set `pageImage` to "pages_output/page_X.png" for any question with visual content in question or options.
+6. Save valid JSON to `{test_dir}/questions.json`.
+"""
+
+        web_prompt_enhanced = f"""I am uploading a Hebrew exam for test "{test_name}".
+
+Please extract all multiple-choice questions into questions.md (or directly JSON) with image-option safe handling.
+
+Rules:
+1. Keep Hebrew in natural reading order.
+2. For image-based options, use placeholders:
+   - "ראה דיאגרמה א" / "ראה גרף ב" / "ראה טבלה ג"
+3. Keep source page marker `(עמוד X)` per question.
+4. Do not invent image descriptions.
+5. If outputting JSON, use only these fields:
+   - question, options, correctIndex (null), optional pageImage.
+6. Return only the requested content (no extra commentary).
+"""
+
     if target in ["local", "all"]:
         local_path = os.path.join(test_dir, "prompt_local_agent.txt")
         with open(local_path, "w", encoding="utf-8") as f:
             f.write(local_prompt)
         print(f"  [OK] Created local agent prompt: {local_path}")
 
+        local_enhanced_path = os.path.join(test_dir, "prompt_local_agent_enhanced.txt")
+        with open(local_enhanced_path, "w", encoding="utf-8") as f:
+            f.write(local_prompt_enhanced)
+        print(f"  [OK] Created local agent enhanced prompt: {local_enhanced_path}")
+
     if target in ["web", "all"]:
         web_path = os.path.join(test_dir, "prompt_web_ai.txt")
         with open(web_path, "w", encoding="utf-8") as f:
             f.write(web_prompt)
         print(f"  [OK] Created web AI prompt: {web_path}")
+
+        web_enhanced_path = os.path.join(test_dir, "prompt_web_ai_enhanced.txt")
+        with open(web_enhanced_path, "w", encoding="utf-8") as f:
+            f.write(web_prompt_enhanced)
+        print(f"  [OK] Created web AI enhanced prompt: {web_enhanced_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate on-demand prompts for local and web AI assistants.")

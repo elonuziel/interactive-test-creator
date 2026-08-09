@@ -3485,10 +3485,12 @@ STRICT EXTRACTION & FORMATTING RULES:
 ===========================================================================
 1. QUESTION HEADERS: Include full question text on the header line starting with \`### שאלה X: [נוסח השאלה בעברית]\` and ending with the 1-based PDF page number in parentheses \`(עמוד X)\`, e.g. \`(עמוד 1)\`.
 2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: \`- א.\`, \`- ב.\`, \`- ג.\`, \`- ד.\`, \`- ה.\`. Extract ALL options for each question (questions may have 4, 5, 6 or more choices).
-3. HEBREW ACCURACY & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve all scientific terms, equations, and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
-4. PRESERVE DIAGRAM & TABLE KEYWORDS: Preserve words referencing figures or diagrams (e.g. "לפניכם", "באיור", "בגרף", "בטבלה", "בתרשים") as they appear in the original text.
-5. NO CITATION TAGS OR CONVERSATIONAL CHATTER: Do NOT include web citations like \`[cite: X]\`. Do NOT write intro or outro commentary outside the code box.
-6. DELIVERABLE FORMAT: Provide your entire response strictly inside a single, copyable Markdown code block (wrapped in \`\`\`markdown ... \`\`\`) OR as a downloadable \`questions.md\` file.`;
+3. IMAGE-BASED OPTIONS (IMPORTANT): If an option is visual (diagram/graph/table/image) and not fully textual, use a short placeholder option text such as "ראה דיאגרמה א", "ראה גרף ב", "ראה טבלה ג".
+4. MIXED OPTIONS: If an option has text plus visual content, keep the text and append a short note like "(ראה גרף בעמוד זה)".
+5. HEBREW ACCURACY & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve all scientific terms, equations, and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
+6. PRESERVE DIAGRAM & TABLE KEYWORDS: Preserve words referencing figures or diagrams (e.g. "לפניכם", "באיור", "בגרף", "בטבלה", "בתרשים") as they appear in the original text.
+7. NO CITATION TAGS OR CONVERSATIONAL CHATTER: Do NOT include web citations like \`[cite: X]\`. Do NOT write intro or outro commentary outside the code box.
+8. DELIVERABLE FORMAT: Provide your entire response strictly inside a single, copyable Markdown code block (wrapped in \`\`\`markdown ... \`\`\`) OR as a downloadable \`questions.md\` file.`;
 
     if (elements.llmPromptBox) {
         elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;

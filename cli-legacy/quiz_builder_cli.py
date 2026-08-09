@@ -417,7 +417,9 @@ def cleanup_workspace_folder(test_dir):
         'pdf_type_result.txt',
         'page_map.json',
         'prompt_local_agent.txt',
+        'prompt_local_agent_enhanced.txt',
         'prompt_web_ai.txt',
+        'prompt_web_ai_enhanced.txt',
         'prompt_proofread.txt',
         'prompt_proofread_local.txt',
         'prompt_proofread_web.txt',
@@ -811,7 +813,14 @@ def run_step6(test_name, test_dir, q_final):
         if not found_md:
             other_mds = [
                 f for f in os.listdir(test_dir)
-                if f.lower().endswith(('.md', '.txt')) and f.lower() not in ['prompt_local_agent.txt', 'prompt_web_ai.txt', 'readme.md', 'raw_text.md']
+                if f.lower().endswith(('.md', '.txt')) and f.lower() not in [
+                    'prompt_local_agent.txt',
+                    'prompt_local_agent_enhanced.txt',
+                    'prompt_web_ai.txt',
+                    'prompt_web_ai_enhanced.txt',
+                    'readme.md',
+                    'raw_text.md'
+                ]
             ]
             if other_mds:
                 found_md = os.path.join(test_dir, other_mds[0])
