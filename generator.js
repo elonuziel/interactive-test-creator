@@ -3929,6 +3929,16 @@ STRICT EXTRACTION & FORMATTING RULES:
             return;
         }
 
+        if ((file.name || '').toLowerCase().endsWith('.docx')) {
+            setPdfTypeNote('קובץ DOCX זוהה. יש להמיר אותו ל-PDF ואז להעלות מחדש.', 'error');
+            if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
+            if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
+            if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
+            if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
+            state.pdfArrayBuffer = null;
+            return;
+        }
+
         try {
             setPdfTypeNote('מזהה את סוג ה-PDF...', 'loading');
             const pdfBuffer = await file.arrayBuffer();

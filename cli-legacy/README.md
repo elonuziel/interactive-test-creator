@@ -30,7 +30,7 @@ A step-by-step Windows wizard (`start.bat`) that automates:
 4. Automatic answer key merging, schema QA validation (`7_check_json.py`), and test manifest updates (`8_generate_manifest.py`).
 5. Building portable single-file HTML apps or starting local web servers.
 
-If `.docx` files are detected, the wizard asks once whether to convert all DOCX files to PDF. If a local converter backend is available, conversion is attempted automatically. If not, the wizard provides manual export-to-PDF steps and resumes after you place PDFs in the same folder.
+If `.docx` files are detected, the wizard asks once whether to convert all DOCX files to PDF. If matching PDFs already exist, it also asks once whether to overwrite them. If a local converter backend is available, conversion is attempted automatically. If not, the wizard provides manual export-to-PDF steps and resumes after you place PDFs in the same folder.
 
 ---
 
