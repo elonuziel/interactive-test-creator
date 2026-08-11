@@ -25,23 +25,11 @@ Your Instructions:
    - Correct reversed parentheses and quotes when mixing English & Hebrew (e.g., "(DNA) לשרשרת" -> "לשרשרת (DNA)").
    - Ensure proper Hebrew question marks ('?') are at the end of questions.
    - Clean up any stray sub-bullet numbering or leftover prefixes (e.g., remove 'א.', 'ב.', '1.' from option strings).
-3. Do NOT modify the overall structure, question count, or existing `correctIndex` / `pageImage` values.
-4. Overwrite `{test_dir}/questions.json` with the proofread, valid JSON.
-
-JSON Schema to maintain:
-[
-  {{
-    "question": "נוסח השאלה בעברית תקינה...",
-    "options": [
-      "אפשרות ראשונה",
-      "אפשרות שנייה",
-      "אפשרות שלישית",
-      "אפשרות רביעית"
-    ],
-    "correctIndex": 0,
-    "pageImage": "pages_output/page_2.png"
-  }}
-]
+3. Preserve question order and all options per question.
+4. Return Markdown only in this format per question:
+     - `### שאלה N: [נוסח השאלה] (עמוד X)`
+     - `- א. ...`, `- ב. ...`, `- ג. ...`, `- ד. ...` (or more as needed)
+5. Save output as `{test_dir}/questions.md`.
 """
     else:
         local_prompt = f"""[TASK: HEBREW MULTIPLE-CHOICE EXAM EXTRACTION]
@@ -53,26 +41,17 @@ Your Instructions:
 1. Inspect all rendered page images in `{test_dir}/pages_output/` sequentially.
 2. Extract EVERY multiple-choice question in the exam.
 3. For each question:
-   - `question`: Full question statement in correct Hebrew reading order (left-to-right sentences, right-to-left Hebrew words).
-   - `options`: Array of all choice strings (questions can have 4, 5, 6 or more options; strip prefixes like 'א.', 'ב.', '1.', '2.').
-   - `correctIndex`: Set to `null` (answer key will be merged automatically by quiz_builder).
-   - `pageImage`: Set to `"pages_output/page_X.png"` (where X is the 1-based page number) ONLY IF the question contains or references a diagram, figure, chart, table, image, or mathematical formula. Omit `pageImage` if the question is purely text.
-4. Save the complete output as valid JSON directly to `{test_dir}/questions.json`.
+   - Format question header exactly as: `### שאלה N: [נוסח השאלה] (עמוד X)`.
+   - List options as bullets: `- א. ...`, `- ב. ...`, `- ג. ...`, `- ד. ...` (or more when needed).
+   - Strip prefixes that are duplicated inside option text.
+4. Save output as `{test_dir}/questions.md` only (not JSON).
 
-Target JSON Schema:
-[
-  {{
-    "question": "מהו התפקיד העיקרי של המיטוכונדריה בתא?",
-    "options": [
-      "ייצור אנרגיה (ATP)",
-      "סינתזת חלבונים",
-      "אחסון החומר התורשתי",
-      "פירוק רעלים בתא"
-    ],
-    "correctIndex": null,
-    "pageImage": "pages_output/page_3.png"
-  }}
-]
+Required Markdown Example:
+### שאלה 1: מהו התפקיד העיקרי של המיטוכונדריה בתא? (עמוד 3)
+- א. ייצור אנרגיה (ATP)
+- ב. סינתזת חלבונים
+- ג. אחסון החומר התורשתי
+- ד. פירוק רעלים בתא
 """
 
     # 2. Web AI Prompts (Extraction vs Proofread)
@@ -92,16 +71,18 @@ Please perform a thorough AI proofreading pass according to these guidelines:
    - Ensure each question has a clean `options` array containing all choices (e.g. 4, 5, 6+ choices).
    - Remove redundant option labels (e.g., strip 'א.', 'ב.', 'ג.', 'ד.' or '1.', '2.' from the start of option strings).
 
-3. SCHEMA PRESERVATION:
-   - Do NOT alter `correctIndex` values (if already present).
-   - Do NOT alter or remove `pageImage` paths (e.g. `"pages_output/page_X.png"`).
-   - Do NOT change the order or number of questions.
+3. STRUCTURE PRESERVATION:
+    - Do NOT change the order or number of questions.
+    - Preserve all options per question.
 
 ---------------------------------------------------------------------------
 OUTPUT & DELIVERABLE REQUIREMENTS:
 ---------------------------------------------------------------------------
-1. Provide your response either as a downloadable `questions.json` file OR in a single clean code block ready for one-click copy-pasting.
-2. Return ONLY complete, valid JSON without introductory commentary or explanations.
+1. Return only raw Markdown content for `questions.md`.
+2. Use this exact format per question:
+    - `### שאלה N: [נוסח השאלה] (עמוד X)`
+    - `- א. ...`, `- ב. ...`, `- ג. ...`, `- ד. ...`
+3. Do not return JSON and do not include commentary or code fences.
 """
     else:
         web_prompt = f"""I am uploading the exam document for Hebrew test "{test_name}".
@@ -129,7 +110,7 @@ STRICT EXTRACTION & PROOFREADING RULES:
 1. HEBREW READING ORDER & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve scientific terms and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
 2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: - א., - ב., - ג., - ד., - ה., etc. Extract all options for each question (questions may have 4, 5, 6 or more choices).
 3. PAGE NUMBER TRACKING: Always end each question header with the exact 1-based PDF source page number in parentheses: (עמוד X), e.g. (עמוד 1), (עמוד 5). This is CRITICAL for matching questions referencing graphs, diagrams, figures, or tables.
-4. DELIVERABLE FORMAT (CODE BOX & FILE DOWNLOAD): Provide your entire response inside a single, copyable Markdown code block (wrapped in ```markdown ... ```) OR as a downloadable `questions.md` file. Do NOT include conversational explanations, intros, or commentary outside the code box.
+4. DELIVERABLE FORMAT: Return only the raw Markdown body for `questions.md` (no JSON, no explanations, no surrounding markdown code fences).
 """
 
     # 3. Enhanced prompts for image-based options (schema-compatible fallback)
@@ -141,8 +122,8 @@ Automated extraction produced `{test_dir}/questions.json` for test "{test_name}"
 This exam may include options that are images/graphs/tables/diagrams.
 
 Important schema constraint:
-- Keep the existing schema only: `question`, `options`, `correctIndex`, optional `pageImage`.
-- Do NOT introduce unsupported fields such as optionImages or nested option objects.
+- Output Markdown only (for later parser conversion).
+- Do NOT introduce unsupported JSON fields such as optionImages or nested option objects.
 
 Your Instructions:
 1. Open and read `{test_dir}/questions.json`.
@@ -152,24 +133,24 @@ Your Instructions:
    - "ראה גרף ב"
    - "ראה טבלה ג"
 4. Do NOT replace placeholders with invented visual descriptions.
-5. Preserve existing `correctIndex` and `pageImage` values.
-6. Overwrite `{test_dir}/questions.json` with valid JSON only.
+5. Return markdown in this structure per question:
+    - `### שאלה N: [נוסח השאלה] (עמוד X)`
+    - `- א. ...`, `- ב. ...`, `- ג. ...`, `- ד. ...`
+6. Save output as `{test_dir}/questions.md` only.
 """
 
-        web_prompt_enhanced = f"""I am attaching an auto-extracted questions.json for Hebrew test "{test_name}".
+        web_prompt_enhanced = f"""I am attaching an auto-extracted questions source for Hebrew test "{test_name}".
 
-Please proofread it while preserving compatibility with this exact schema:
-- question (string)
-- options (string array)
-- correctIndex (number or null)
-- pageImage (optional string)
+    Please proofread and return ONLY raw Markdown content for `questions.md`.
 
-Rules for visual/image options:
-1. Keep placeholder-style options such as "ראה דיאגרמה א" / "ראה גרף ב".
-2. Do NOT add unsupported fields (no optionImages, no nested option objects).
-3. Keep `pageImage` paths unchanged for visual questions.
-4. Return only valid JSON with no commentary.
-"""
+    Rules for visual/image options:
+    1. Keep placeholder-style options such as "ראה דיאגרמה א" / "ראה גרף ב".
+    2. Do NOT invent image descriptions.
+    3. Use this exact format per question:
+       - `### שאלה N: [נוסח השאלה] (עמוד X)`
+       - `- א. ...`, `- ב. ...`, `- ג. ...`, `- ד. ...`
+    4. Do not return JSON, no code fences, and no commentary.
+    """
     else:
         local_prompt_enhanced = f"""[TASK: HEBREW MULTIPLE-CHOICE EXTRACTION - IMAGE-OPTION SAFE MODE]
 
@@ -177,9 +158,8 @@ Context:
 You are processing test "{test_name}" (Form {form_number}). Source page renders are in `{test_dir}/pages_output/`.
 
 Critical schema constraint:
-- Output must stay compatible with this schema only:
-  `question` (string), `options` (string[]), `correctIndex` (null), optional `pageImage` (string).
-- No per-option image fields are allowed.
+- Output must be valid Markdown that can be parsed by quiz_builder into JSON.
+- No per-option image fields or JSON objects are allowed in the markdown output.
 
 Extraction Rules:
 1. Extract every multiple-choice question in order.
@@ -188,24 +168,29 @@ Extraction Rules:
    - Text option: keep the text.
    - Image-only option: use placeholder text like "ראה דיאגרמה א", "ראה גרף ב", "ראה טבלה ג".
    - Mixed text+image option: keep text and append short reference like "(ראה גרף בעמוד זה)".
-4. Set `correctIndex` to null.
-5. Set `pageImage` to "pages_output/page_X.png" for any question with visual content in question or options.
-6. Save valid JSON to `{test_dir}/questions.json`.
+4. Use this exact markdown shape per question:
+  - Header: `### שאלה N: [טקסט השאלה] (עמוד X)`
+  - Options: one per line as `- א. ...`, `- ב. ...`, etc.
+5. Save output to `{test_dir}/questions.md`.
 """
 
         web_prompt_enhanced = f"""I am uploading a Hebrew exam for test "{test_name}".
 
-Please extract all multiple-choice questions into questions.md (or directly JSON) with image-option safe handling.
+Please extract all multiple-choice questions and return ONLY raw Markdown content for `questions.md`.
 
 Rules:
 1. Keep Hebrew in natural reading order.
 2. For image-based options, use placeholders:
    - "ראה דיאגרמה א" / "ראה גרף ב" / "ראה טבלה ג"
-3. Keep source page marker `(עמוד X)` per question.
-4. Do not invent image descriptions.
-5. If outputting JSON, use only these fields:
-   - question, options, correctIndex (null), optional pageImage.
-6. Return only the requested content (no extra commentary).
+3. Do not invent image descriptions.
+4. Use this exact format for every question:
+   - `### שאלה N: [נוסח השאלה] (עמוד X)`
+   - `- א. [אפשרות]`
+   - `- ב. [אפשרות]`
+   - `- ג. [אפשרות]`
+   - `- ד. [אפשרות]`
+5. Include `(עמוד X)` with the 1-based source page number in every question header.
+6. Return only the markdown body with no JSON, no commentary, and no surrounding code fences.
 """
 
     if target in ["local", "all"]:

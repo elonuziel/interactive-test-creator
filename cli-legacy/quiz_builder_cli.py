@@ -699,7 +699,10 @@ def process_workspace(test_name, test_dir):
 
     if agent_found:
         print(f"  {C_GREEN}[✔] Detected CLI Agent: {agent_found}{C_RESET}")
-        use_ag = input(f"   [?] Launch {agent_found} automatically? (Y/n) [Default: Y]: ").strip().lower()
+        # In non-interactive contexts (e.g., pytest), skip auto-launch prompts.
+        use_ag = 'n' if not sys.stdin.isatty() else input(
+            f"   [?] Launch {agent_found} automatically? (Y/n) [Default: Y]: "
+        ).strip().lower()
         if use_ag != 'n':
             # Generate local prompt on demand
             run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
@@ -801,31 +804,38 @@ def run_step6(test_name, test_dir, q_final):
     print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
 
     # Auto-detect Markdown questions file (questions.md, output.md, questions.txt, etc.)
-    if not os.path.exists(q_final):
-        md_candidates = ['questions.md', 'output.md', 'questions.txt']
-        found_md = None
-        for cand in md_candidates:
-            cand_p = os.path.join(test_dir, cand)
-            if os.path.exists(cand_p):
-                found_md = cand_p
-                break
+    md_candidates = ['questions.md', 'output.md', 'questions.txt']
+    found_md = None
+    for cand in md_candidates:
+        cand_p = os.path.join(test_dir, cand)
+        if os.path.exists(cand_p):
+            found_md = cand_p
+            break
 
-        if not found_md:
-            other_mds = [
-                f for f in os.listdir(test_dir)
-                if f.lower().endswith(('.md', '.txt')) and f.lower() not in [
-                    'prompt_local_agent.txt',
-                    'prompt_local_agent_enhanced.txt',
-                    'prompt_web_ai.txt',
-                    'prompt_web_ai_enhanced.txt',
-                    'readme.md',
-                    'raw_text.md'
-                ]
+    if not found_md:
+        other_mds = [
+            f for f in os.listdir(test_dir)
+            if f.lower().endswith(('.md', '.txt')) and f.lower() not in [
+                'prompt_local_agent.txt',
+                'prompt_local_agent_enhanced.txt',
+                'prompt_web_ai.txt',
+                'prompt_web_ai_enhanced.txt',
+                'readme.md',
+                'raw_text.md'
             ]
-            if other_mds:
-                found_md = os.path.join(test_dir, other_mds[0])
+        ]
+        if other_mds:
+            found_md = os.path.join(test_dir, other_mds[0])
 
-        if found_md and os.path.exists(found_md):
+    if found_md and os.path.exists(found_md):
+        should_parse_md = (not os.path.exists(q_final))
+        if not should_parse_md:
+            try:
+                should_parse_md = os.path.getmtime(found_md) >= os.path.getmtime(q_final)
+            except Exception:
+                should_parse_md = False
+
+        if should_parse_md:
             print(f"  {C_CYAN}[i] Auto-detected Markdown question file ({os.path.basename(found_md)}). Parsing into questions.json...{C_RESET}\n")
             img_dir = os.path.join(test_dir, 'images')
             page_map = os.path.join(test_dir, 'page_map.json')

@@ -46,8 +46,10 @@ def main():
     cleaned_count = 0
     for q in qs:
         question_text = q.get('question', '')
+        options_text = ' '.join(str(o) for o in q.get('options', []) if o)
+        has_visual_text = bool(IMAGE_KEYWORDS_RE.search(question_text)) or bool(IMAGE_KEYWORDS_RE.search(options_text))
         if 'pageImage' in q:
-            if not q.get('image') and not IMAGE_KEYWORDS_RE.search(question_text):
+            if not q.get('image') and not has_visual_text:
                 del q['pageImage']
                 cleaned_count += 1
 
@@ -65,12 +67,16 @@ def main():
         options = q.get('options', [])
         if len(options) < 2:
             issues.append(f"Option count: {len(options)} (fewer than minimum 2 options)")
-        elif args.expected_options is not None and len(options) != args.expected_options:
-            warns.append(f"Option count: {len(options)} (expected {args.expected_options})")
+        elif len(options) != expected_opts:
+            warns.append(f"Option count: {len(options)} (expected {expected_opts})")
             
         for j, opt in enumerate(options):
             if not opt:
                 issues.append(f"Empty option {j}")
+
+        options_text = ' '.join(str(o) for o in options if o)
+        if IMAGE_KEYWORDS_RE.search(options_text) and not q.get('pageImage') and not q.get('image'):
+            warns.append("Visual option keywords detected but no pageImage/image field found")
                 
         # correctIndex out of range causes a silent app bug
         ci = q.get('correctIndex', 0)
