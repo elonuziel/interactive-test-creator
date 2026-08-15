@@ -40,8 +40,8 @@ THEMES = {
     "dark": {
         "bg": "#0f172a",          # Slate 900
         "surface": "#1e293b",     # Slate 800
-        "surface_card": "#1e293b",
-        "card_hover": "#283548",
+        "surface_card": "#1a2639",  # Slightly lighter than bg so cards pop
+        "card_hover": "#243650",  # Hover highlight (visibly brighter)
         "border": "#334155",      # Slate 700
         "text_primary": "#f8fafc",# Slate 50
         "text_secondary": "#94a3b8",# Slate 400
@@ -53,7 +53,7 @@ THEMES = {
         "warning": "#f59e0b",     # Amber 500
         "warning_bg": "#78350f",
         "danger": "#ef4444",      # Red 500
-        "input_bg": "#0f172a",
+        "input_bg": "#162032",    # Distinct from bg so entry fields are visible
         "badge_built": "#059669",
         "badge_ready": "#2563eb",
         "badge_extract": "#d97706",
@@ -111,6 +111,7 @@ class QuizBuilderGUI:
 
         self._apply_theme_config()
         self._build_ui()
+        self._bind_keyboard_shortcuts()
         self._start_log_consumer()
         self.refresh_workspaces()
 
@@ -124,7 +125,12 @@ class QuizBuilderGUI:
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
 
         # ── 1. Top Header Bar ───────────────────────────────────────────
-        header_frame = tk.Frame(self.main_frame, bg=self.colors["surface"], bd=1, relief=tk.SOLID)
+        header_frame = tk.Frame(
+            self.main_frame,
+            bg=self.colors["surface"],
+            highlightbackground=self.colors["border"],
+            highlightthickness=1
+        )
         header_frame.pack(fill=tk.X, pady=(0, 12))
 
         header_inner = tk.Frame(header_frame, bg=self.colors["surface"])
@@ -172,7 +178,12 @@ class QuizBuilderGUI:
         self.theme_btn.pack(side=tk.RIGHT, padx=4)
 
         # ── 2. Folder Selector & Quick Action Toolbar ───────────────────
-        toolbar_card = tk.Frame(self.main_frame, bg=self.colors["surface"], bd=1, relief=tk.SOLID)
+        toolbar_card = tk.Frame(
+            self.main_frame,
+            bg=self.colors["surface"],
+            highlightbackground=self.colors["border"],
+            highlightthickness=1
+        )
         toolbar_card.pack(fill=tk.X, pady=(0, 12))
 
         tb_inner = tk.Frame(toolbar_card, bg=self.colors["surface"])
@@ -288,6 +299,20 @@ class QuizBuilderGUI:
         )
         server_btn.pack(side=tk.LEFT, padx=4)
 
+        self.watch_btn = tk.Button(
+            actions_row,
+            text="👁 Watch Mode: OFF",
+            command=self.toggle_watch_mode,
+            font=("Segoe UI", 9),
+            bg=self.colors["input_bg"],
+            fg=self.colors["text_secondary"],
+            activebackground=self.colors["border"],
+            relief=tk.FLAT,
+            padx=10, pady=5,
+            cursor="hand2"
+        )
+        self.watch_btn.pack(side=tk.LEFT, padx=4)
+
         # Search Filter Box
         search_box = tk.Frame(actions_row, bg=self.colors["surface"])
         search_box.pack(side=tk.RIGHT)
@@ -350,7 +375,12 @@ class QuizBuilderGUI:
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Bottom Pane: Progress & Activity Log Drawer
-        log_pane = tk.Frame(content_split, bg=self.colors["surface"], bd=1, relief=tk.SOLID)
+        log_pane = tk.Frame(
+            content_split,
+            bg=self.colors["surface"],
+            highlightbackground=self.colors["border"],
+            highlightthickness=1
+        )
         content_split.add(log_pane, minsize=140, height=180)
 
         log_header = tk.Frame(log_pane, bg=self.colors["surface"])
@@ -359,8 +389,9 @@ class QuizBuilderGUI:
         log_title = tk.Label(log_header, text="📊 Live Activity & Pipeline Console", font=("Segoe UI", 9, "bold"), bg=self.colors["surface"], fg=self.colors["text_primary"])
         log_title.pack(side=tk.LEFT)
 
-        self.progress_bar = ttk.Progressbar(log_header, mode="determinate", length=220)
-        self.progress_bar.pack(side=tk.RIGHT, padx=4)
+        self.progress_bar = ttk.Progressbar(log_header, mode="indeterminate", length=220)
+        # Progress bar starts hidden — only shown during active processing
+        self.progress_bar.pack_forget()
 
         # Log Text Box
         self.log_text = tk.Text(
@@ -420,17 +451,35 @@ class QuizBuilderGUI:
             widget.destroy()
 
         if not workspaces:
-            empty_box = tk.Frame(self.scrollable_cards, bg=self.colors["surface"], bd=1, relief=tk.SOLID)
+            empty_box = tk.Frame(
+                self.scrollable_cards,
+                bg=self.colors["surface"],
+                highlightbackground=self.colors["border"],
+                highlightthickness=1
+            )
             empty_box.pack(fill=tk.X, padx=12, pady=24)
-            lbl = tk.Label(
+            tk.Label(
                 empty_box,
-                text="📂 No exam folders or files found in this workspace.\nDrop .pdf, .docx, or .csv files into the folder and click Refresh!",
-                font=("Segoe UI", 11),
+                text="📂",
+                font=("Segoe UI", 36),
+                bg=self.colors["surface"],
+                fg=self.colors["text_secondary"]
+            ).pack(pady=(20, 4))
+            tk.Label(
+                empty_box,
+                text="No exam workspaces found",
+                font=("Segoe UI", 13, "bold"),
+                bg=self.colors["surface"],
+                fg=self.colors["text_primary"]
+            ).pack()
+            tk.Label(
+                empty_box,
+                text="Drop .pdf, .docx, or .csv exam files into the selected folder,\nthen press 🔄 Refresh — or press F5.",
+                font=("Segoe UI", 10),
                 bg=self.colors["surface"],
                 fg=self.colors["text_secondary"],
-                pady=24
-            )
-            lbl.pack()
+                justify=tk.CENTER
+            ).pack(pady=(4, 20))
             return
 
         for info in workspaces:
@@ -440,12 +489,30 @@ class QuizBuilderGUI:
         card = tk.Frame(
             self.scrollable_cards,
             bg=self.colors["surface_card"],
-            bd=1,
-            relief=tk.SOLID,
             highlightbackground=self.colors["border"],
             highlightthickness=1
         )
-        card.pack(fill=tk.X, padx=6, pady=6)
+        card.pack(fill=tk.X, padx=6, pady=4)
+
+        # Hover highlight effect
+        def _on_enter(e, w=card):
+            w.configure(highlightbackground=self.colors["primary"])
+            for child in w.winfo_children():
+                try:
+                    child.configure(bg=self.colors["card_hover"])
+                except Exception:
+                    pass
+
+        def _on_leave(e, w=card):
+            w.configure(highlightbackground=self.colors["border"])
+            for child in w.winfo_children():
+                try:
+                    child.configure(bg=self.colors["surface_card"])
+                except Exception:
+                    pass
+
+        card.bind("<Enter>", _on_enter)
+        card.bind("<Leave>", _on_leave)
 
         inner = tk.Frame(card, bg=self.colors["surface_card"])
         inner.pack(fill=tk.X, padx=14, pady=10)
@@ -739,11 +806,45 @@ class QuizBuilderGUI:
         self.log("🚀 Launching local web server on port 8000...")
         cli.start_local_server(8000)
 
+    def toggle_watch_mode(self):
+        """Toggle live watch mode on/off."""
+        self.watch_active = not self.watch_active
+        if self.watch_active:
+            self.watch_btn.config(
+                text="👁 Watch Mode: ON",
+                fg=self.colors["success"],
+                bg=self.colors["success_bg"]
+            )
+            self.log("👁 Watch mode enabled — monitoring workspace for changes...")
+            self._watch_poll()
+        else:
+            self.watch_btn.config(
+                text="👁 Watch Mode: OFF",
+                fg=self.colors["text_secondary"],
+                bg=self.colors["input_bg"]
+            )
+            self.log("⏹ Watch mode disabled.")
+
+    def _watch_poll(self):
+        """Poll the workspace every 3 seconds while watch mode is active."""
+        if not self.watch_active:
+            return
+        self.refresh_workspaces()
+        self.root.after(3000, self._watch_poll)
+
+    def _bind_keyboard_shortcuts(self):
+        """Bind global keyboard shortcuts."""
+        self.root.bind("<F5>", lambda e: self.refresh_workspaces())
+        self.root.bind("<Control-b>", lambda e: self.run_batch_all())
+        self.root.bind("<Control-B>", lambda e: self.build_ready_quizzes())
+        self.root.bind("<Control-r>", lambda e: self.refresh_workspaces())
+
     def toggle_theme(self):
         self.theme_name = "light" if self.theme_name == "dark" else "dark"
         self._apply_theme_config()
         self.main_frame.destroy()
         self._build_ui()
+        self._bind_keyboard_shortcuts()
         self.refresh_workspaces()
 
     # ── Progress & Log Utilities ─────────────────────────────────────
@@ -762,11 +863,13 @@ class QuizBuilderGUI:
     def set_processing_state(self, is_processing):
         self.is_processing = is_processing
         if is_processing:
+            self.progress_bar.pack(side=tk.RIGHT, padx=4)  # Show only when busy
             self.progress_bar.start(10)
             self.batch_btn.config(state=tk.DISABLED)
             self.build_ready_btn.config(state=tk.DISABLED)
         else:
             self.progress_bar.stop()
+            self.progress_bar.pack_forget()  # Hide when idle
             self.batch_btn.config(state=tk.NORMAL)
             self.build_ready_btn.config(state=tk.NORMAL)
 

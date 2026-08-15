@@ -27,7 +27,7 @@ echo   [1] Open In-Browser Component Test Runner (test_runner.html)
 echo   [2] Open Web Quiz Builder (web/index.html)
 echo   [3] Open Web Quiz Player (web/quiz_player.html)
 echo   [4] Run Local CLI Test Suite (test-suite/run_local_tests.py)
-echo   [5] Launch Python Desktop/CLI Quiz Builder (desktop/start.bat)
+echo   [5] Launch Python Desktop/CLI Quiz Builder (start_app.bat)
 echo   [S] Start / Verify Local HTTP Server Status
 echo   [Q] Stop Server ^& Quit
 echo.
@@ -93,7 +93,7 @@ if /i "%CHOICE%"=="5" (
     echo ---------------------------------------------------------------
     echo Launching Python Desktop/CLI Builder...
     echo ---------------------------------------------------------------
-    call desktop\start.bat
+    call start_app.bat
     goto MENU
 )
 if /i "%CHOICE%"=="S" (

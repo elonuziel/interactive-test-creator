@@ -12,10 +12,12 @@ web_dir_src = os.path.join(spec_dir, 'web')
 
 datas = [
     (python_scripts_src, 'python_scripts'),
+    (python_scripts_src, 'desktop/python_scripts'),
     (python_scripts_src, 'cli-legacy/python_scripts'),
 ]
 
 if os.path.isdir(web_dir_src):
+    datas.append((web_dir_src, 'desktop/web'))
     datas.append((web_dir_src, 'cli-legacy/web'))
     datas.append((web_dir_src, 'web'))
     datas.append((web_dir_src, '.'))
@@ -37,6 +39,13 @@ a = Analysis(
         'base64',
         're',
         'runpy',
+        'quiz_builder_gui',
+        'tkinter',
+        'tkinter.ttk',
+        'tkinter.filedialog',
+        'tkinter.messagebox',
+        'queue',
+        'threading',
     ],
     hookspath=[],
     hooksconfig={},

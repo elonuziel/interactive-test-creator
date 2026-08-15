@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, feat/exe-builder ]
     paths:
-      - 'cli-legacy/**'
+      - 'desktop/**'
       - '.github/workflows/build-exe.yml'
     tags: [ 'v*' ]
   workflow_dispatch:
@@ -55,19 +55,19 @@ jobs:
 
       - name: Build Executable with PyInstaller & Embed Version
         run: |
-          python cli-legacy/build_exe.py --version ${{ steps.tag_name.outputs.TAG_NAME }}
+          python desktop/build_exe.py --version ${{ steps.tag_name.outputs.TAG_NAME }}
 
       - name: "Code Sign Executable (Publisher: Elon Uziel)"
         shell: powershell
         run: |
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Elon Uziel, O=Elon Uziel" -CertStoreLocation "Cert:\CurrentUser\My"
-          Set-AuthenticodeSignature -FilePath "cli-legacy/dist/quiz_builder.exe" -Certificate $cert -HashAlgorithm SHA256
+          Set-AuthenticodeSignature -FilePath "desktop/dist/quiz_builder.exe" -Certificate $cert -HashAlgorithm SHA256
 
       - name: Upload Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: quiz_builder_exe
-          path: cli-legacy/dist/quiz_builder.exe
+          path: desktop/dist/quiz_builder.exe
           if-no-files-found: error
 
       - name: Create GitHub Release & Upload Executable Asset
@@ -85,6 +85,6 @@ jobs:
             - **Automatic local server & default browser launching**
             - **Full PDF extraction & standalone HTML quiz exporting**
           files: |
-            cli-legacy/dist/quiz_builder.exe
+            desktop/dist/quiz_builder.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
