@@ -24,10 +24,10 @@ if !SERVER_STARTED! equ 1 (
 echo ===============================================================
 echo.
 echo   [1] Open In-Browser Component Test Runner (test_runner.html)
-echo   [2] Open Quiz Builder (index.html)
-echo   [3] Open Quiz Player (quiz_player.html)
-echo   [4] Run Local CLI Test Suite (run_local_tests.py)
-echo   [5] Launch Python Desktop/CLI Quiz Builder (python_app/start.bat)
+echo   [2] Open Web Quiz Builder (web/index.html)
+echo   [3] Open Web Quiz Player (web/quiz_player.html)
+echo   [4] Run Local CLI Test Suite (test-suite/run_local_tests.py)
+echo   [5] Launch Python Desktop/CLI Quiz Builder (desktop/start.bat)
 echo   [S] Start / Verify Local HTTP Server Status
 echo   [Q] Stop Server ^& Quit
 echo.
@@ -46,18 +46,18 @@ if /i "%CHOICE%"=="1" (
 if /i "%CHOICE%"=="2" (
     call :ENSURE_SERVER
     if !SERVER_STARTED! equ 1 (
-        start "" "http://localhost:%PORT%/index.html"
+        start "" "http://localhost:%PORT%/web/index.html"
     ) else (
-        start "" "%~dp0index.html"
+        start "" "%~dp0web\index.html"
     )
     goto MENU
 )
 if /i "%CHOICE%"=="3" (
     call :ENSURE_SERVER
     if !SERVER_STARTED! equ 1 (
-        start "" "http://localhost:%PORT%/quiz_player.html"
+        start "" "http://localhost:%PORT%/web/quiz_player.html"
     ) else (
-        start "" "%~dp0quiz_player.html"
+        start "" "%~dp0web\quiz_player.html"
     )
     goto MENU
 )
@@ -68,6 +68,8 @@ if /i "%CHOICE%"=="4" (
     echo ---------------------------------------------------------------
     set "RUN_PY="
     if exist "%~dp0.venv\Scripts\python.exe" set "RUN_PY=%~dp0.venv\Scripts\python.exe"
+    if exist "%~dp0venv\Scripts\python.exe" set "RUN_PY=%~dp0venv\Scripts\python.exe"
+    if exist "%~dp0desktop\.venv\Scripts\python.exe" set "RUN_PY=%~dp0desktop\.venv\Scripts\python.exe"
     if "!RUN_PY!"=="" (
         where python >nul 2>nul
         if !errorlevel! equ 0 set "RUN_PY=python"
@@ -91,7 +93,7 @@ if /i "%CHOICE%"=="5" (
     echo ---------------------------------------------------------------
     echo Launching Python Desktop/CLI Builder...
     echo ---------------------------------------------------------------
-    call python_app\start.bat
+    call desktop\start.bat
     goto MENU
 )
 if /i "%CHOICE%"=="S" (

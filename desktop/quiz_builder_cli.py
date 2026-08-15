@@ -69,7 +69,7 @@ if getattr(sys, 'frozen', False):
     MEI_DIR = getattr(sys, '_MEIPASS', CLI_ROOT)
     PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'python_scripts')
     if not os.path.isdir(PYTHON_SCRIPTS_DIR):
-        PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'python_app', 'python_scripts')
+        PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'desktop', 'python_scripts')
         if not os.path.isdir(PYTHON_SCRIPTS_DIR):
             PYTHON_SCRIPTS_DIR = os.path.join(MEI_DIR, 'cli-legacy', 'python_scripts')
 else:
@@ -77,7 +77,7 @@ else:
     MEI_DIR = CLI_ROOT
     PYTHON_SCRIPTS_DIR = os.path.join(CLI_ROOT, 'python_scripts')
 
-REPO_ROOT = os.path.dirname(CLI_ROOT) if os.path.basename(CLI_ROOT) in ['python_app', 'cli-legacy'] else CLI_ROOT
+REPO_ROOT = os.path.dirname(CLI_ROOT) if os.path.basename(CLI_ROOT) in ['desktop', 'python_app', 'cli-legacy'] else CLI_ROOT
 TESTS_DIR = os.path.join(REPO_ROOT, 'tests') if os.path.isdir(os.path.join(REPO_ROOT, 'tests')) else os.path.join(CLI_ROOT, 'tests')
 DEFAULT_OUTPUT_DIR = os.path.join(REPO_ROOT, 'output')
 
@@ -269,6 +269,7 @@ def run_script(script_name, args):
     candidate_paths = [
         os.path.join(PYTHON_SCRIPTS_DIR, script_name),
         os.path.join(MEI_DIR, 'python_scripts', script_name),
+        os.path.join(MEI_DIR, 'desktop', 'python_scripts', script_name),
         os.path.join(MEI_DIR, 'python_app', 'python_scripts', script_name),
         os.path.join(MEI_DIR, 'cli-legacy', 'python_scripts', script_name),
         os.path.join(CLI_ROOT, 'python_scripts', script_name),

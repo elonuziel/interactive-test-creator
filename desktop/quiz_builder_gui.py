@@ -27,7 +27,7 @@ from tkinter import ttk, filedialog, messagebox
 
 # Resolve directories
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) in ['cli-legacy', 'python_app'] else SCRIPT_DIR
+REPO_ROOT = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) in ['desktop', 'python_app', 'cli-legacy'] else SCRIPT_DIR
 sys.path.insert(0, SCRIPT_DIR)
 
 try:

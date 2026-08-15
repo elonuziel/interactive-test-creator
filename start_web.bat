@@ -3,9 +3,13 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-title Interactive Hebrew Quiz Builder — Desktop App
+title Interactive Hebrew Quiz Builder — Web App
 
-:: Detect Python executable
+echo ===============================================================
+echo   Launching Interactive Hebrew Quiz Builder (Web App)
+echo ===============================================================
+
+:: Detect Python executable to serve via HTTP
 set "PYTHON_EXE="
 if exist "%~dp0.venv\Scripts\python.exe" set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
 if exist "%~dp0venv\Scripts\python.exe" set "PYTHON_EXE=%~dp0venv\Scripts\python.exe"
@@ -22,16 +26,10 @@ if "!PYTHON_EXE!"=="" (
 )
 
 if not "!PYTHON_EXE!"=="" (
-    "!PYTHON_EXE!" "%~dp0desktop\quiz_builder_gui.py" %*
-    if !errorlevel! neq 0 (
-        echo.
-        echo [X] Desktop app closed with code !errorlevel!. Press any key to exit.
-        pause >nul
-    )
+    echo Starting local web server at http://localhost:8080 ...
+    start "" "http://localhost:8080/web/index.html"
+    "!PYTHON_EXE!" -m http.server 8080 --directory "%~dp0."
 ) else (
-    echo.
-    echo [X] Python 3 was not found on your PATH or in a local virtual environment.
-    echo     Please install Python 3.8+ to run the Desktop Quiz Builder App.
-    echo.
-    pause
+    echo Opening web app directly in default browser...
+    start "" "%~dp0web\index.html"
 )

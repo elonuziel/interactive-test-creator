@@ -14,7 +14,7 @@ import os
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_DIR = os.path.join(SCRIPT_DIR, 'python_app')
+APP_DIR = os.path.join(SCRIPT_DIR, 'desktop')
 
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)

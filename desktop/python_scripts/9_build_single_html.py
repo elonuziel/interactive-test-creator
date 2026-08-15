@@ -24,6 +24,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 # Resolve paths relative to the repo root & PyInstaller _MEIPASS
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) == 'python_scripts' else SCRIPT_DIR
+REPO_ROOT = os.path.dirname(APP_DIR) if os.path.basename(APP_DIR) in ['desktop', 'python_app', 'cli-legacy'] else APP_DIR
 
 def resolve_web_asset(filename):
     """Find template assets (index.html, style.css, app.js) strictly inside web/."""
@@ -31,6 +32,7 @@ def resolve_web_asset(filename):
     candidates = []
     if frozen_base:
         candidates.extend([
+            os.path.join(frozen_base, 'desktop', 'web', filename),
             os.path.join(frozen_base, 'python_app', 'web', filename),
             os.path.join(frozen_base, 'cli-legacy', 'web', filename),
             os.path.join(frozen_base, 'web', filename),
@@ -38,6 +40,7 @@ def resolve_web_asset(filename):
         ])
     candidates.extend([
         os.path.join(APP_DIR, 'web', filename),
+        os.path.join(REPO_ROOT, 'web', filename),
         os.path.join(SCRIPT_DIR, filename),
     ])
 

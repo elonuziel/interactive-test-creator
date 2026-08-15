@@ -18,6 +18,10 @@ env/
 dist/
 build/
 *.spec
+desktop/dist/
+desktop/build/
+desktop/output/
+desktop/tests/
 python_app/dist/
 python_app/build/
 python_app/output/
