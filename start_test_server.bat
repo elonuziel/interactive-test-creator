@@ -27,7 +27,7 @@ echo   [1] Open In-Browser Component Test Runner (test_runner.html)
 echo   [2] Open Quiz Builder (index.html)
 echo   [3] Open Quiz Player (quiz_player.html)
 echo   [4] Run Local CLI Test Suite (run_local_tests.py)
-echo   [5] Launch Legacy Python CLI Quiz Builder (cli-legacy/start.bat)
+echo   [5] Launch Python Desktop/CLI Quiz Builder (python_app/start.bat)
 echo   [S] Start / Verify Local HTTP Server Status
 echo   [Q] Stop Server ^& Quit
 echo.
@@ -89,9 +89,9 @@ if /i "%CHOICE%"=="4" (
 if /i "%CHOICE%"=="5" (
     echo.
     echo ---------------------------------------------------------------
-    echo Launching Legacy Python CLI Builder...
+    echo Launching Python Desktop/CLI Builder...
     echo ---------------------------------------------------------------
-    call cli-legacy\start.bat
+    call python_app\start.bat
     goto MENU
 )
 if /i "%CHOICE%"=="S" (

@@ -44,12 +44,25 @@ Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading di
 
 ---
 
+## 🖥️ Python Desktop GUI & Batch CLI Builder (`python_app/`)
+
+- **Root CLI & Batch Runner (`quiz_builder.py`)**:
+  - Run `python quiz_builder.py` to scan exam folders, auto-group flat files, auto-convert DOCX, and dispatch terminal agents.
+  - Run `python quiz_builder.py --gui` or double-click **`start_app.bat`** to launch the Desktop GUI app.
+  - Run `python quiz_builder.py --build` to compile all ready tests into `output/` with a **Master Quiz Portal** (`output/index.html`).
+  - Run `python quiz_builder.py --watch` for live auto-recompilation on save.
+- **Desktop GUI Application (`python_app/quiz_builder_gui.py` / `start_app.bat`)**:
+  - Native, zero-dependency desktop app with Dark/Light themes, visual exam cards, 1-click prompt copy, agent dispatch, and live activity log.
+
+---
+
 ## 🧪 Development Server & Component Test Suite
 
-- **Local Development Launcher (`start_test_server.bat`)**: Double-click to automatically launch a local HTTP server on port 8080 (detects Python or Node), open the browser, and present an interactive CLI menu.
-- **In-Browser Test Runner (`test-suite/test_runner.html`)**: English component test suite with real-time execution timing (`ms`), performance metric cards, and payload inspection.
-- **Node.js CLI Unit Tests (`test-suite/run_tests.js`)**: Headless unit test script using `node:assert` for local terminal verification.
-- **Automated GitHub Actions CI (`.github/workflows/deploy-pages.yml`)**: Automated CI pipeline running unit tests on every push before publishing to GitHub Pages.
+- **Desktop App Launcher (`start_app.bat`)**: Double-click to launch the native Python Desktop GUI.
+- **Local Dev Server & Test Menu (`start_test_server.bat`)**: Double-click to launch a local HTTP server on port 8080, open the browser, and present an interactive menu.
+- **Python Pytest Suite (`python_app/tests_py/`)**: Run `python -m pytest python_app/tests_py -v` (57 automated unit tests).
+- **Local Component Test Suite (`test-suite/run_local_tests.py`)**: Run `python test-suite/run_local_tests.py` (10 automated component tests).
+- **In-Browser Test Runner (`test-suite/test_runner.html`)**: Real-time browser component tests with performance metrics.
 
 ---
 
@@ -63,12 +76,24 @@ interactive-test-creator/
 ├── app.js                # Quiz Engine & Navigation
 ├── style.css             # Unified RTL & Theme System
 ├── favicon.svg           # Application SVG Favicon
+│
+├── quiz_builder.py       # Root Python Entry Point (CLI & GUI wrapper)
+├── start_app.bat         # Double-click Desktop GUI App Launcher
 ├── start_test_server.bat # Local HTTP Server & Test Launcher
-├── test-suite/           # In-Browser & Node.js Component Unit Tests
+│
+├── python_app/           # Modern Python Desktop GUI & Batch CLI App
+│   ├── quiz_builder_gui.py   # Desktop GUI Application (Tkinter)
+│   ├── quiz_builder_cli.py   # Batch CLI Runner & Engine
+│   ├── python_scripts/       # Core pipeline scripts (1_detect.. to 9_build..)
+│   ├── tests_py/             # Pytest automated test suite (57 tests)
+│   ├── web/                  # Bundle templates (index.html, style.css, app.js)
+│   └── start.bat             # Desktop app batch launcher
+│
+├── test-suite/           # In-Browser & Local Component Unit Tests
 ├── vendor/               # Third-party dependencies (PDF.js)
 ├── .github/workflows/    # Automated CI/CD Pages deployment workflow
-├── cli-legacy/           # Legacy Python scripts & batch wizard
-└── deal-with-later/      # Preserved research guides, scripts & proposals
+├── tests/                # Local exam workspaces (gitignored)
+└── output/               # Generated standalone quizzes & portal (gitignored)
 ```
 
 ---

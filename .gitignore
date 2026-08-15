@@ -1,5 +1,8 @@
-# Sample test files & test runs
+# Exam Workspaces & Test Data (local exams are never committed)
 tests/
+tests/*
+output/
+output/*
 
 # Python & Pytest Caches
 __pycache__/
@@ -11,15 +14,22 @@ __pycache__/
 venv/
 env/
 
-# PyInstaller Build Outputs & Binaries
+# Build & Dist Outputs
 dist/
 build/
-dist/
+*.spec
+python_app/dist/
+python_app/build/
+python_app/output/
+python_app/tests/
 cli-legacy/dist/
 cli-legacy/build/
+cli-legacy/output/
+cli-legacy/tests/
 
 # Generated Standalone Quiz Exports
 interactive_quiz*.html
+*_interactive_quiz.html
 
 # OS & IDE Artifacts
 .DS_Store
@@ -32,8 +42,3 @@ desktop.ini
 # Temporary & Log Files
 *.log
 *.tmp
-
-#build directory
-build/
-dist/
-output/

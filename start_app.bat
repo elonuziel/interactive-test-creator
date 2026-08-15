@@ -8,8 +8,8 @@ title Interactive Hebrew Quiz Builder — Desktop App
 :: Detect Python executable
 set "PYTHON_EXE="
 if exist "%~dp0.venv\Scripts\python.exe" set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
-if "!PYTHON_EXE!"=="" if exist "%~dp0venv\Scripts\python.exe" set "PYTHON_EXE=%~dp0venv\Scripts\python.exe"
-if "!PYTHON_EXE!"=="" if exist "%~dp0cli-legacy\.venv\Scripts\python.exe" set "PYTHON_EXE=%~dp0cli-legacy\.venv\Scripts\python.exe"
+if exist "%~dp0venv\Scripts\python.exe" set "PYTHON_EXE=%~dp0venv\Scripts\python.exe"
+if exist "%~dp0python_app\.venv\Scripts\python.exe" set "PYTHON_EXE=%~dp0python_app\.venv\Scripts\python.exe"
 
 if "!PYTHON_EXE!"=="" (
     where python >nul 2>nul
@@ -22,7 +22,7 @@ if "!PYTHON_EXE!"=="" (
 )
 
 if not "!PYTHON_EXE!"=="" (
-    "!PYTHON_EXE!" "%~dp0cli-legacy\quiz_builder_gui.py" %*
+    "!PYTHON_EXE!" "%~dp0python_app\quiz_builder_gui.py" %*
     if !errorlevel! neq 0 (
         echo.
         echo [X] Desktop app closed with code !errorlevel!. Press any key to exit.

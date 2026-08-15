@@ -27,7 +27,7 @@ from tkinter import ttk, filedialog, messagebox
 
 # Resolve directories
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) == 'cli-legacy' else SCRIPT_DIR
+REPO_ROOT = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) in ['cli-legacy', 'python_app'] else SCRIPT_DIR
 sys.path.insert(0, SCRIPT_DIR)
 
 try:
@@ -694,7 +694,7 @@ class QuizBuilderGUI:
         def worker():
             self.set_processing_state(True)
             self.log("🚀 Starting Batch Pipeline for all detected workspaces...")
-            output_dir = os.path.join(SCRIPT_DIR, 'output')
+            output_dir = os.path.join(REPO_ROOT, 'output')
             cli.run_batch_pipeline(self.target_dir, auto_confirm=True, output_dir=output_dir)
             self.log("🎉 Batch Pipeline completed!")
             self.set_processing_state(False)
@@ -710,7 +710,7 @@ class QuizBuilderGUI:
         def worker():
             self.set_processing_state(True)
             self.log("🔨 Compiling all ready workspaces...")
-            output_dir = os.path.join(SCRIPT_DIR, 'output')
+            output_dir = os.path.join(REPO_ROOT, 'output')
             cli.run_batch_pipeline(self.target_dir, auto_confirm=True, build_only=True, output_dir=output_dir)
             self.log("✔ Ready workspaces built successfully!")
             self.set_processing_state(False)
@@ -719,7 +719,7 @@ class QuizBuilderGUI:
         threading.Thread(target=worker, daemon=True).start()
 
     def open_master_portal(self):
-        output_dir = os.path.join(SCRIPT_DIR, 'output')
+        output_dir = os.path.join(REPO_ROOT, 'output')
         portal_path = os.path.join(output_dir, 'index.html')
         if not os.path.isfile(portal_path):
             # Generate on the fly
