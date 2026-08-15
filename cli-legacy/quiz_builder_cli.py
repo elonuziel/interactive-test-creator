@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """
-quiz_builder_cli.py — Complete Interactive Hebrew Quiz Builder & Local Server
-100% faithful Python port of start.bat featuring in-process script execution,
-AI agent auto-launchers, Explorer folder opening, ANSI VT colors, and standalone HTML exporting.
+quiz_builder_cli.py — Modernized Streamlined Batch Hebrew Quiz Builder & Local Server
+Features:
+- Multi-exam folder-drop & flat-file auto-grouping
+- 1-Screen Quick Confirmation summary table
+- Batch DOCX to PDF auto-conversion
+- Automated PDF rendering, text extraction, and QA checks
+- Terminal AI Agent auto-dispatch (agy, gemini, claude) or Web AI prompts + BATCH_PROMPTS_INDEX.md
+- Standalone single-file HTML quiz compilation
+- Master Quiz Portal (output/index.html) with search & stats
+- Fast --build and --watch modes
 """
 
 import os
@@ -21,6 +28,7 @@ import socketserver
 import webbrowser
 import threading
 import time
+from pathlib import Path
 
 # Ensure UTF-8 output and enable Windows Virtual Terminal ANSI color mode
 if hasattr(sys.stdout, 'reconfigure'):
@@ -68,6 +76,12 @@ else:
     PYTHON_SCRIPTS_DIR = os.path.join(CLI_ROOT, 'python_scripts')
 
 TESTS_DIR = os.path.join(CLI_ROOT, 'tests')
+DEFAULT_OUTPUT_DIR = os.path.join(CLI_ROOT, 'output')
+
+
+# =========================================================================
+# System & Utility Helpers
+# =========================================================================
 
 def copy_to_clipboard(text):
     if sys.platform == 'win32':
@@ -78,6 +92,7 @@ def copy_to_clipboard(text):
         except Exception:
             pass
     return False
+
 
 def open_in_explorer(path):
     if not os.path.exists(path):
@@ -91,6 +106,7 @@ def open_in_explorer(path):
         subprocess.Popen(['open', path])
     else:
         subprocess.Popen(['xdg-open', path])
+
 
 def find_soffice_binary():
     """Find a LibreOffice soffice executable if available."""
@@ -107,6 +123,7 @@ def find_soffice_binary():
             if os.path.isfile(p):
                 return p
     return None
+
 
 def has_word_com():
     """Check whether Microsoft Word COM automation is available on Windows."""
@@ -133,6 +150,7 @@ def has_word_com():
     except Exception:
         return False
 
+
 def detect_docx_converter():
     """Return a converter backend tuple: (backend_name, backend_value)."""
     soffice_path = find_soffice_binary()
@@ -141,6 +159,7 @@ def detect_docx_converter():
     if has_word_com():
         return ('wordcom', 'powershell')
     return (None, None)
+
 
 def convert_docx_to_pdf_with_soffice(soffice_path, docx_path, output_dir):
     cmd = [
@@ -154,6 +173,7 @@ def convert_docx_to_pdf_with_soffice(soffice_path, docx_path, output_dir):
     ]
     res = subprocess.run(cmd, capture_output=True, text=True, timeout=180, check=False)
     return res.returncode == 0, (res.stderr or res.stdout or '').strip()
+
 
 def convert_docx_to_pdf_with_wordcom(docx_path, pdf_path):
     safe_docx = docx_path.replace("'", "''")
@@ -179,6 +199,7 @@ def convert_docx_to_pdf_with_wordcom(docx_path, pdf_path):
         check=False,
     )
     return res.returncode == 0, (res.stderr or res.stdout or '').strip()
+
 
 def convert_docx_batch(docx_files, test_dir, backend_name, backend_value, overwrite_existing=False):
     """Convert DOCX files to PDFs in-place. Returns summary dict."""
@@ -216,37 +237,29 @@ def convert_docx_batch(docx_files, test_dir, backend_name, backend_value, overwr
         'failed': failed,
     }
 
-def print_header():
-    print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-    print(f"{C_CYAN}│{C_RESET} {C_BOLD}{C_WHITE}         INTERACTIVE HEBREW QUIZ BUILDER (CLI EXECUTABLE)                 {C_RESET} {C_CYAN}│{C_RESET}")
-    print(f"{C_CYAN}│{C_RESET} {C_GRAY}  Transform PDF Exams & Spreadsheet Answer Keys into Interactive Quizzes  {C_RESET} {C_CYAN}│{C_RESET}")
-    print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
-    print(f"  {C_YELLOW}💡 TIP: Move quiz_builder.exe to any folder to manage your tests there.{C_RESET}")
-    print(f"  {C_GRAY}   Current Storage Location: {TESTS_DIR}{C_RESET}\n")
 
-def check_prerequisites():
-    print(f" {C_BOLD}[Step 1/6] System Environment Check{C_RESET}")
-    print(f" {C_GRAY}{'─' * 74}{C_RESET}")
-    
-    missing = []
+def detect_cli_agent():
+    """Detect available CLI AI agents in PATH."""
+    for ag in ['agy', 'gemini', 'claude', 'cursor']:
+        if shutil.which(ag):
+            return ag
+    return None
+
+
+def is_pdf_digital(pdf_path):
     if fitz is None:
-        missing.append("pymupdf")
-    if pd is None:
-        missing.append("pandas")
-        
-    if missing:
-        print(f"  {C_YELLOW}[!] Notice: Optional libraries missing ({', '.join(missing)}).{C_RESET}")
-        print(f"      PDF/Excel fallback scripts will run via system handlers if needed.\n")
-    else:
-        print(f"  {C_GREEN}[✔] Python Core Environment & Libraries are ready.{C_RESET}\n")
+        return False
+    try:
+        doc = fitz.open(pdf_path)
+        pages_checked = min(3, len(doc))
+        if pages_checked == 0:
+            return False
+        total_chars = sum(len(doc[i].get_text().strip()) for i in range(pages_checked))
+        avg = total_chars / pages_checked
+        return avg >= 50
+    except Exception:
+        return False
 
-def format_bytes(size_bytes):
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    else:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 def run_script(script_name, args):
     """Run a pipeline script in-process to guarantee PyInstaller compatibility."""
@@ -280,135 +293,6 @@ def run_script(script_name, args):
     finally:
         sys.argv = old_argv
 
-def start_local_server(port=8000):
-    web_dir = os.path.join(MEI_DIR, 'web')
-    if not os.path.isdir(web_dir):
-        web_dir = os.path.join(CLI_ROOT, 'web')
-    if not os.path.isdir(web_dir):
-        web_dir = CLI_ROOT
-
-    os.chdir(web_dir)
-    handler = http.server.SimpleHTTPRequestHandler
-    httpd = socketserver.TCPServer(("", port), handler)
-    print(f"\n  {C_GREEN}[✔] Local Web Server active at http://localhost:{port}/{C_RESET}")
-    print(f"      Opening default browser...\n")
-    
-    def serve():
-        httpd.serve_forever()
-        
-    t = threading.Thread(target=serve, daemon=True)
-    t.start()
-    
-    time.sleep(0.5)
-    target_url = f"http://localhost:{port}/index.html" if os.path.isfile(os.path.join(web_dir, 'index.html')) else f"http://localhost:{port}/"
-    webbrowser.open(target_url)
-
-def interactive_wizard():
-    print_header()
-    check_prerequisites()
-
-    os.makedirs(TESTS_DIR, exist_ok=True)
-
-    while True:
-        print(f" {C_BOLD}[Step 2/6] Test Workspaces{C_RESET}")
-        print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
-
-        workspaces = [d for d in sorted(os.listdir(TESTS_DIR)) if os.path.isdir(os.path.join(TESTS_DIR, d))]
-        has_ready = False
-        
-        if workspaces:
-            print("  Available Workspaces:")
-            for idx, w in enumerate(workspaces, 1):
-                w_path = os.path.join(TESTS_DIR, w)
-                q_path = os.path.join(w_path, 'questions.json')
-                html_files = [f for f in os.listdir(w_path) if f.endswith('.html')]
-                
-                if os.path.exists(q_path):
-                    has_ready = True
-                    status_badge = f"{C_GREEN}[READY]{C_RESET}"
-                    extra_info = f" ({len(html_files)} HTML built)" if html_files else ""
-                else:
-                    status_badge = f"{C_YELLOW}[PENDING]{C_RESET}"
-                    extra_info = ""
-                print(f"    [{idx}] {w:<20} {status_badge}{extra_info}")
-        else:
-            print("    (No existing test folders found in tests/)")
-
-        print("\n  Actions:")
-        if workspaces:
-            print(f"    [1-{len(workspaces)}] Select an existing test workspace")
-        print("    [N] Create a NEW test workspace")
-        if has_ready:
-            print("    [B] Build standalone HTML quiz from ready test")
-            print("    [S] Start local web server to browse quizzes")
-        print("    [Q] Quit\n")
-
-        choice = input("   [?] Your choice: ").strip()
-        if not choice:
-            continue
-
-        if choice.lower() == 'q':
-            print(f"\n{C_CYAN}Exiting Quiz Builder. Goodbye!{C_RESET}\n")
-            break
-        elif choice.lower() == 's':
-            start_local_server(8000)
-            input("   Press Enter to stop the web server and return to menu...")
-            continue
-        elif choice.lower() == 'n':
-            name = input("   [?] Test workspace name (e.g. 9900, bio_101) [Default: test_1]: ").strip()
-            if not name:
-                name = "test_1"
-            name = name.replace(' ', '_')
-            test_dir = os.path.join(TESTS_DIR, name)
-            os.makedirs(test_dir, exist_ok=True)
-            print(f"\n  {C_GREEN}[✔] Workspace directory created: {test_dir}{C_RESET}\n")
-            process_workspace(name, test_dir)
-        elif choice.lower() == 'b':
-            if not workspaces:
-                print(f"\n  {C_YELLOW}[!] No test workspaces found.{C_RESET}\n")
-                continue
-            print("\n  Select workspace to build:")
-            for idx, w in enumerate(workspaces, 1):
-                print(f"    [{idx}] {w}")
-            w_idx = input("   [?] Workspace number: ").strip()
-            if w_idx.isdigit() and 1 <= int(w_idx) <= len(workspaces):
-                target = workspaces[int(w_idx) - 1]
-                run_script('9_build_single_html.py', [os.path.join(TESTS_DIR, target)])
-        elif choice.isdigit() and 1 <= int(choice) <= len(workspaces):
-            target = workspaces[int(choice) - 1]
-            test_dir = os.path.join(TESTS_DIR, target)
-            print(f"\n  Workspace Selected: {C_BOLD}{target}{C_RESET}")
-            q_file = os.path.join(test_dir, 'questions.json')
-            if os.path.exists(q_file):
-                print(f"  Status: {C_GREEN}READY (questions.json present){C_RESET}\n")
-                print(f"  Select an action for {target}:")
-                print("    [1] Build standalone HTML quiz file")
-                print("    [2] Re-process with AI agent (re-extract / proofread)")
-                print("    [B] Back to main menu\n")
-                ex_choice = input("   [?] Your choice (1/2/B) [Default: 1]: ").strip().lower()
-                if ex_choice == '2':
-                    process_workspace(target, test_dir)
-                elif ex_choice == 'b':
-                    continue
-                else:
-                    run_script('9_build_single_html.py', [test_dir])
-            else:
-                print(f"  Status: {C_YELLOW}PENDING (requires processing){C_RESET}\n")
-                process_workspace(target, test_dir)
-
-def is_pdf_digital(pdf_path):
-    if fitz is None:
-        return False
-    try:
-        doc = fitz.open(pdf_path)
-        pages_checked = min(3, len(doc))
-        if pages_checked == 0:
-            return False
-        total_chars = sum(len(doc[i].get_text().strip()) for i in range(pages_checked))
-        avg = total_chars / pages_checked
-        return avg >= 50
-    except Exception:
-        return False
 
 def cleanup_workspace_folder(test_dir):
     """Clean up scratch files, prompt txt files, clean merged PDFs, and unused page renders."""
@@ -438,7 +322,7 @@ def cleanup_workspace_folder(test_dir):
             except Exception:
                 pass
 
-    # Delete any clean merged PDFs (*_clean.pdf) and any leftover prompt .txt files
+    # Delete any clean merged PDFs (*_clean.pdf) and leftover prompt .txt files
     for fname in os.listdir(test_dir):
         if fname.lower().endswith('_clean.pdf') or (fname.lower().startswith('prompt_') and fname.lower().endswith('.txt')):
             fp = os.path.join(test_dir, fname)
@@ -484,326 +368,421 @@ def cleanup_workspace_folder(test_dir):
                     except Exception:
                         pass
 
-        # If no page images were referenced and folder is now empty, remove folder
         if kept_pages == 0 and len(os.listdir(pages_dir)) == 0:
             try:
                 os.rmdir(pages_dir)
             except Exception:
                 pass
+
+    return cleaned, deleted_pages
+
+
+# =========================================================================
+# Intake & Auto-Grouping Engine
+# =========================================================================
+
+def normalize_stem_name(filename):
+    """Derive clean exam stem name by stripping answer key suffixes."""
+    stem = os.path.splitext(filename)[0]
+    # Remove trailing answer/key/form indicators
+    stem = re.sub(r'([_\-\s]+(answers?|ans|key|solutions?|פתרונות|תשובות|form\d+|טופס\d+))+$', '', stem, flags=re.IGNORECASE)
+    stem = stem.strip('_- ')
+    return stem or os.path.splitext(filename)[0]
+
+
+def scan_and_group_inputs(target_dir, tests_dir=None):
+    """
+    Scan a target directory for flat exam files or subfolders,
+    auto-grouping matching files into test workspaces.
+    """
+    if tests_dir is None:
+        tests_dir = os.path.join(CLI_ROOT, 'tests')
+    os.makedirs(tests_dir, exist_ok=True)
+
+    if not os.path.exists(target_dir):
+        return []
+
+    entries = os.listdir(target_dir)
+    subdirs = [d for d in entries if os.path.isdir(os.path.join(target_dir, d)) and not d.startswith('.')]
+    flat_files = [f for f in entries if os.path.isfile(os.path.join(target_dir, f)) and not f.startswith('.')]
+
+    # Check if target_dir itself is already tests_dir
+    is_same_tests_dir = (os.path.abspath(target_dir) == os.path.abspath(tests_dir))
+
+    # Auto-group flat files by stem
+    groups = {}
+    valid_exts = ('.pdf', '.docx', '.csv', '.xlsx', '.xls', '.md', '.json', '.txt')
+    for fname in flat_files:
+        if fname.lower().endswith(valid_exts) and fname.lower() not in ['manifest.json', 'batch_prompts_index.md']:
+            stem = normalize_stem_name(fname)
+            groups.setdefault(stem, []).append(fname)
+
+    # Move/Copy flat files into organized test folders
+    for stem, files in groups.items():
+        # Check if contains at least one PDF or DOCX or questions file
+        has_exam_core = any(f.lower().endswith(('.pdf', '.docx', '.json', '.md')) for f in files)
+        if not has_exam_core:
+            continue
+
+        workspace_path = os.path.join(tests_dir, stem)
+        os.makedirs(workspace_path, exist_ok=True)
+        for fname in files:
+            src = os.path.join(target_dir, fname)
+            dst = os.path.join(workspace_path, fname)
+            if src != dst and not os.path.exists(dst):
+                try:
+                    shutil.copy2(src, dst)
+                except Exception:
+                    pass
+
+    # Include existing subdirectories
+    for d in subdirs:
+        sub_path = os.path.join(target_dir, d)
+        if not is_same_tests_dir:
+            dst_sub = os.path.join(tests_dir, d)
+            if not os.path.exists(dst_sub):
+                try:
+                    shutil.copytree(sub_path, dst_sub)
+                except Exception:
+                    pass
+
+    # Return all valid workspaces inside tests_dir
+    workspaces = []
+    if os.path.isdir(tests_dir):
+        for entry in sorted(os.listdir(tests_dir)):
+            full_p = os.path.join(tests_dir, entry)
+            if os.path.isdir(full_p) and not entry.startswith('.'):
+                workspaces.append(full_p)
+
+    return workspaces
+
+
+def analyze_workspace(test_dir):
+    """Analyze a test workspace directory and return structured metadata."""
+    name = os.path.basename(os.path.normpath(test_dir))
+    files = os.listdir(test_dir) if os.path.isdir(test_dir) else []
+
+    pdf_files = [f for f in files if f.lower().endswith('.pdf') and not f.lower().endswith('_clean.pdf')]
+    docx_files = [f for f in files if f.lower().endswith('.docx')]
+    csv_files = [f for f in files if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
+    html_files = [f for f in files if f.lower().endswith('.html')]
+
+    has_q_json = os.path.isfile(os.path.join(test_dir, 'questions.json'))
+    has_q_md = any(f.lower() in ['questions.md', 'output.md', 'questions.txt'] for f in files)
+    pages_dir = os.path.join(test_dir, 'pages_output')
+    has_pages = os.path.isdir(pages_dir) and len(os.listdir(pages_dir)) > 0
+
+    # Auto-detect form number from answer filename or default
+    form_num = "0"
+    if csv_files:
+        form_match = re.search(r'form[_\-\s]*(\d+)', csv_files[0], re.IGNORECASE)
+        if form_match:
+            form_num = form_match.group(1)
         else:
-            print(f"  {C_GRAY}[i] Preserved {kept_pages} diagram/table image(s) in pages_output/{C_RESET}")
+            form_num = "1"
 
-    if cleaned > 0 or deleted_pages > 0:
-        print(f"  {C_GRAY}[i] Workspace Cleanup: Removed {cleaned} scratch file(s) and {deleted_pages} unused page render(s).{C_RESET}")
+    # Determine status
+    if html_files and has_q_json:
+        status = "BUILT"
+    elif has_q_json:
+        status = "READY_TO_BUILD"
+    elif has_q_md:
+        status = "READY_TO_PARSE"
+    elif pdf_files or docx_files:
+        status = "NEEDS_EXTRACTION"
+    else:
+        status = "EMPTY"
 
-def process_workspace(test_name, test_dir):
-    # Step 3: Check for source files & launch Explorer
-    pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
-    docx_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.docx')]
-    csv_files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
+    return {
+        'name': name,
+        'dir': test_dir,
+        'pdf_files': pdf_files,
+        'docx_files': docx_files,
+        'csv_files': csv_files,
+        'html_files': html_files,
+        'has_questions_json': has_q_json,
+        'has_questions_md': has_q_md,
+        'has_pages': has_pages,
+        'form_number': form_num,
+        'status': status,
+    }
 
-    if not pdf_files and not docx_files:
-        print(f"\n{C_YELLOW}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-        print(f"{C_YELLOW}│                   ACTION REQUIRED: PLACE EXAM FILES                      │{C_RESET}")
-        print(f"{C_YELLOW}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
-        print(f"  Please place your exam source files into workspace:")
-        print(f"  📁 {C_BOLD}{test_dir}{C_RESET}\n")
-        print("  Required files:")
-        print("    1. exam.pdf or exam.docx - Your exam source file")
-        print("    2. answers.csv - Answer key (CSV or Excel .xlsx / .xls) [Optional]\n")
-        print("  Opening workspace folder in Explorer...")
-        open_in_explorer(test_dir)
-        input("  Press Enter after copying your files into the workspace folder...")
 
-        pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
-        docx_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.docx')]
-        csv_files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.csv', '.xlsx', '.xls'))]
+# =========================================================================
+# 1-Screen Summary & Batch Confirmation UI
+# =========================================================================
+
+def print_header():
+    print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+    print(f"{C_CYAN}│{C_RESET} {C_BOLD}{C_WHITE}         INTERACTIVE HEBREW QUIZ BUILDER (BATCH RUNNER)                   {C_RESET} {C_CYAN}│{C_RESET}")
+    print(f"{C_CYAN}│{C_RESET} {C_GRAY}  Batch Transform Exams & Answer Keys into Interactive Standalone Quizzes {C_RESET} {C_CYAN}│{C_RESET}")
+    print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
+
+
+def display_batch_summary(workspaces_info, agent_found=None, converter_name=None):
+    """Print a 1-screen summary table of all detected tests & environment status."""
+    print(f"{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+    print(f"{C_CYAN}│{C_RESET} {C_BOLD}🚀 BATCH EXAM SUMMARY ({len(workspaces_info)} Exam{'s' if len(workspaces_info) != 1 else ''} Found){C_RESET}{' ' * max(0, 48 - len(str(len(workspaces_info))))}{C_CYAN}│{C_RESET}")
+    print(f"{C_CYAN}├────┬──────────────────────┬────────────────────────┬─────────────┬───────────────┤{C_RESET}")
+    print(f"{C_CYAN}│{C_RESET} {C_BOLD}#  │ Exam Name            │ Source File            │ Form / Key  │ Status        {C_RESET}{C_CYAN}│{C_RESET}")
+    print(f"{C_CYAN}├────┼──────────────────────┼────────────────────────┼─────────────┼───────────────┤{C_RESET}")
+
+    status_badges = {
+        "BUILT": f"{C_GREEN}[BUILT]{C_RESET}",
+        "READY_TO_BUILD": f"{C_GREEN}[READY BUILD]{C_RESET}",
+        "READY_TO_PARSE": f"{C_CYAN}[READY PARSE]{C_RESET}",
+        "NEEDS_EXTRACTION": f"{C_YELLOW}[EXTRACTION]{C_RESET}",
+        "EMPTY": f"{C_GRAY}[EMPTY]{C_RESET}",
+    }
+
+    for idx, info in enumerate(workspaces_info, 1):
+        name = (info['name'][:20] + '..') if len(info['name']) > 20 else info['name']
+        src = "None"
+        if info['pdf_files']:
+            src = info['pdf_files'][0]
+        elif info['docx_files']:
+            src = info['docx_files'][0] + " (DOCX)"
+        src = (src[:22] + '..') if len(src) > 22 else src
+
+        ans = f"Form {info['form_number']}"
+        if info['csv_files']:
+            ans += f" ({info['csv_files'][0][:8]})"
+        ans = (ans[:11] + '..') if len(ans) > 11 else ans
+
+        badge = status_badges.get(info['status'], f"[{info['status']}]")
+        print(f"{C_CYAN}│{C_RESET} {idx:<2} │ {name:<20} │ {src:<22} │ {ans:<11} │ {badge:<22} {C_CYAN}│{C_RESET}")
+
+    print(f"{C_CYAN}└────┴──────────────────────┴────────────────────────┴─────────────┴───────────────┘{C_RESET}")
+
+    agent_str = f"{C_GREEN}{agent_found} (Ready){C_RESET}" if agent_found else f"{C_YELLOW}None (Web Prompt Mode){C_RESET}"
+    conv_str = f"{C_GREEN}{converter_name}{C_RESET}" if converter_name else f"{C_GRAY}None (Manual PDF){C_RESET}"
+
+    print(f"  🤖 {C_BOLD}CLI Agent:{C_RESET} {agent_str}  │  📄 {C_BOLD}DOCX Converter:{C_RESET} {conv_str}\n")
+
+
+# =========================================================================
+# Master Portal HTML Generator
+# =========================================================================
+
+def generate_master_portal(output_dir, built_quizzes):
+    """
+    Generate output/index.html containing a master dashboard
+    to launch all generated interactive quizzes.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    portal_path = os.path.join(output_dir, 'index.html')
+
+    quiz_cards_html = []
+    for q in built_quizzes:
+        name = q.get('name', 'Quiz')
+        title = q.get('title', name.replace('_', ' ').title())
+        q_count = q.get('question_count', 0)
+        rel_html = q.get('html_name', f"{name}.html")
+
+        quiz_cards_html.append(f"""
+        <div class="quiz-card" data-title="{title.lower()} {name.lower()}">
+            <div class="card-header">
+                <span class="quiz-badge">{q_count} שאלות</span>
+                <span class="status-dot"></span>
+            </div>
+            <h2 class="quiz-title">{title}</h2>
+            <div class="quiz-meta">
+                <span>📁 {name}</span>
+                <span>⚡ ציון מיידי</span>
+            </div>
+            <a href="{rel_html}" class="launch-btn" target="_blank">פתור מבחן כעת ←</a>
+        </div>
+        """)
+
+    cards_joined = "\n".join(quiz_cards_html) if quiz_cards_html else "<p class='no-quizzes'>לא נמצאו מבחנים מוכנים. הרץ את quiz_builder כדי ליצור מבחנים!</p>"
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>פורטל המבחנים האינטראקטיביים | Master Quiz Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {{
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --border: #334155;
+        }}
+        * {{ margin: 0; padding: 0; box-sizing: border-box; font-family: 'Rubik', sans-serif; }}
+        body {{ background-color: var(--bg-color); color: var(--text-primary); min-height: 100vh; padding: 2rem 1rem; }}
+        .portal-container {{ max-width: 1000px; margin: 0 auto; }}
+        header {{ text-align: center; margin-bottom: 2.5rem; }}
+        header h1 {{ font-size: 2.4rem; font-weight: 800; background: linear-gradient(135deg, #60a5fa, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.5rem; }}
+        header p {{ color: var(--text-secondary); font-size: 1.1rem; }}
+        .stats-bar {{ display: flex; gap: 1rem; justify-content: center; margin: 1.5rem 0; flex-wrap: wrap; }}
+        .stat-pill {{ background: var(--card-bg); border: 1px solid var(--border); padding: 0.5rem 1.2rem; border-radius: 9999px; font-size: 0.9rem; color: var(--text-secondary); }}
+        .stat-pill strong {{ color: var(--text-primary); }}
+        .search-box {{ margin-bottom: 2rem; display: flex; justify-content: center; }}
+        .search-input {{ width: 100%; max-width: 500px; padding: 0.85rem 1.5rem; border-radius: 9999px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text-primary); font-size: 1rem; outline: none; transition: border-color 0.2s; text-align: right; }}
+        .search-input:focus {{ border-color: var(--primary); }}
+        .quiz-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }}
+        .quiz-card {{ background: var(--card-bg); border: 1px solid var(--border); border-radius: 1rem; padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }}
+        .quiz-card:hover {{ transform: translateY(-4px); border-color: var(--primary); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4); }}
+        .card-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }}
+        .quiz-badge {{ background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; }}
+        .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; }}
+        .quiz-title {{ font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; line-height: 1.4; }}
+        .quiz-meta {{ font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; display: flex; justify-content: space-between; }}
+        .launch-btn {{ display: block; text-align: center; background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: white; text-decoration: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.95rem; transition: filter 0.2s; }}
+        .launch-btn:hover {{ filter: brightness(1.1); }}
+        .no-quizzes {{ text-align: center; color: var(--text-secondary); grid-column: 1 / -1; padding: 3rem; }}
+    </style>
+</head>
+<body>
+    <div class="portal-container">
+        <header>
+            <h1>📚 פורטל המבחנים האינטראקטיביים</h1>
+            <p>מבחנים דיגיטליים עצמאיים לתרגול אינטראקטיבי עם בדיקה מיידית וסימון שאלות</p>
+            <div class="stats-bar">
+                <div class="stat-pill">סה"כ מבחנים: <strong>{len(built_quizzes)}</strong></div>
+                <div class="stat-pill">סה"כ שאלות: <strong>{sum(q.get('question_count', 0) for q in built_quizzes)}</strong></div>
+                <div class="stat-pill">מצב: <strong>100% עצמאי (Offline)</strong></div>
+            </div>
+        </header>
+
+        <div class="search-box">
+            <input type="text" class="search-input" id="quizSearch" placeholder="🔍 חפש מבחן לפי שם או נושא..." oninput="filterQuizzes()">
+        </div>
+
+        <div class="quiz-grid" id="quizGrid">
+            {cards_joined}
+        </div>
+    </div>
+
+    <script>
+        function filterQuizzes() {{
+            const query = document.getElementById('quizSearch').value.toLowerCase();
+            const cards = document.querySelectorAll('.quiz-card');
+            cards.forEach(card => {{
+                const title = card.getAttribute('data-title') || '';
+                card.style.display = title.includes(query) ? 'flex' : 'none';
+            }});
+        }}
+    </script>
+</body>
+</html>"""
+
+    with open(portal_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+    return portal_path
+
+
+# =========================================================================
+# Single Workspace Pipeline Runner
+# =========================================================================
+
+def process_workspace_auto(test_dir, agent_choice=None, auto_confirm=True):
+    """
+    Run the end-to-end automated processing pipeline for a single test workspace.
+    Returns path to built HTML if successful, or None.
+    """
+    test_name = os.path.basename(os.path.normpath(test_dir))
+    info = analyze_workspace(test_dir)
+
+    print(f"\n{C_BOLD}▶ Processing Workspace: {C_CYAN}{test_name}{C_RESET}")
 
     converted_pdf_names = []
-    if docx_files:
-        print(f"  {C_CYAN}[i] DOCX File(s) Found: {', '.join(docx_files)}{C_RESET}")
-        convert_choice = input("   [?] Convert all DOCX files to PDF now? (Y/n) [Default: Y]: ").strip().lower()
-        if convert_choice != 'n':
-            overwrite_existing = False
-            matching_existing = []
-            for docx_name in docx_files:
-                base_name = os.path.splitext(docx_name)[0]
-                expected_pdf = os.path.join(test_dir, f"{base_name}.pdf")
-                if os.path.exists(expected_pdf):
-                    matching_existing.append(os.path.basename(expected_pdf))
-
-            if matching_existing:
-                print(f"  {C_YELLOW}[!] Existing matching PDF(s): {', '.join(matching_existing)}{C_RESET}")
-                ow_choice = input("   [?] Overwrite those matching PDFs from DOCX? (y/N) [Default: N]: ").strip().lower()
-                overwrite_existing = (ow_choice == 'y')
-
-            backend_name, backend_value = detect_docx_converter()
-            if backend_name:
-                print(f"  {C_CYAN}[i] Converting DOCX files using backend: {backend_name}{C_RESET}")
-                summary = convert_docx_batch(
-                    docx_files,
-                    test_dir,
-                    backend_name,
-                    backend_value,
-                    overwrite_existing=overwrite_existing,
-                )
-                for src, dst in summary['converted']:
-                    converted_pdf_names.append(dst)
-                    print(f"  {C_GREEN}[✔] Converted: {src} -> {dst}{C_RESET}")
-                for src, reason in summary['skipped']:
-                    print(f"  {C_GRAY}[i] Skipped: {src} ({reason}){C_RESET}")
-                for src, reason in summary['failed']:
-                    print(f"  {C_YELLOW}[!] Failed: {src} ({reason}){C_RESET}")
-            else:
-                print(f"  {C_YELLOW}[!] No local DOCX-to-PDF converter was detected.{C_RESET}")
-                print("      Manual fallback:")
-                print("      1. Open each .docx file in Word/Docs")
-                print("      2. Export/Save As PDF in the same workspace folder")
-                print("      3. Return here and continue")
+    if info['docx_files']:
+        backend_name, backend_value = detect_docx_converter()
+        if backend_name:
+            print(f"  {C_CYAN}[i] Converting DOCX to PDF ({backend_name})...{C_RESET}")
+            summary = convert_docx_batch(info['docx_files'], test_dir, backend_name, backend_value)
+            for src, dst in summary['converted']:
+                converted_pdf_names.append(dst)
+                print(f"  {C_GREEN}[✔] Converted {src} -> {dst}{C_RESET}")
+        else:
+            print(f"  {C_YELLOW}[!] No local DOCX-to-PDF converter was detected.{C_RESET}")
+            if sys.stdin.isatty():
                 open_in_explorer(test_dir)
                 input("  Press Enter after exporting DOCX files to PDF...")
+        info = analyze_workspace(test_dir)
 
-            pdf_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.pdf')]
-            docx_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.docx')]
-        else:
-            print(f"  {C_GRAY}[i] DOCX conversion skipped by user.{C_RESET}")
+    pdf_files = sorted(info['pdf_files'], key=lambda x: x.lower())
+    if not pdf_files:
+        print(f"  {C_YELLOW}[!] No PDF file in {test_name}. Skipping.{C_RESET}")
+        return None
 
-    pdf_files = sorted(pdf_files, key=lambda x: x.lower())
     if converted_pdf_names:
         preferred = [p for p in converted_pdf_names if p in pdf_files]
-        if preferred:
-            selected_pdf = preferred[0]
-        else:
-            selected_pdf = pdf_files[0] if pdf_files else None
+        selected_pdf = preferred[0] if preferred else pdf_files[0]
     else:
-        selected_pdf = pdf_files[0] if pdf_files else None
+        selected_pdf = pdf_files[0]
+    pdf_path = os.path.join(test_dir, selected_pdf)
 
-    if pdf_files:
-        print(f"  {C_GREEN}[✔] PDF File Found: {selected_pdf}{C_RESET}")
-    else:
-        print(f"  {C_YELLOW}[!] WARNING: No PDF file found in {test_dir}{C_RESET}")
-        print("      Please add a PDF file (or convert DOCX to PDF) and run this workspace again.")
-        return
-
-    if csv_files:
-        print(f"  {C_GREEN}[✔] Answer Key Found: {csv_files[0]}{C_RESET}")
-    else:
-        print(f"  {C_CYAN}[i] NOTE: No answer key spreadsheet found.{C_RESET}")
-
-    print(f"\n {C_BOLD}[Step 4/6] Document Pre-processing & Format Analysis{C_RESET}")
-    print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
-
-    # PDF Type Detection
-    is_digital = False
-    if pdf_files:
-        pdf_path = os.path.join(test_dir, selected_pdf)
-        print("  [1/2] Analyzing PDF format (Digital vs Scanned)...")
-        run_script('1_detect_pdf_type.py', [pdf_path])
-        is_digital = is_pdf_digital(pdf_path)
-
-    # Answer Key Form Setup
-    form_number = "1"
-    if csv_files:
-        print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-        print(f"{C_CYAN}│ [2/2] ANSWER KEY FORM SETUP                                              │{C_RESET}")
-        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
-        print("   Enter the Form Number corresponding to this answer key.")
-        print("   (e.g., 111, 32, 76, 1, 0). Refer to your PDF title page if unsure.\n")
-        fn_input = input("   [?] Form Number [Default: 1]: ").strip()
-        if fn_input:
-            form_number = fn_input
-        print(f"\n  {C_CYAN}[i] Extracting answer key for Form {form_number}...{C_RESET}")
-        ans_file = os.path.join(test_dir, csv_files[0])
-        out_ans = os.path.join(test_dir, 'answers.json')
-        run_script('4_extract_csv_answers.py', [ans_file, form_number, '-o', out_ans])
-    else:
-        print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-        print(f"{C_CYAN}│ [2/2] FORM NUMBER SETUP (No answer spreadsheet found)                   │{C_RESET}")
-        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
-        print("   Is this Form 0 (Master Exam where option 1/א is always the answer)?")
-        print("   • Enter '0' to auto-generate Form Zero answer key")
-        print("   • Enter Form Number (e.g., 111, 32, 1) if adding answers manually later\n")
-        fn_input = input("   [?] Form Number [Default: 0 for Form Zero]: ").strip()
-        if not fn_input:
-            form_number = "0"
-        else:
-            form_number = fn_input
-        if form_number == "0":
-            print(f"\n  {C_GREEN}[✔] Form 0 selected! Auto-generating baseline answer key...{C_RESET}")
-            out_ans = os.path.join(test_dir, 'answers.json')
-            run_script('4_extract_csv_answers.py', ['none', '0', '-o', out_ans])
-
-    skip_step3 = input("\n   [?] Press Enter to run page rendering & text extraction, or 's' to skip: ").strip().lower()
-    if skip_step3 != 's' and pdf_files:
-        pdf_path = os.path.join(test_dir, selected_pdf)
-        print("\n  Page Cleaning Options:")
-        print("    • Press [Enter] for Standard cleaning (skips cover/instructions pages 1-4, 6,8,10...)")
-        print("    • Type custom pages to discard (e.g., '1-3, 5')")
-        print("    • Type 'none' to preserve all pages\n")
-        discard_pages = input("   [?] Discard pages [Default: standard]: ").strip()
-        if not discard_pages:
-            discard_pages = "std"
-
-        print(f"\n  {C_CYAN}[i] Rendering clean PDF pages...{C_RESET}")
+    # 2. Format analysis & Page rendering
+    run_script('1_detect_pdf_type.py', [pdf_path])
+    is_digital = is_pdf_digital(pdf_path)
+    if not info['has_pages']:
+        print(f"  {C_CYAN}[i] Rendering clean PDF pages...{C_RESET}")
         out_pages = os.path.join(test_dir, 'pages_output')
         clean_pdf = os.path.join(test_dir, f"{test_name}_clean.pdf")
-        run_script('3_render_pdf_pages.py', [pdf_path, '-o', out_pages, '--discard-pages', discard_pages, '--merged-pdf', clean_pdf])
-        
-        # Open rendered page output folder in Explorer for visual inspection / AI referencing
-        print("  Opening rendered pages output folder in Explorer...\n")
-        open_in_explorer(out_pages)
+        run_script('3_render_pdf_pages.py', [pdf_path, '-o', out_pages, '--discard-pages', 'std', '--merged-pdf', clean_pdf])
 
         if is_digital:
-            print(f"  {C_GREEN}[✔] DIGITAL PDF DETECTED: Extracting text automatically...{C_RESET}")
+            print(f"  {C_GREEN}[✔] Digital PDF detected: Extracting text...{C_RESET}")
             raw_md = os.path.join(test_dir, 'raw_text.md')
             img_dir = os.path.join(test_dir, 'images')
             page_map = os.path.join(test_dir, 'page_map.json')
             q_out = os.path.join(test_dir, 'questions.json')
-
             run_script('2_extract_text_fitz.py', [pdf_path, '-o', raw_md, '--extract-images', img_dir, '--page-map', page_map])
             run_script('5_parse_questions_md.py', [raw_md, '-o', q_out, '--image-dir', img_dir, '--page-map', page_map])
-        else:
-            print(f"  {C_YELLOW}[!] SCANNED PDF DETECTED: Skipping PyMuPDF text parsing.{C_RESET}")
-            print(f"      Rendered page images are ready in pages_output/ for AI agent extraction.\n")
 
-    # Step 5: AI Agent & Prompt Assistant
-    print(f"\n {C_BOLD}[Step 5/6] AI Agent Question Extraction & Proofreading{C_RESET}")
-    print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
+    # 3. Answer Key extraction
+    out_ans = os.path.join(test_dir, 'answers.json')
+    if info['csv_files']:
+        csv_file = os.path.join(test_dir, info['csv_files'][0])
+        print(f"  {C_CYAN}[i] Extracting answer key from {info['csv_files'][0]} (Form {info['form_number']})...{C_RESET}")
+        run_script('4_extract_csv_answers.py', [csv_file, info['form_number'], '-o', out_ans])
+    elif not os.path.exists(out_ans):
+        print(f"  {C_CYAN}[i] Setting baseline Form 0 answers...{C_RESET}")
+        run_script('4_extract_csv_answers.py', ['none', '0', '-o', out_ans])
 
-    q_exists = os.path.exists(os.path.join(test_dir, 'questions.json'))
-    if q_exists:
-        print(f"  {C_CYAN}[i] Automated text extraction is complete!{C_RESET}")
-        print("      Hebrew text extraction may benefit from an AI proofreading pass to fix reversed words.")
-        proof_choice = input("\n   [?] Run AI proofreading pass on questions.json? (Y/n) [Default: Y]: ").strip().lower()
-        if proof_choice == 'n':
-            print(f"  {C_CYAN}[i] Skipping AI proofreading pass. Proceeding to post-processing...{C_RESET}")
-            q_final = os.path.join(test_dir, 'questions.json')
-            # Jump directly to Step 6
-            run_step6(test_name, test_dir, q_final)
-            return
-        else:
-            print(f"\n  {C_CYAN}[i] Preparing AI proofreading prompt...{C_RESET}")
-    else:
-        print(f"  {C_CYAN}[i] AI Agent pass needed to extract questions from rendered pages into questions.json.{C_RESET}")
+    # 4. Generate Prompts / Dispatch Agent
+    has_answers_flag = "1" if os.path.isfile(out_ans) else "0"
+    detected_agent = detect_cli_agent() if agent_choice in [None, 'auto'] else (agent_choice if agent_choice != 'none' else None)
 
-    has_answers_flag = "1" if os.path.isfile(os.path.join(test_dir, 'answers.json')) else "0"
-    local_prompt_path = os.path.join(test_dir, 'prompt_local_agent.txt')
-    web_prompt_path = os.path.join(test_dir, 'prompt_web_ai.txt')
-
-    # Check CLI Agents
-    agent_found = None
-    for ag in ['agy', 'gemini', 'claude']:
-        if shutil.which(ag):
-            agent_found = ag
-            break
-
-    if agent_found:
-        print(f"  {C_GREEN}[✔] Detected CLI Agent: {agent_found}{C_RESET}")
-        # In non-interactive contexts (e.g., pytest), skip auto-launch prompts.
-        use_ag = 'n' if not sys.stdin.isatty() else input(
-            f"   [?] Launch {agent_found} automatically? (Y/n) [Default: Y]: "
-        ).strip().lower()
-        if use_ag != 'n':
-            # Generate local prompt on demand
-            run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
-            if os.path.isfile(local_prompt_path):
-                print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-                print(f"{C_CYAN}│ LAUNCHING LOCAL AGENT: {agent_found:<49} │{C_RESET}")
-                print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
-                print("   1. Opening agent in a new terminal window with prompt piped.")
-                print("   2. The agent will output/update questions.json automatically.")
-                print("   3. Once finished, return here and press Enter to continue.\n")
+    if detected_agent and not os.path.exists(os.path.join(test_dir, 'questions.json')):
+        print(f"  {C_CYAN}[i] Generating prompt and dispatching CLI agent: {detected_agent}...{C_RESET}")
+        run_script('generate_prompts.py', [test_dir, test_name, info['form_number'], has_answers_flag, 'local'])
+        prompt_path = os.path.join(test_dir, 'prompt_local_agent.txt')
+        if os.path.isfile(prompt_path):
+            try:
                 if sys.platform == 'win32':
-                    cmd_str = f'type "{local_prompt_path}" | {agent_found}'
+                    cmd_str = f'type "{prompt_path}" | {detected_agent}'
                     subprocess.Popen(['cmd', '/c', 'start', 'cmd', '/k', cmd_str], shell=True)
-                input("   Press Enter after the AI agent completes...")
+                else:
+                    subprocess.Popen([detected_agent], stdin=open(prompt_path, 'r'))
+            except Exception as e:
+                print(f"  {C_YELLOW}[!] Could not launch agent: {e}{C_RESET}")
+    else:
+        run_script('generate_prompts.py', [test_dir, test_name, info['form_number'], has_answers_flag, 'all'])
 
-    mode_title = "PROOFREADING ASSISTANT" if q_exists else "EXTRACTION ASSISTANT"
-    print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-    print(f"{C_CYAN}│ AI {mode_title:<69} │{C_RESET}")
-    print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
-    print("  Select a prompt helper option:")
-    print("    [1] LOCAL AGENT (agy, gemini, claude, Cursor, Antigravity, VS Code)")
-    print("        Generates prompt_local_agent.txt on demand.")
-    print("    [2] WEB AI (ChatGPT, Claude.ai, Gemini Web, Google AI Studio)")
-    print("        Generates prompt_web_ai.txt on demand & opens AI website.")
-    print("    [3] Print both prompts to console")
-    print("    [S] Skip prompt helper\n")
-
-    p_choice = input("   [?] Your choice (1/2/3/S) [Default: 1]: ").strip().lower()
-    if p_choice == '2':
-        run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'web'])
-        print(f"\n  {C_GREEN}[✔] Created {web_prompt_path}{C_RESET}")
-        print("  Open a Web AI assistant in browser?")
-        print("    [1] ChatGPT (chatgpt.com)")
-        print("    [2] Gemini Web (gemini.google.com)")
-        print("    [3] Claude Web (claude.ai)")
-        print("    [4] Google AI Studio (aistudio.google.com)")
-        print("    [N] Skip opening browser\n")
-        web_choice = input("   [?] Your choice (1/2/3/4/N): ").strip()
-        if web_choice == '1': webbrowser.open('https://chatgpt.com')
-        elif web_choice == '2': webbrowser.open('https://gemini.google.com')
-        elif web_choice == '3': webbrowser.open('https://claude.ai')
-        elif web_choice == '4': webbrowser.open('https://aistudio.google.com')
-    elif p_choice == '3':
-        run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'all'])
-        if os.path.isfile(local_prompt_path):
-            with open(local_prompt_path, 'r', encoding='utf-8') as f:
-                print(f"\n{C_GRAY}--- LOCAL PROMPT ---{C_RESET}\n{f.read()}\n")
-        if os.path.isfile(web_prompt_path):
-            with open(web_prompt_path, 'r', encoding='utf-8') as f:
-                print(f"\n{C_GRAY}--- WEB PROMPT ---{C_RESET}\n{f.read()}\n")
-    elif p_choice != 's':
-        run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
-        print(f"\n  {C_GREEN}[✔] Created {local_prompt_path}{C_RESET}")
-
-    if p_choice != 's':
-        print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-        print(f"{C_CYAN}│          NEXT STEPS: QUESTION EXTRACTION / PROOFREADING                  │{C_RESET}")
-        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}")
-        print("   1. Open the generated prompt file:")
-        print(f"      • Local: {local_prompt_path}")
-        print(f"      • Web:   {web_prompt_path}")
-        print("   2. Copy the prompt text and paste it into your AI assistant.")
-        print("   3. (If using Web AI for Scanned PDF) Upload page images from pages_output/.")
-        print(f"   4. Save the AI's returned JSON array as 'questions.json' into:")
-        print(f"      📁 {test_dir}")
-        print("   5. Once 'questions.json' is ready, return here and press Enter.")
-        print(f"{C_CYAN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
-        input("   [?] Press Enter when questions.json is ready in test folder...")
-
-    # Check for candidate JSON files
+    # 5. Markdown / JSON post-processing & Validation
     q_final = os.path.join(test_dir, 'questions.json')
-    if not os.path.exists(q_final):
-        candidates = ['final_questions.json', 'output.json', 'response.json', 'data.json', 'interactive_quiz.json']
-        found = False
-        for cand in candidates:
-            cand_p = os.path.join(test_dir, cand)
-            if os.path.exists(cand_p):
-                print(f"\n  {C_CYAN}[i] Found candidate {cand}. Renaming to questions.json...{C_RESET}")
-                shutil.move(cand_p, q_final)
-                found = True
-                break
+    run_step6(test_name, test_dir, q_final, auto_build=True)
 
-        if not found:
-            other_jsons = [
-                f for f in os.listdir(test_dir)
-                if f.lower().endswith('.json') and f.lower() not in ['answers.json', 'page_map.json', 'questions.json']
-            ]
-            if other_jsons:
-                target_json = other_jsons[0]
-                cand_p = os.path.join(test_dir, target_json)
-                print(f"\n  {C_CYAN}[i] Auto-detected question JSON file ({target_json}). Renaming to questions.json...{C_RESET}")
-                shutil.move(cand_p, q_final)
+    # Check if HTML built
+    html_files = [f for f in os.listdir(test_dir) if f.lower().endswith('.html')]
+    if html_files:
+        return os.path.join(test_dir, html_files[0])
+    return None
 
-    # Step 6: Post-processing & Validation
-    run_step6(test_name, test_dir, q_final)
 
-def run_step6(test_name, test_dir, q_final):
-    print(f"\n {C_BOLD}[Step 6/6] Automated Post-Processing & Validation{C_RESET}")
-    print(f" {C_GRAY}{'─' * 74}{C_RESET}\n")
-
-    # Auto-detect Markdown questions file (questions.md, output.md, questions.txt, etc.)
+def run_step6(test_name, test_dir, q_final, auto_build=True):
+    """Auto-detect Markdown, merge answers, validate JSON schema, and build HTML."""
+    # Check for Markdown questions file
     md_candidates = ['questions.md', 'output.md', 'questions.txt']
     found_md = None
     for cand in md_candidates:
@@ -836,73 +815,250 @@ def run_step6(test_name, test_dir, q_final):
                 should_parse_md = False
 
         if should_parse_md:
-            print(f"  {C_CYAN}[i] Auto-detected Markdown question file ({os.path.basename(found_md)}). Parsing into questions.json...{C_RESET}\n")
+            print(f"  {C_CYAN}[i] Parsing {os.path.basename(found_md)} -> questions.json...{C_RESET}")
             img_dir = os.path.join(test_dir, 'images')
             page_map = os.path.join(test_dir, 'page_map.json')
             run_script('5_parse_questions_md.py', [found_md, '-o', q_final, '--image-dir', img_dir, '--page-map', page_map])
 
-    # Auto-detect any exported JSON file that is not answers.json / page_map.json
+    # Auto-detect any candidate JSON file
     if not os.path.exists(q_final):
-        other_jsons = [
-            f for f in os.listdir(test_dir)
-            if f.lower().endswith('.json') and f.lower() not in ['answers.json', 'page_map.json', 'pdf_type_result.json', 'manifest.json', 'questions.json']
-        ]
-        if other_jsons:
-            target_json = other_jsons[0]
-            cand_p = os.path.join(test_dir, target_json)
-            print(f"  {C_CYAN}[i] Auto-detected question JSON file ({target_json}). Renaming to questions.json...{C_RESET}\n")
-            shutil.move(cand_p, q_final)
+        candidates = ['final_questions.json', 'output.json', 'response.json', 'data.json', 'interactive_quiz.json']
+        for cand in candidates:
+            cand_p = os.path.join(test_dir, cand)
+            if os.path.exists(cand_p):
+                shutil.move(cand_p, q_final)
+                break
 
     if os.path.exists(q_final):
-        print(f"  {C_CYAN}[i] Merging answer key into questions.json...{C_RESET}")
+        print(f"  {C_CYAN}[i] Merging answers & running QA checks...{C_RESET}")
         run_script('6_merge_json_answers.py', [test_dir])
-
-        print(f"\n  {C_CYAN}[i] Running QA schema validation...{C_RESET}")
         run_script('7_check_json.py', [q_final])
-
-        print(f"\n  {C_CYAN}[i] Updating test manifest...{C_RESET}")
         run_script('8_generate_manifest.py', [])
-
-        # Clean up intermediate scratch files
         cleanup_workspace_folder(test_dir)
 
-        print(f"\n  {C_GREEN}[✔] All post-processing steps completed successfully!{C_RESET}\n")
-        build_opt = input("   [?] Build standalone HTML quiz now? (Y/n) [Default: Y]: ").strip().lower()
-        if build_opt != 'n':
+        if auto_build:
+            print(f"  {C_GREEN}[✔] Compiling standalone HTML quiz...{C_RESET}")
             run_script('9_build_single_html.py', [test_dir])
-            
-            # Find generated HTML file
-            html_files = [f for f in os.listdir(test_dir) if f.endswith('.html')]
-            html_name = html_files[0] if html_files else f"{test_name}_interactive_quiz.html"
-            html_path = os.path.join(test_dir, html_name)
-
-            print(f"\n{C_GREEN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
-            print(f"{C_GREEN}│                       🎉 QUIZ BUILD COMPLETE!                           │{C_RESET}")
-            print(f"{C_GREEN}├──────────────────────────────────────────────────────────────────────────┤{C_RESET}")
-            print(f"{C_GREEN}│{C_RESET}  📄 Quiz File: {html_name:<57} {C_GREEN}│{C_RESET}")
-            print(f"{C_GREEN}│{C_RESET}  📁 Folder:    {test_dir:<57} {C_GREEN}│{C_RESET}")
-            print(f"{C_GREEN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
-            print("  Options:")
-            print("    [1] Open HTML quiz in default Web Browser")
-            print("    [2] Open test workspace folder in Explorer")
-            print("    [M] Return to Main Menu\n")
-
-            post_choice = input("   [?] Your choice (1/2/M) [Default: 1]: ").strip().lower()
-            if post_choice == '2':
-                open_in_explorer(test_dir)
-            elif post_choice != 'm':
-                if os.path.exists(html_path):
-                    webbrowser.open(html_path)
-                else:
-                    open_in_explorer(test_dir)
     else:
-        print(f"  {C_YELLOW}[!] questions.json not found in {test_dir}. Place questions.json to complete building.{C_RESET}\n")
+        print(f"  {C_GRAY}[i] questions.json pending for {test_name}. Ready for prompt copy-paste.{C_RESET}")
+
+
+# =========================================================================
+# Batch Pipeline & Flag Actions
+# =========================================================================
+
+def run_batch_pipeline(target_dir, agent_choice=None, auto_confirm=False, build_only=False, output_dir=None):
+    """
+    Main entry point for batch processing a folder or tests/ directory.
+    """
+    print_header()
+    check_prerequisites()
+
+    if output_dir is None:
+        output_dir = DEFAULT_OUTPUT_DIR
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 1. Scan and group
+    tests_dir = os.path.join(CLI_ROOT, 'tests')
+    workspaces = scan_and_group_inputs(target_dir, tests_dir)
+    if not workspaces:
+        print(f"  {C_YELLOW}[!] No exam workspaces or files found in: {target_dir}{C_RESET}")
+        print(f"      Drop .pdf or .docx files into '{target_dir}' and run again.\n")
+        return
+
+    workspaces_info = [analyze_workspace(w) for w in workspaces]
+    agent_found = detect_cli_agent() if agent_choice in [None, 'auto'] else agent_choice
+    conv_name, _ = detect_docx_converter()
+
+    # 2. Display 1-Screen Summary Table
+    display_batch_summary(workspaces_info, agent_found, conv_name)
+
+    # 3. Confirm proceed
+    if not auto_confirm and sys.stdin.isatty():
+        choice = input(f"   {C_BOLD}[?] Proceed with batch processing? (Y/n) [Default: Y]: {C_RESET}").strip().lower()
+        if choice == 'n':
+            print(f"\n{C_CYAN}Batch cancelled by user.{C_RESET}\n")
+            return
+
+    print(f"\n{C_CYAN}{'═' * 74}{C_RESET}")
+    print(f"{C_BOLD}🚀 Starting Batch Pipeline for {len(workspaces_info)} Exams...{C_RESET}")
+    print(f"{C_CYAN}{'═' * 74}{C_RESET}")
+
+    built_quizzes = []
+    for info in workspaces_info:
+        if build_only:
+            # Build ready only
+            if info['has_questions_json'] or info['has_questions_md']:
+                run_step6(info['name'], info['dir'], os.path.join(info['dir'], 'questions.json'), auto_build=True)
+        else:
+            process_workspace_auto(info['dir'], agent_choice=agent_choice, auto_confirm=True)
+
+        # Collect compiled HTML files
+        html_files = [f for f in os.listdir(info['dir']) if f.lower().endswith('.html')]
+        if html_files:
+            src_html = os.path.join(info['dir'], html_files[0])
+            dst_html = os.path.join(output_dir, f"{info['name']}.html")
+            try:
+                shutil.copy2(src_html, dst_html)
+            except Exception:
+                pass
+
+            # Read question count
+            q_count = 0
+            q_file = os.path.join(info['dir'], 'questions.json')
+            if os.path.isfile(q_file):
+                try:
+                    with open(q_file, 'r', encoding='utf-8') as qf:
+                        q_count = len(json.load(qf))
+                except Exception:
+                    pass
+
+            built_quizzes.append({
+                'name': info['name'],
+                'title': info['name'].replace('_', ' ').title(),
+                'question_count': q_count,
+                'html_name': f"{info['name']}.html",
+                'path': dst_html,
+            })
+
+    # Generate Master Batch Prompts Index
+    try:
+        from python_scripts.generate_prompts import generate_batch_prompts_index
+        batch_md = os.path.join(output_dir, 'BATCH_PROMPTS_INDEX.md')
+        generate_batch_prompts_index(workspaces_info, batch_md)
+    except Exception:
+        pass
+
+    # Generate Master Portal
+    portal_path = generate_master_portal(output_dir, built_quizzes)
+
+    print(f"\n{C_GREEN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
+    print(f"{C_GREEN}│{C_RESET} {C_BOLD}{C_WHITE}🎉 BATCH COMPLETE: {len(built_quizzes)} / {len(workspaces_info)} Quizzes Compiled Successfully!{C_RESET}          {C_GREEN}│{C_RESET}")
+    print(f"{C_GREEN}├──────────────────────────────────────────────────────────────────────────┤{C_RESET}")
+    print(f"{C_GREEN}│{C_RESET}  📁 Output Directory:    {output_dir:<49} {C_GREEN}│{C_RESET}")
+    print(f"{C_GREEN}│{C_RESET}  🌐 Master Quiz Portal:  {portal_path:<49} {C_GREEN}│{C_RESET}")
+    print(f"{C_GREEN}└──────────────────────────────────────────────────────────────────────────┘{C_RESET}\n")
+
+    if sys.stdin.isatty() and not auto_confirm:
+        open_choice = input("   [?] Open Master Portal in browser? (Y/n) [Default: Y]: ").strip().lower()
+        if open_choice != 'n':
+            webbrowser.open(portal_path)
+
+
+def watch_workspaces(target_dir, output_dir=None):
+    """Watch target directory for changes to questions.md or questions.json and auto-rebuild."""
+    if output_dir is None:
+        output_dir = DEFAULT_OUTPUT_DIR
+    os.makedirs(output_dir, exist_ok=True)
+
+    tests_dir = os.path.join(CLI_ROOT, 'tests')
+    print(f"\n{C_CYAN}[i] 👁️  Watch Mode Active! Monitoring workspaces in {tests_dir}...{C_RESET}")
+    print(f"      Save any questions.md or questions.json to trigger instant re-compilation.")
+    print(f"      Press Ctrl+C to stop.\n")
+
+    mtimes = {}
+    try:
+        while True:
+            workspaces = [os.path.join(tests_dir, d) for d in os.listdir(tests_dir) if os.path.isdir(os.path.join(tests_dir, d))]
+            for w in workspaces:
+                for target_file in ['questions.md', 'questions.json']:
+                    fp = os.path.join(w, target_file)
+                    if os.path.isfile(fp):
+                        mtime = os.path.getmtime(fp)
+                        if fp in mtimes and mtime > mtimes[fp]:
+                            print(f"\n  {C_CYAN}[⚡] Change detected in {os.path.basename(w)}/{target_file}! Rebuilding...{C_RESET}")
+                            run_step6(os.path.basename(w), w, os.path.join(w, 'questions.json'), auto_build=True)
+                            # Copy to output
+                            html_files = [f for f in os.listdir(w) if f.lower().endswith('.html')]
+                            if html_files:
+                                shutil.copy2(os.path.join(w, html_files[0]), os.path.join(output_dir, f"{os.path.basename(w)}.html"))
+                                print(f"  {C_GREEN}[✔] Updated quiz: {output_dir}/{os.path.basename(w)}.html{C_RESET}")
+                        mtimes[fp] = mtime
+            time.sleep(1.5)
+    except KeyboardInterrupt:
+        print("\nWatch mode stopped.")
+
+
+def check_prerequisites():
+    print(f" {C_BOLD}[Step 1/6] System Environment Check{C_RESET}")
+    print(f" {C_GRAY}{'─' * 74}{C_RESET}")
+
+    missing = []
+    if fitz is None:
+        missing.append("pymupdf")
+    if pd is None:
+        missing.append("pandas")
+
+    if missing:
+        print(f"  {C_YELLOW}[!] Notice: Optional libraries missing ({', '.join(missing)}).{C_RESET}")
+        print(f"      PDF/Excel fallback scripts will run via system handlers if needed.\n")
+    else:
+        print(f"  {C_GREEN}[✔] Python Core Environment & Libraries are ready.{C_RESET}\n")
+
+
+def start_local_server(port=8000):
+    web_dir = os.path.join(MEI_DIR, 'web')
+    if not os.path.isdir(web_dir):
+        web_dir = os.path.join(CLI_ROOT, 'web')
+    if not os.path.isdir(web_dir):
+        web_dir = CLI_ROOT
+
+    os.chdir(web_dir)
+    handler = http.server.SimpleHTTPRequestHandler
+    httpd = socketserver.TCPServer(("", port), handler)
+    print(f"\n  {C_GREEN}[✔] Local Web Server active at http://localhost:{port}/{C_RESET}")
+    print(f"      Opening default browser...\n")
+
+    def serve():
+        httpd.serve_forever()
+
+    t = threading.Thread(target=serve, daemon=True)
+    t.start()
+    time.sleep(0.5)
+    target_url = f"http://localhost:{port}/index.html" if os.path.isfile(os.path.join(web_dir, 'index.html')) else f"http://localhost:{port}/"
+    webbrowser.open(target_url)
+
+
+def process_workspace(test_name, test_dir):
+    """Legacy interactive single-workspace handler for backward compatibility."""
+    return process_workspace_auto(test_dir, agent_choice='auto', auto_confirm=False)
+
+
+def interactive_wizard():
+    """Main interactive wizard routing to batch runner or server."""
+    run_batch_pipeline(TESTS_DIR, auto_confirm=False)
+
+
+# =========================================================================
+# Main CLI Entry Point
+# =========================================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Interactive Hebrew Quiz Builder Executable")
-    parser.add_argument("--server", action="store_true", help="Start local web server immediately")
-    parser.add_argument("--port", type=int, default=8000, help="Port for local web server")
+    parser = argparse.ArgumentParser(description="Modernized Batch Interactive Hebrew Quiz Builder")
+    parser.add_argument("folder", nargs="?", default=None, help="Target folder containing exam files or subdirectories (default: ./tests)")
+    parser.add_argument("--gui", "-g", action="store_true", help="Launch the modern Desktop GUI Application")
+    parser.add_argument("--build", "-b", action="store_true", help="Quick-build all ready workspaces without re-extracting")
+    parser.add_argument("--watch", "-w", action="store_true", help="Live watch mode: auto-compile quizzes on questions.md/json save")
+    parser.add_argument("--agent", "-a", default=None, help="CLI Agent to use (agy, gemini, claude, none, auto)")
+    parser.add_argument("--yes", "-y", action="store_true", help="Non-interactive mode (auto-proceed with batch)")
+    parser.add_argument("--output", "-o", default=None, help="Output folder for compiled quizzes (default: ./output)")
+    parser.add_argument("--server", "-s", action="store_true", help="Start local web server immediately")
+    parser.add_argument("--port", "-p", type=int, default=8000, help="Port for local web server")
+
     args = parser.parse_args()
+
+    target_dir = args.folder or TESTS_DIR
+
+    if args.gui:
+        try:
+            import tkinter as tk
+            from quiz_builder_gui import QuizBuilderGUI
+            root = tk.Tk()
+            app = QuizBuilderGUI(root, initial_dir=target_dir)
+            root.mainloop()
+            return
+        except Exception as e:
+            print(f"Error launching GUI: {e}. Running CLI...")
 
     if args.server:
         start_local_server(args.port)
@@ -911,8 +1067,19 @@ def main():
                 time.sleep(1)
         except KeyboardInterrupt:
             print("\nServer stopped.")
+        return
+
+    if args.watch:
+        watch_workspaces(target_dir, output_dir=args.output)
     else:
-        interactive_wizard()
+        run_batch_pipeline(
+            target_dir,
+            agent_choice=args.agent,
+            auto_confirm=args.yes or not sys.stdin.isatty(),
+            build_only=args.build,
+            output_dir=args.output,
+        )
+
 
 if __name__ == "__main__":
     main()

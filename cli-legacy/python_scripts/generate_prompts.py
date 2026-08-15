@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import argparse
 
@@ -214,6 +214,80 @@ Rules:
         with open(web_enhanced_path, "w", encoding="utf-8") as f:
             f.write(web_prompt_enhanced)
         print(f"  [OK] Created web AI enhanced prompt: {web_enhanced_path}")
+
+
+def generate_batch_prompts_index(workspaces_info, output_path):
+    """
+    Generate a unified BATCH_PROMPTS_INDEX.md aggregating copyable prompts
+    and instructions for all tests in a batch.
+    """
+    lines = [
+        "# 📋 Master Batch AI Prompts Index",
+        "",
+        "> This document aggregates all AI prompts for your batch of exams.",
+        "> Copy the prompt for each exam and paste it into **ChatGPT**, **Claude.ai**, **Gemini Web**, or **Google AI Studio**.",
+        "",
+        "## 📑 Tests in this Batch",
+        "",
+        "| # | Test Name | Form | Source Files | Prompt File |",
+        "|---|---|---|---|---|",
+    ]
+
+    for idx, info in enumerate(workspaces_info, 1):
+        name = info.get("name", f"test_{idx}")
+        form = info.get("form_number", "0")
+        src = ", ".join(info.get("source_files", [])) or "PDF"
+        prompt_rel = os.path.join("tests", name, "prompt_web_ai.txt").replace("\\", "/")
+        lines.append(f"| {idx} | **{name}** | Form {form} | `{src}` | [`{prompt_rel}`]({prompt_rel}) |")
+
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## 🚀 Copy-Paste Prompts per Exam",
+        "",
+    ])
+
+    for idx, info in enumerate(workspaces_info, 1):
+        name = info.get("name", f"test_{idx}")
+        test_dir = info.get("dir", "")
+        form = info.get("form_number", "0")
+        has_ans = bool(info.get("csv_files") or os.path.isfile(os.path.join(test_dir, "answers.json")))
+        web_prompt_path = os.path.join(test_dir, "prompt_web_ai.txt")
+        
+        if not os.path.isfile(web_prompt_path) and os.path.isdir(test_dir):
+            try:
+                generate_prompts(test_dir, name, form, has_ans, target="web")
+            except Exception:
+                pass
+
+        prompt_content = ""
+        if os.path.isfile(web_prompt_path):
+            with open(web_prompt_path, "r", encoding="utf-8") as pf:
+                prompt_content = pf.read().strip()
+
+        pages_dir = os.path.join(test_dir, "pages_output")
+        pages_count = len(os.listdir(pages_dir)) if os.path.isdir(pages_dir) else 0
+
+        lines.extend([
+            f"### Exam {idx}: `{name}`",
+            f"- **Workspace:** `{test_dir}`",
+            f"- **Rendered Pages:** {pages_count} pages in `{test_dir}/pages_output/`",
+            f"- **Target Output:** Save returned Markdown as `{test_dir}/questions.md`",
+            "",
+            "```text",
+            prompt_content or f"(Generate prompt by running generate_prompts.py on {test_dir})",
+            "```",
+            "",
+            "---",
+            "",
+        ])
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    print(f"  [✔] Generated Master Batch Prompts Index: {output_path}")
+    return output_path
 
 
 if __name__ == "__main__":
