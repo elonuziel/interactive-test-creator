@@ -7,7 +7,8 @@ const {
     extractAnswersForForm,
     mergeAnswers,
     getStorageKey,
-    getCustomSelectedIndices
+    getCustomSelectedIndices,
+    validateQuestions
 } = require('../quiz-core.js');
 
 function runTest(suiteName, name, fn) {
@@ -79,6 +80,16 @@ runTest('Storage Hashing', 'Generates deterministic keys based on the full quest
     assert.ok(getStorageKey(first).startsWith('quiz_answers_'));
 });
 
+runTest('Question Validation', 'Rejects malformed questions with actionable errors', () => {
+    const errors = validateQuestions([
+        { question: '', options: ['only one'], correctIndex: 3 },
+        { question: 'Valid', options: ['A', 'B'], correctIndex: 0, sourcePage: 0 }
+    ]);
+    assert.strictEqual(errors.length, 4);
+    assert.ok(errors.some((error) => error.includes('שאלה 1: חסר טקסט')));
+    assert.ok(errors.some((error) => error.includes('שאלה 2: sourcePage אינו תקין')));
+});
+
 runTest('Mix & Match Custom Practice', 'Combines categories and manual selections without duplicates', () => {
     const answers = [
         { selectedOptionId: 1, isCorrect: false },
@@ -94,6 +105,23 @@ runTest('Mix & Match Custom Practice', 'Combines categories and manual selection
         flagged: true
     }, [2]);
     assert.deepStrictEqual(selected, [0, 2, 3]);
+});
+
+runTest('Standalone Export', 'Escapes script terminators and inlines scripts', () => {
+    const QuizExport = require('../quiz-export.js');
+    const template = '<link rel="stylesheet" href="style.css"><script id="quiz-data" type="application/json"></script><script src="quiz-core.js"></script><script src="app.js"></script>';
+    let html = QuizExport.injectStylesheet(template, 'body{}');
+    html = QuizExport.injectInlineQuestions(html, [{ question: '</script><script>alert(1)</script>', options: ['A', 'B'], correctIndex: 0 }]);
+    html = QuizExport.injectScript(html, 'quiz-core.js', 'console.log("core");');
+    html = QuizExport.injectScript(html, 'app.js', 'console.log("app");');
+
+    assert.strictEqual((html.match(/id="quiz-data"/g) || []).length, 1);
+    assert.ok(!html.includes('</script><script>alert(1)'));
+    assert.ok(html.includes('<style>body{}</style>'));
+    assert.ok(html.includes('<script>console.log("core");</script>'));
+    assert.ok(html.includes('<script>console.log("app");</script>'));
+    assert.ok(!html.includes('src="quiz-core.js"'));
+    assert.ok(!html.includes('src="app.js"'));
 });
 
 console.log('\n──────────────────────────────────────────────────────────────');

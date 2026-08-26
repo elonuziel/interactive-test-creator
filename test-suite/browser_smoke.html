@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Browser Smoke Checklist</title>
+    <style>
+        body { max-width: 760px; margin: 2rem auto; padding: 0 1rem; font: 16px system-ui, sans-serif; line-height: 1.5; }
+        li { margin: .75rem 0; }
+        code { background: #f1f5f9; padding: .15rem .35rem; border-radius: .25rem; }
+        .note { padding: 1rem; background: #eff6ff; border: 1px solid #93c5fd; border-radius: .5rem; }
+    </style>
+</head>
+<body>
+    <h1>Builder → Quiz browser smoke test</h1>
+    <p class="note">This checklist intentionally uses no external browser automation dependency. Run it from the local HTTP server and record any failing checkpoint in the issue/PR.</p>
+    <ol>
+        <li>Open <a href="../index.html" target="_blank" rel="noopener">the builder</a>. Confirm the page loads without a console error.</li>
+        <li>Import a valid questions JSON file. Confirm question cards appear in the preview.</li>
+        <li>Edit question text and an option. Confirm the edited values remain visible after another edit.</li>
+        <li>Click <strong>הורד מבחן עצמאי</strong>. Confirm an HTML file downloads successfully.</li>
+        <li>Open the downloaded HTML file. Confirm it loads questions without a <code>questions.json</code> request.</li>
+        <li>Start the quiz, answer one question, navigate, and return. Confirm the answer remains selected.</li>
+        <li>Refresh the standalone quiz before completing it. Confirm the resume notice appears.</li>
+        <li>Open browser developer tools and confirm there are no errors during the flow.</li>
+    </ol>
+</body>
+</html>

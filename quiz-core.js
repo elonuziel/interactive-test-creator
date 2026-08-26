@@ -170,6 +170,31 @@
         return `quiz_answers_${Math.abs(hash)}`;
     }
 
+    function validateQuestions(questions) {
+        const errors = [];
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return ['לא נמצאו שאלות.'];
+        }
+        questions.forEach((question, index) => {
+            const number = index + 1;
+            if (!question || typeof question !== 'object') {
+                errors.push(`שאלה ${number}: המבנה אינו אובייקט.`);
+                return;
+            }
+            if (!String(question.question || '').trim()) errors.push(`שאלה ${number}: חסר טקסט.`);
+            if (!Array.isArray(question.options) || question.options.length < 2) {
+                errors.push(`שאלה ${number}: נדרשות לפחות 2 תשובות.`);
+            }
+            if (Array.isArray(question.options) && (!Number.isInteger(question.correctIndex) || question.correctIndex < 0 || question.correctIndex >= question.options.length)) {
+                errors.push(`שאלה ${number}: correctIndex אינו תקין.`);
+            }
+            if (question.sourcePage !== undefined && (!Number.isInteger(Number(question.sourcePage)) || Number(question.sourcePage) < 1)) {
+                errors.push(`שאלה ${number}: sourcePage אינו תקין.`);
+            }
+        });
+        return errors;
+    }
+
     function getCustomSelectedIndices(questions, userAnswers, userFlags, categories = {}, manualIndices = []) {
         const selected = new Set();
         (questions || []).forEach((question, index) => {
@@ -192,6 +217,7 @@
         extractAnswersForForm,
         mergeAnswers,
         getStorageKey,
-        getCustomSelectedIndices
+        getCustomSelectedIndices,
+        validateQuestions
     };
 }));

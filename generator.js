@@ -37,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
         formNumber: document.getElementById('form-number'),
         mergeAnswersBtn: document.getElementById('merge-answers-btn'),
         autoAttachDiagramsBtn: document.getElementById('auto-attach-diagrams-btn'),
-        stripQuestionHeadersBtn: document.getElementById('strip-question-headers-btn'),
         stripQuestionHeadersBtnPreview: document.getElementById('strip-question-headers-btn-preview'),
         ocrEngine: document.getElementById('ocr-engine'),
         llmPolicy: document.getElementById('llm-policy'),
@@ -52,17 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
         scannedActionsBox: document.getElementById('scanned-actions-box'),
         digitalActionsBox: document.getElementById('digital-actions-box'),
         runDigitalLocalBtn: document.getElementById('run-digital-local-btn'),
-        showDigitalPromptBtn: document.getElementById('show-digital-prompt-btn'),
         digitalPromptExpandable: document.getElementById('digital-prompt-expandable'),
         copyDigitalPromptBtn: document.getElementById('copy-digital-prompt-btn'),
         digitalLlmPromptBox: document.getElementById('digital-llm-prompt-box'),
-        showApiSettingsBtn: document.getElementById('show-api-settings-btn'),
         toggleProcessingSettingsBtn: document.getElementById('toggle-processing-settings-btn'),
         processingSettingsContainer: document.getElementById('processing-settings-container'),
         copyPromptBtn: document.getElementById('copy-prompt-btn'),
         llmPromptBox: document.getElementById('llm-prompt-box'),
-        downloadCleanPdfMain: document.getElementById('download-clean-pdf-main'),
-        presetStdBtnMain: document.getElementById('preset-std-btn-main'),
         pdfSidebarCard: document.getElementById('pdf-sidebar-card'),
         toggleSidebarCollapseBtn: document.getElementById('toggle-sidebar-collapse-btn'),
         builderLayout: document.getElementById('builder-layout'),
@@ -2064,6 +2059,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const extractAnswersForForm = window.QuizCore.extractAnswersForForm;
 
     const mergeAnswers = window.QuizCore.mergeAnswers;
+    const validateQuestions = window.QuizCore.validateQuestions;
 
     // ── Interactive PDF Page Crop Modal Controller ───────────────────────────
     let currentCropTargetIndex = null;
@@ -2685,12 +2681,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const [indexHtml, styleCss, appJs] = await Promise.all([
+            const [indexHtml, styleCss, quizCoreJs, appJs] = await Promise.all([
                 fetch('quiz_player.html').then((response) => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     return response.text();
                 }),
                 fetch('style.css').then((response) => {
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return response.text();
+                }),
+                fetch('quiz-core.js').then((response) => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     return response.text();
                 }),
@@ -2700,13 +2700,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             ]);
 
-            state.templateCache = { indexHtml, styleCss, appJs };
+            state.templateCache = { indexHtml, styleCss, quizCoreJs, appJs };
             return state.templateCache;
         } catch (err) {
             if (window.location.protocol === 'file:') {
                 throw new Error('לא ניתן ליצור קובץ מבחן בעת הרצה ישירה מקובץ מקומי (file://). דפדפנים חוסמים טעינת תבניות מסיבות אבטחה. הפעל שרת מקומי (כגון Live Server או npx serve) ונסה שוב.');
             }
-            throw new Error(`טעינת תבניות המבחן נכשלה (${err.message}). ודא שהקבצים quiz_player.html, style.css, app.js קיימים בתיקייה.`);
+            throw new Error(`טעינת תבניות המבחן נכשלה (${err.message}). ודא שהקבצים quiz_player.html, style.css, quiz-core.js, app.js קיימים בתיקייה.`);
         }
     }
 
@@ -2731,6 +2731,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function createStandaloneQuizHtml() {
+        const validationErrors = validateQuestions(state.questions);
+        if (validationErrors.length) {
+            throw new Error(`לא ניתן לייצא: ${validationErrors.slice(0, 5).join(' ')}`);
+        }
+
         const shouldCompress = elements.compressExportImages ? elements.compressExportImages.checked : false;
         const qualityVal = Number(elements.compressQualitySlider?.value) || 75;
         const quality = Math.min(Math.max(qualityVal, 10), 90) / 100;
@@ -2752,27 +2757,13 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }));
 
-        const { indexHtml, styleCss, appJs } = await getTemplateSources();
-        const inlinedCssHtml = indexHtml.replace(
-            /<link rel="stylesheet" href="style\.css">/,
-            `<style>${styleCss}</style>`
-        );
-
-        // Ensure exported standalone HTML always points to the online builder,
-        // even if quiz_player.html was cached before a local edit.
+        const { indexHtml, styleCss, quizCoreJs, appJs } = await getTemplateSources();
+        const styledHtml = window.QuizExport.injectStylesheet(indexHtml, styleCss);
         const onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
-        const standaloneNavHtml = inlinedCssHtml.replace(
-            /<a\s+[^>]*id="builder-nav-link"[^>]*>[\s\S]*?<\/a>/i,
-            `<a href="${onlineBuilderUrl}" id="builder-nav-link" class="nav-link" title="פתח יוצר מבחן אונליין">יוצר מבחן אונליין ←</a>`
-        );
-
-        const appScript = appJs.replace(/<\/(script)/gi, '<\\/$1');
-        const payload = JSON.stringify(cleanedQuestions, null, 2);
-
-        return standaloneNavHtml.replace(
-            /<script src="app\.js"><\/script>/,
-            `<script>window.__INLINE_QUESTIONS__=${payload};(function(){const originalFetch=window.fetch.bind(window);window.fetch=function(input,init){const url=typeof input==='string'?input:(input&&input.url)||'';if(typeof url==='string'&&/questions\\.json(?:\\?|$)/.test(url)){return Promise.resolve(new Response(JSON.stringify(window.__INLINE_QUESTIONS__),{headers:{'Content-Type':'application/json'}}));}return originalFetch(input,init);};})();</script><script>${appScript}</script>`
-        );
+        const standaloneNavHtml = window.QuizExport.setBuilderLink(styledHtml, onlineBuilderUrl);
+        const dataHtml = window.QuizExport.injectInlineQuestions(standaloneNavHtml, cleanedQuestions);
+        const withCore = window.QuizExport.injectScript(dataHtml, 'quiz-core.js', quizCoreJs);
+        return window.QuizExport.injectScript(withCore, 'app.js', appJs);
     }
 
     async function runParse() {
@@ -2929,6 +2920,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
                 state.questions = await verifyTestWithGemini(state.questions, apiKey);
             }
+        }
+
+        const validationErrors = validateQuestions(state.questions);
+        if (validationErrors.length) {
+            throw new Error(`נמצאו שאלות לא תקינות: ${validationErrors.slice(0, 5).join(' ')}`);
         }
 
         renderPreview();
@@ -3091,7 +3087,12 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error('JSON לא זוהה כמבנה שאלות נתמך.');
         }
 
-        return normalizeQuestionsJson(asArray);
+        const normalized = normalizeQuestionsJson(asArray);
+        const validationErrors = validateQuestions(normalized);
+        if (validationErrors.length) {
+            throw new Error(`מבנה השאלות אינו תקין: ${validationErrors.slice(0, 5).join(' ')}`);
+        }
+        return normalized;
     }
 
     // ── PDF Page Sidebar & Thumbnail Generator ─────────────────────────────────
@@ -3381,13 +3382,11 @@ STRICT EXTRACTION & FORMATTING RULES:
 
     // Preset buttons & Clean PDF download listeners
     elements.presetStdBtn?.addEventListener('click', applyStandardFilter);
-    elements.presetStdBtnMain?.addEventListener('click', applyStandardFilter);
     elements.presetEvenOddBtn?.addEventListener('click', toggleEvenOddFilter);
     elements.presetBlankBtn?.addEventListener('click', toggleEvenOddFilter);
     elements.presetSelectAllBtn?.addEventListener('click', () => selectAllPages(true));
     elements.presetDeselectAllBtn?.addEventListener('click', () => selectAllPages(false));
     elements.downloadCleanPdf?.addEventListener('click', downloadCleanPdf);
-    elements.downloadCleanPdfMain?.addEventListener('click', downloadCleanPdf);
 
     elements.toggleSidebarCollapseBtn?.addEventListener('click', () => {
         if (!elements.pdfSidebarCard) return;
@@ -3596,7 +3595,6 @@ STRICT EXTRACTION & FORMATTING RULES:
 
     elements.mergeAnswersBtn?.addEventListener('click', () => tryMergeAnswersFromCsv(true));
     elements.autoAttachDiagramsBtn?.addEventListener('click', autoAttachDiagramPageImages);
-    elements.stripQuestionHeadersBtn?.addEventListener('click', stripAllQuestionHeaderPrefixes);
     elements.stripQuestionHeadersBtnPreview?.addEventListener('click', stripAllQuestionHeaderPrefixes);
 
     // jsonFile Upload Listener (Supports questions.json and questions.md)
@@ -3702,7 +3700,6 @@ STRICT EXTRACTION & FORMATTING RULES:
         }
     }
 
-    elements.showApiSettingsBtn?.addEventListener('click', () => toggleProcessingSettings(true));
     elements.toggleProcessingSettingsBtn?.addEventListener('click', () => toggleProcessingSettings(false));
 
     // Copy prompt helper listener

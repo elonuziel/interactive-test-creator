@@ -155,11 +155,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Fetch Questions ───────────────────────────────────────────────────────
-    fetch('questions.json')
-        .then(r => {
+    const inlineQuestions = document.getElementById('quiz-data')?.textContent.trim();
+    const questionsSource = inlineQuestions
+        ? Promise.resolve(JSON.parse(inlineQuestions))
+        : fetch('questions.json').then(r => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json();
-        })
+        });
+
+    questionsSource
         .then(data => {
             if (!Array.isArray(data) || data.length === 0) {
                 throw new Error('questions.json is empty or malformed');

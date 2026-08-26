@@ -59,6 +59,8 @@ Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading di
 interactive-test-creator/
 ├── index.html            # Web Quiz Builder Interface (GitHub Pages Root)
 ├── generator.js          # OCR, Gemini API, & PDF Parser Engine
+├── quiz-core.js          # Shared question, answer, and quiz utilities
+├── quiz-export.js        # Standalone export template helpers
 ├── quiz_player.html      # Standalone Quiz Player Shell
 ├── app.js                # Quiz Engine & Navigation
 ├── style.css             # Unified RTL & Theme System
