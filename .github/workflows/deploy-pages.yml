@@ -39,6 +39,15 @@ jobs:
       - name: Run Component Integrity Unit Tests
         run: node test-suite/run_tests.js
 
+      - name: Install browser test dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser smoke tests
+        run: npm run test:browser
+
       - name: Prepare site artifact
         run: |
           mkdir -p site

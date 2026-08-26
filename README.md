@@ -48,8 +48,10 @@ Turn scanned or digital Hebrew exam PDFs into fully interactive, self-grading di
 
 - **Local Development Launcher (`start_test_server.bat`)**: Double-click to automatically launch a local HTTP server on port 8080 (detects Python or Node), open the browser, and present an interactive CLI menu.
 - **In-Browser Test Runner (`test-suite/test_runner.html`)**: English component test suite with real-time execution timing (`ms`), performance metric cards, and payload inspection.
+- **Browser Smoke Checklist (`test-suite/browser_smoke.html`)**: Manual builder → export → standalone-player verification checklist.
 - **Node.js CLI Unit Tests (`test-suite/run_tests.js`)**: Headless unit test script using `node:assert` for local terminal verification.
-- **Automated GitHub Actions CI (`.github/workflows/deploy-pages.yml`)**: Automated CI pipeline running unit tests on every push before publishing to GitHub Pages.
+- **Playwright Browser Tests (`test-suite/browser/`)**: Automated import, edit, export, and standalone-player resume coverage. Run with `npm install`, `npx playwright install chromium`, then `npm run test:browser`.
+- **Automated GitHub Actions CI (`.github/workflows/deploy-pages.yml`)**: Automated unit and browser tests on every push before publishing to GitHub Pages.
 
 ---
 
@@ -66,7 +68,7 @@ interactive-test-creator/
 ├── style.css             # Unified RTL & Theme System
 ├── favicon.svg           # Application SVG Favicon
 ├── start_test_server.bat # Local HTTP Server & Test Launcher
-├── test-suite/           # In-Browser & Node.js Component Unit Tests
+├── test-suite/           # In-Browser, Node, and Playwright tests
 ├── vendor/               # Third-party dependencies (PDF.js)
 ├── .github/workflows/    # Automated CI/CD Pages deployment workflow
 ├── cli-legacy/           # Legacy Python scripts & batch wizard

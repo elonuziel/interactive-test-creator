@@ -21,6 +21,12 @@ cli-legacy/build/
 # Generated Standalone Quiz Exports
 interactive_quiz*.html
 
+# Playwright output
+test-results/
+playwright-report/
+blob-report/
+
+
 # OS & IDE Artifacts
 .DS_Store
 Thumbs.db
