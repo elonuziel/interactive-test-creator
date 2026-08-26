@@ -133,18 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── localStorage Persistence ──────────────────────────────────────────────
-    function getStorageKey() {
-        if (!questions || !questions.length) return 'quiz_answers_v1';
-        let hash = 0;
-        const lastIdx = questions.length - 1;
-        const midIdx = Math.floor(questions.length / 2);
-        const sampleText = (questions[0]?.question || '') + (questions[midIdx]?.question || '') + (questions[lastIdx]?.question || '') + questions.length;
-        for (let i = 0; i < sampleText.length; i++) {
-            hash = ((hash << 5) - hash) + sampleText.charCodeAt(i);
-            hash |= 0;
-        }
-        return `quiz_answers_${Math.abs(hash)}`;
-    }
+    const getStorageKey = () => window.QuizCore.getStorageKey(questions);
 
     function saveProgress() {
         localStorage.setItem(getStorageKey(), JSON.stringify({
@@ -357,31 +346,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Custom Practice Mix & Match ───────────────────────────────────────────
     function getCustomSelectedIndices() {
-        const selected = new Set();
-
-        questions.forEach((q, i) => {
-            const answer = userAnswers[i];
-            const isCorrect = answer && answer.isCorrect;
-            const isUnanswered = !answer;
-
-            if (chkMixWrong && chkMixWrong.checked && !isCorrect && !isUnanswered) {
-                selected.add(i);
-            }
-            if (chkMixUnanswered && chkMixUnanswered.checked && isUnanswered) {
-                selected.add(i);
-            }
-            if (chkMixFlagged && chkMixFlagged.checked && userFlags[i]) {
-                selected.add(i);
-            }
-        });
-
-        manualSelectedIndices.forEach(idx => {
-            if (idx >= 0 && idx < questions.length) {
-                selected.add(idx);
-            }
-        });
-
-        return Array.from(selected).sort((a, b) => a - b);
+        return window.QuizCore.getCustomSelectedIndices(
+            questions,
+            userAnswers,
+            userFlags,
+            {
+                wrong: !!chkMixWrong?.checked,
+                unanswered: !!chkMixUnanswered?.checked,
+                flagged: !!chkMixFlagged?.checked
+            },
+            Array.from(manualSelectedIndices)
+        );
     }
 
     function updateCustomPracticeSelection() {

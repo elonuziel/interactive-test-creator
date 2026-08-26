@@ -2046,44 +2046,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return formatted;
     }
 
-    function parseCsvRows(csvText) {
-        const rows = [];
-        let row = [];
-        let value = '';
-        let inQuotes = false;
-
-        for (let i = 0; i < csvText.length; i++) {
-            const char = csvText[i];
-            const next = csvText[i + 1];
-
-            if (char === '"') {
-                if (inQuotes && next === '"') {
-                    value += '"';
-                    i++;
-                } else {
-                    inQuotes = !inQuotes;
-                }
-            } else if (char === ',' && !inQuotes) {
-                row.push(value);
-                value = '';
-            } else if ((char === '\n' || char === '\r') && !inQuotes) {
-                if (char === '\r' && next === '\n') i++;
-                row.push(value);
-                value = '';
-                if (row.some((cell) => cell.trim() !== '')) rows.push(row);
-                row = [];
-            } else {
-                value += char;
-            }
-        }
-
-        if (value.length || row.length) {
-            row.push(value);
-            if (row.some((cell) => cell.trim() !== '')) rows.push(row);
-        }
-
-        return rows;
-    }
+    const parseCsvRows = window.QuizCore.parseCsvRows;
 
     function parseXlsxToRows(arrayBuffer) {
         if (!window.XLSX) {
@@ -2098,92 +2061,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return rows.filter((row) => row.some((cell) => String(cell).trim() !== ''));
     }
 
-    function extractAnswersForForm(rows, formNumber) {
-        if (!rows || !rows.length) return new Map();
+    const extractAnswersForForm = window.QuizCore.extractAnswersForForm;
 
-        const cleanTarget = String(formNumber || '').trim().toLowerCase().replace(/\.0$/, '');
-        let headers = null;
-        let selectedRow = null;
-
-        for (const row of rows) {
-            if (!row || !row.length) continue;
-            const firstCellRaw = String(row[0] || '').trim().toLowerCase();
-            const firstCell = firstCellRaw.replace(/\.0$/, '');
-            if (firstCellRaw.includes('שאלון') || firstCellRaw.includes('form')) {
-                headers = row;
-                continue;
-            }
-            if (cleanTarget && (firstCell === cleanTarget || firstCell.includes(cleanTarget))) {
-                selectedRow = row;
-                break;
-            }
-        }
-
-        if (!selectedRow && cleanTarget) {
-            for (const row of rows) {
-                if (row.some(cell => String(cell || '').trim().toLowerCase().replace(/\.0$/, '') === cleanTarget)) {
-                    selectedRow = row;
-                    break;
-                }
-            }
-        }
-
-        if (!selectedRow && rows.length > 1 && !cleanTarget) {
-            selectedRow = rows[1];
-        }
-
-        if (!selectedRow) {
-            throw new Error(`לא נמצאה שורת שאלון ${formNumber} בקובץ התשובות.`);
-        }
-
-        const answers = new Map();
-
-        if (headers) {
-            for (let i = 0; i < headers.length; i++) {
-                const header = String(headers[i] || '').trim();
-                const qNumMatch = header.match(/\d+/);
-                if (!qNumMatch) continue;
-
-                const questionNumber = Number(qNumMatch[0]);
-                const rawCell = String(selectedRow[i] || '');
-
-                const answerMatch = rawCell.match(/\((\d+)\)/) || rawCell.match(/^(\d+)$/);
-                if (answerMatch) {
-                    answers.set(questionNumber, Number(answerMatch[1]) - 1);
-                    continue;
-                }
-
-                if (rawCell.includes('מבוטלת') || rawCell.includes('והת')) {
-                    answers.set(questionNumber, null);
-                }
-            }
-        } else {
-            // Sequential column index mapping (Column 1..N -> Q1..QN)
-            let qIdx = 1;
-            const startCol = (String(selectedRow[0] || '').trim().toLowerCase() === cleanTarget) ? 1 : 0;
-            for (let i = startCol; i < selectedRow.length; i++) {
-                const rawCell = String(selectedRow[i] || '').trim();
-                if (!rawCell) continue;
-                const answerMatch = rawCell.match(/\((\d+)\)/) || rawCell.match(/^(\d+)$/);
-                if (answerMatch) {
-                    answers.set(qIdx, Number(answerMatch[1]) - 1);
-                    qIdx++;
-                }
-            }
-        }
-
-        return answers;
-    }
-
-    function mergeAnswers(questions, answerMap) {
-        return questions.map((question, index) => {
-            const answer = answerMap.get(index + 1);
-            if (typeof answer === 'number' && answer >= 0 && answer < question.options.length) {
-                return { ...question, correctIndex: answer, shuffleOptions: false };
-            }
-            return { ...question, shuffleOptions: false };
-        });
-    }
+    const mergeAnswers = window.QuizCore.mergeAnswers;
 
     // ── Interactive PDF Page Crop Modal Controller ───────────────────────────
     let currentCropTargetIndex = null;
