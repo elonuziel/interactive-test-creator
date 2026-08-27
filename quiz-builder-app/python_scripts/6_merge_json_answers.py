@@ -30,8 +30,8 @@ def main():
         print(f"Questions file not found: {q_path}")
         return 1
     if not a_path.exists():
-        print(f"Answers file not found: {a_path}")
-        return 1
+        print(f"Notice: Answers file not found ({a_path}); skipping answers merge.")
+        return 0
     try:
         questions = (load_markdown_questions(q_path) if q_path.suffix.lower() == '.md'
                      else json.loads(q_path.read_text(encoding='utf-8')))

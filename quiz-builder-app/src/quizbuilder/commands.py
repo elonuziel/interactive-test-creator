@@ -63,7 +63,9 @@ def process_workspace(
         artifacts.extend((pages, merged))
 
     if workspace.questions_path.exists():
-        runner.merge_answers(workspace.path)
+        has_answers = bool(selected_answer_key) or (workspace.path / "answers.json").is_file() or (workspace.path / "answers.md").is_file()
+        if has_answers:
+            runner.merge_answers(workspace.path)
         runner.validate(workspace.questions_path)
         artifacts.append(workspace.questions_path)
     return artifacts
