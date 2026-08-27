@@ -2,6 +2,7 @@ name: Build Desktop GUI
 
 on:
   push:
+    branches: [ main ]
     tags:
       - "v*"
   workflow_dispatch:
@@ -29,29 +30,63 @@ jobs:
       - name: Install GUI and packaging dependencies
         working-directory: quiz-builder-app
         run: python -m pip install -e ".[package]"
-      - name: Build GUI bundle
+
+      - name: Determine Release Tag
+        id: tag_name
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v2.1.${{ github.run_number }}"
+          fi
+          echo "TAG_NAME=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build Linux GUI bundle
+        if: runner.os == 'Linux'
         working-directory: quiz-builder-app
         run: python build_gui.py
+
+      - name: Build & Sign Windows GUI bundle
+        if: runner.os == 'Windows'
+        run: |
+          python quiz-builder-app/build_exe.py --version ${{ steps.tag_name.outputs.TAG_NAME }}
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Elon Uziel, O=Elon Uziel" -CertStoreLocation "Cert:\CurrentUser\My"
+          Set-AuthenticodeSignature -FilePath "quiz-builder-app/dist/quiz_builder_gui.exe" -Certificate $cert -HashAlgorithm SHA256
+
       - name: Package Linux bundle
         if: runner.os == 'Linux'
         run: tar -czf interactive-quiz-builder-gui-linux-x86_64.tar.gz -C quiz-builder-app/dist quiz_builder_gui
+
       - name: Package Windows bundle
         if: runner.os == 'Windows'
         shell: pwsh
         run: Compress-Archive -Path quiz-builder-app/dist/quiz_builder_gui.exe -DestinationPath interactive-quiz-builder-gui-windows-x64.zip -Force
-      - name: Upload GUI bundle
+
+      - name: Upload GUI bundle artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.path }}
+
       - name: Attach Linux bundle to GitHub Release
-        if: runner.os == 'Linux' && startsWith(github.ref, 'refs/tags/')
+        if: runner.os == 'Linux'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+          name: Interactive Quiz Builder GUI ${{ steps.tag_name.outputs.TAG_NAME }}
           files: interactive-quiz-builder-gui-linux-x86_64.tar.gz
           generate_release_notes: true
+
       - name: Attach Windows bundle to GitHub Release
-        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
+        if: runner.os == 'Windows'
         uses: softprops/action-gh-release@v2
         with:
-          files: interactive-quiz-builder-gui-windows-x64.zip
+          tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+          name: Interactive Quiz Builder GUI ${{ steps.tag_name.outputs.TAG_NAME }}
+          files: |
+            interactive-quiz-builder-gui-windows-x64.zip
+            quiz-builder-app/dist/quiz_builder_gui.exe
+          generate_release_notes: true
+
+
