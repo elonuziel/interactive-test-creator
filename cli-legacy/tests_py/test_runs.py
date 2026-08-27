@@ -3,7 +3,7 @@ import json
 import pytest
 
 from quizbuilder.models import Workspace
-from quizbuilder.batch import discover_batch
+from quizbuilder.batch import discover_batch, exam_variant, match_answer_keys
 from quizbuilder.exporter import build_run_standalone_quiz
 from quizbuilder.preview import PreviewError, render_pdf_page
 from quizbuilder.runs import RunError, assemble_run, write_run_questions
@@ -115,6 +115,31 @@ def test_discover_batch_separates_multiple_exam_pdfs(tmp_path):
     assert candidates[0].workspace.path != candidates[1].workspace.path
     assert candidates[0].workspace.source_pdf == moed_a
     assert candidates[1].workspace.source_pdf == moed_b
+
+
+def test_exam_variant_recognizes_hebrew_and_english_names():
+    assert exam_variant("מבחן מועד א 2010") == "a"
+    assert exam_variant("answers_moed_b_2010") == "b"
+    assert exam_variant("מועד ב2017") == "b"
+    assert exam_variant("2012ב") == "b"
+    assert exam_variant("exam_2010") is None
+
+
+def test_match_answer_keys_uses_same_moed_variant(tmp_path):
+    pdf = tmp_path / "מועד א 2015.pdf"
+    keys = (
+        tmp_path / "תשובות מועד ב 2015.xlsx",
+        tmp_path / "תשובות מועד א 2015.xlsx",
+    )
+
+    assert match_answer_keys(pdf, keys) == (keys[1],)
+
+
+def test_match_answer_keys_does_not_use_other_moed(tmp_path):
+    pdf = tmp_path / "מועד א 2012.pdf"
+    keys = (tmp_path / "פתרון מועד ב 2012.xlsx",)
+
+    assert match_answer_keys(pdf, keys) == ()
 
 
 def test_render_pdf_page_returns_png_bytes(tmp_path):
