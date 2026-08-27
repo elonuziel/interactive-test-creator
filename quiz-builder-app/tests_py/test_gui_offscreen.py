@@ -98,3 +98,17 @@ def test_main_window_custom_file_choosers(application, tmp_path):
 
     window.close()
 
+
+def test_cli_agent_info_buttons_and_provider_reload(application, tmp_path):
+    window = MainWindow(Config.defaults(root=tmp_path))
+    assert hasattr(window, "super_batch_info_btn")
+    assert hasattr(window, "ai_info_btn")
+    assert "CLI AI agent" in window.super_batch_info_btn.toolTip()
+    assert "CLI AI agent" in window.ai_info_btn.toolTip()
+
+    initial_count = window.ai_provider_combo.count()
+    assert initial_count > 0
+    window.reload_ai_providers()
+    assert window.ai_provider_combo.count() == initial_count
+    window.close()
+

@@ -149,12 +149,21 @@ class MainWindow(QWidget):
         self.exam_search.setPlaceholderText("Search exams...")
         self.exam_list = QListWidget()
         self.batch_button = QPushButton("Process selected exams")
+        
+        super_batch_row = QHBoxLayout()
         self.super_batch_button = QPushButton("Super Batch (local AI)")
-        self.super_batch_button.setToolTip("Review and generate questions.md for multiple exams using a detected local CLI AI.")
+        self.super_batch_button.setToolTip("Review and generate questions.md for multiple exams automatically using a detected local CLI AI.")
+        self.super_batch_info_btn = QPushButton("ℹ️")
+        self.super_batch_info_btn.setMaximumWidth(32)
+        self.super_batch_info_btn.setToolTip("Why use a local CLI AI agent? Click to learn the advantages and see how to install one.")
+        self.super_batch_info_btn.clicked.connect(self.show_cli_agent_guide)
+        super_batch_row.addWidget(self.super_batch_button, 1)
+        super_batch_row.addWidget(self.super_batch_info_btn)
+
         left.addWidget(self.exam_search)
         left.addWidget(self.exam_list, 1)
         left.addWidget(self.batch_button)
-        left.addWidget(self.super_batch_button)
+        left.addLayout(super_batch_row)
         self.extract_splitter.addWidget(self.exam_group)
 
         self.extract_group = QGroupBox("2. Prepare questions (saved as questions.md)")
@@ -183,6 +192,12 @@ class MainWindow(QWidget):
         self.launch_ai_button = QPushButton("Create AI prompt")
         self._on_ai_provider_changed()
         self.launch_ai_button.setToolTip("Create a prompt for extracting questions into questions.md.")
+        
+        self.ai_info_btn = QPushButton("ℹ️")
+        self.ai_info_btn.setMaximumWidth(32)
+        self.ai_info_btn.setToolTip("What is a CLI AI agent? Click to learn the advantages and how to install one.")
+        self.ai_info_btn.clicked.connect(self.show_cli_agent_guide)
+
         self.answer_combo = QComboBox()
         self.answer_combo.addItem("No answer key", None)
         self.browse_answer_button = QPushButton("Choose file...")
@@ -203,6 +218,7 @@ class MainWindow(QWidget):
         ai_row = QHBoxLayout()
         ai_row.addWidget(self.ai_provider_combo, 2)
         ai_row.addWidget(self.launch_ai_button, 3)
+        ai_row.addWidget(self.ai_info_btn)
         right.addLayout(ai_row)
 
         # Clean PDF section for scanned exams
@@ -1252,6 +1268,88 @@ class MainWindow(QWidget):
         else:
             self.launch_ai_button.setText(f"⚡ Generate with {provider.label}")
             self.launch_ai_button.setToolTip(f"Directly pipe prompt into {provider.label} ({command}) and save questions.md in exam folder.")
+
+    def reload_ai_providers(self) -> None:
+        current_data = self.ai_provider_combo.currentData()
+        self.ai_provider_combo.clear()
+        local_items = detect_providers(self.config.provider.freebuff_commands)
+        for provider, command in local_items:
+            self.ai_provider_combo.addItem(f"Local: {provider.label} ({command})", (provider, command))
+        for provider in WEB_PROVIDERS:
+            self.ai_provider_combo.addItem(f"Web: {provider.label}", (provider, None))
+        if current_data:
+            for i in range(self.ai_provider_combo.count()):
+                if self.ai_provider_combo.itemData(i) == current_data:
+                    self.ai_provider_combo.setCurrentIndex(i)
+                    break
+        self._on_ai_provider_changed()
+
+    def show_cli_agent_guide(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("CLI AI Agents: Advantages & Setup Guide")
+        dialog.resize(680, 520)
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(12)
+
+        title = QLabel("🚀 Why Use a Terminal CLI AI Agent?")
+        title.setStyleSheet("font-size: 17px; font-weight: bold; color: #38bdf8;")
+        layout.addWidget(title)
+
+        intro = QLabel(
+            "Terminal CLI AI agents run locally in your environment to automate PDF question extraction, "
+            "OCR for scanned exams, and batch processing without manual copy-pasting."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        group_adv = QGroupBox("Key Advantages of CLI Agents over Web Chats")
+        adv_layout = QVBoxLayout(group_adv)
+        adv_text = QLabel(
+            "• <b>Full Automation:</b> Inspects the PDF directly on disk and saves <code>questions.md</code> automatically.<br>"
+            "• <b>Super Batch Mode:</b> Processes dozens of exams concurrently in parallel with zero manual clicks.<br>"
+            "• <b>No File Size or Token Limits:</b> Inspects multi-page exams directly without web upload restrictions.<br>"
+            "• <b>Privacy & Speed:</b> Executes directly on your machine within your local workspace."
+        )
+        adv_text.setWordWrap(True)
+        adv_layout.addWidget(adv_text)
+        layout.addWidget(group_adv)
+
+        group_install = QGroupBox("How to Install a CLI Agent")
+        inst_layout = QVBoxLayout(group_install)
+        inst_text = QLabel(
+            "Install any supported CLI tool and ensure it is available in your system <b>PATH</b>:<br><br>"
+            "• <b>Claude Code CLI:</b> <code>npm install -g @anthropic-ai/claude-code</code><br>"
+            "• <b>Antigravity CLI:</b> <code>agy</code><br>"
+            "• <b>Freebuff CLI:</b> <code>freebuff</code><br>"
+            "• <b>Ollama (Offline/Local models):</b> <code>ollama</code> (https://ollama.com)<br>"
+            "• <b>Gemini / LLM CLIs:</b> <code>pip install google-genai</code> or <code>pip install llm</code>"
+        )
+        inst_text.setWordWrap(True)
+        inst_layout.addWidget(inst_text)
+        layout.addWidget(group_install)
+
+        btn_row = QHBoxLayout()
+        btn_search = QPushButton("🔍 Search Google for CLI AI Agents")
+        btn_search.setToolTip("Open browser to search for CLI AI agent guides.")
+        btn_search.clicked.connect(lambda: webbrowser.open("https://www.google.com/search?q=install+terminal+ai+cli+agents+claude+code+gemini+ollama"))
+        btn_row.addWidget(btn_search)
+
+        btn_reload = QPushButton("🔄 Reload Detected AI Providers")
+        btn_reload.setToolTip("Scan system PATH for newly installed CLI AI tools.")
+        def on_reload_clicked():
+            self.reload_ai_providers()
+            local_count = sum(1 for i in range(self.ai_provider_combo.count()) if "Local:" in self.ai_provider_combo.itemText(i))
+            QMessageBox.information(dialog, "Providers Reloaded", f"Scanned system PATH. {local_count} local CLI AI tool(s) detected.")
+        btn_reload.clicked.connect(on_reload_clicked)
+        btn_row.addWidget(btn_reload)
+
+        layout.addLayout(btn_row)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        dialog.exec()
 
     def launch_ai(self) -> None:
         workspace = self.state["workspace"]
