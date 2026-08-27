@@ -5,6 +5,8 @@ import copy
 from pathlib import Path
 import tempfile
 
+from .markdown import dump_questions
+
 from .paths import application_root
 from .pipeline import PipelineRunner
 from .runs import QuizRun

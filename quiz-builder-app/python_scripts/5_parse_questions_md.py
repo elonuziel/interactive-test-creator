@@ -290,7 +290,7 @@ def main():
         description="Parse extracted Hebrew Markdown into structured JSON with smart detection."
     )
     parser.add_argument("md_file", help="Path to the Markdown file")
-    parser.add_argument("-o", "--output", help="Output JSON file", default="questions.json")
+    parser.add_argument("-o", "--output", help="Output Markdown file", default="questions.md")
     parser.add_argument("--image-dir", help="Directory containing extracted images (from 2_extract_text_fitz)", default=None)
     parser.add_argument("--page-map", help="JSON file mapping line index → page number (from 2_extract_text_fitz)", default=None)
     parser.add_argument("--include-source-page", action="store_true",

@@ -53,7 +53,7 @@ def assemble_run(
     for workspace in selected:
         path = workspace.questions_path
         if not path.is_file():
-            raise RunError(f"Test '{workspace.name}' has no questions.json file.")
+            raise RunError(f"Test '{workspace.name}' has no questions.json file (questions.md is also accepted).")
         try:
             questions = load_questions(path)
         except ValidationError as exc:

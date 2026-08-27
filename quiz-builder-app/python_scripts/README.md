@@ -55,28 +55,28 @@ python 2_extract_text_fitz.py "exam.pdf" --first-page-only
 | `--reverse` | *(deprecated)* No‑op — word order is auto‑detected now |
 
 **B. `5_parse_questions_md.py`**
-Parses the generated Markdown file into a structured `questions.json` file.
+Parses the generated Markdown file into the default editable `questions.md` format.
 Uses robust regex patterns that handle multiple question/answer formats including LTR‑grouped Hebrew text.
 Supports image association via keyword detection (`גרף`, `תרשים`, etc.) and page‑map from step 2.
 
 **Usage:**
 ```bash
 # Parse text only:
-python 5_parse_questions_md.py "raw_text.md" -o "questions.json"
+python 5_parse_questions_md.py "raw_text.md" -o "questions.md"
 
 # Parse with image association:
-python 5_parse_questions_md.py "raw_text.md" -o "questions.json" \
+python 5_parse_questions_md.py "raw_text.md" -o "questions.md" \
     --image-dir "images" --page-map "page_map.json"
 
 # Include source page in output (for debugging):
-python 5_parse_questions_md.py "raw_text.md" -o "questions.json" \
+python 5_parse_questions_md.py "raw_text.md" -o "questions.md" \
     --include-source-page
 ```
 
 **Options:**
 | Flag | Description |
 |------|-------------|
-| `-o`, `--output FILE` | Output JSON file (default: `questions.json`) |
+| `-o`, `--output FILE` | Output Markdown file (default: `questions.md`) |
 | `--image-dir DIR` | Directory with extracted images for keyword‑based association |
 | `--page-map FILE` | JSON file from `2_extract_text_fitz.py --page-map` |
 | `--include-source-page` | Add `sourcePage` field to each question for debugging |
@@ -88,7 +88,7 @@ Use these scripts to render the PDF to images and extract text manually (via Vis
 Renders a PDF to PNG images per page.
 **Usage:** `python 3_render_pdf_pages.py "exam.pdf" -o "pages"`
 
-*After rendering, use an LLM or manual transcription to create `questions.json` with the text and options.*
+*After rendering, use an LLM or manual transcription to create `questions.md` with the text and options.*
 
 ### 4. Answer Extraction and Merging
 
@@ -99,20 +99,20 @@ The script scans for the row containing `שאלון` and handles the `3 (2) [15]
 *(Where "76" is the test form number)*
 
 **B. `6_merge_json_answers.py`**
-Merges the extracted answers from the CSV with the raw questions JSON and maps 1-based CSV selections (1, 2, 3, 4) to 0-based `correctIndex` values (0, 1, 2, 3) stored in `questions.json`.
-**Usage:** `python 6_merge_json_answers.py "questions.json" "answers.json" -o "final_questions.json"`
+Merges the extracted answers from the CSV with the Markdown question source and maps 1-based CSV selections (1, 2, 3, 4) to 0-based `correctIndex` values (0, 1, 2, 3) stored in `questions.md`.
+**Usage:** `python 6_merge_json_answers.py "questions.md" "answers.json" -o "questions.md"`
 
 ### 5. Quality Assurance
 
 **`7_check_json.py`**
-Checks the final JSON file for dropped options, empty questions, duplicate option text, or out-of-bounds `correctIndex` values. Run this before deploying!
+Checks the final Markdown question file for dropped options, empty questions, duplicate option text, or out-of-bounds `correctIndex` values. Run this before deploying!
 **Usage:** `python 7_check_json.py "final_questions.json"`
 **Options:** `--expected-options N` (default: 4; mismatched counts produce a warning instead of an error)
 
 ### 6. Auto-Generate Test Manifest
 
 **`8_generate_manifest.py`**
-Scans the `tests/` directory for subdirectories containing `questions.json` and generates a `manifest.json` file that the web app uses to populate the test selection menu.
+Scans the `tests/` directory for subdirectories containing `questions.md` (or legacy `questions.json`) and generates a `manifest.json` file that the web app uses to populate the test selection menu.
 
 **Usage:**
 ```bash

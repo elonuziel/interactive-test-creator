@@ -7,6 +7,7 @@ import re
 
 from .models import SourceFiles, Workspace
 from .workspace import discover_sources
+from .validation import questions_path
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,7 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
         for path in root.iterdir()
         if path.is_dir()
         and path.name != "runs"
-        and (path / "questions.json").is_file()
+        and questions_path(path).is_file()
     )
 
     for path in sorted(project_dirs, key=lambda item: str(item).casefold()):
@@ -89,7 +90,7 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
                 key=lambda item: item.name.lower(),
             )
         )
-        if len(pdfs) > 1 and not (path / "questions.json").is_file():
+        if len(pdfs) > 1 and not questions_path(path).is_file():
             projects_root = path / ".quizbuilder"
             project_candidates = [(pdf, projects_root / _project_slug(pdf.stem)) for pdf in pdfs]
         else:
@@ -110,7 +111,7 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
             elif source_pdf and exam_variant(source_pdf.stem) and not matched_answers and answers:
                 issues.append("no answer key matches this Moed variant")
             if not workspace.questions_path.is_file():
-                issues.append("questions.json is missing")
+                issues.append("questions.json is missing (questions.md is also accepted)")
             candidates.append(BatchCandidate(workspace, sources, tuple(issues)))
     return candidates
 

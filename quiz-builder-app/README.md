@@ -112,15 +112,17 @@ python -m quizbuilder serve --port 8000
 python -m quizbuilder init biology_101
 python -m quizbuilder process tests/biology_101
 python -m quizbuilder prompt tests/biology_101 --kind local
-python -m quizbuilder validate tests/biology_101/questions.json
+python -m quizbuilder validate tests/biology_101/questions.md
 python -m quizbuilder build tests/biology_101
 python -m quizbuilder clean tests/biology_101
 python -m quizbuilder wizard
 python -m quizbuilder --config quizbuilder.toml detect
 ```
 
-The desktop GUI lets you choose a projects folder, edit a test's `questions.json`
-with RTL-aware fields, save changes, and export a standalone HTML quiz. Select one
+The desktop GUI lets you choose a projects folder, edit a test's `questions.md`
+with RTL-aware fields, save changes, and export a standalone HTML quiz. Markdown is
+now the default human-editable question format; legacy `questions.json` files remain
+readable for compatibility. Select one
 test for a normal run, or check multiple tests and enable mixed mode to create a
 derived quiz without changing the source projects. Generated runs are placed in
 the folder's `runs/` directory.
@@ -147,7 +149,7 @@ Copy `quizbuilder.toml.example` to `quizbuilder.toml` and customize workspace de
    - Follow [LLM_RUNBOOK.md](LLM_RUNBOOK.md) for Vision LLMs or check [python_scripts/README.md](python_scripts/README.md) for script usages (`1_detect_pdf_type.py` through `6_merge_json_answers.py`).
 3. **Validate & Update Manifest**:
    ```bash
-   python python_scripts/7_check_json.py tests/botany_2024_a/questions.json
+   python python_scripts/7_check_json.py tests/botany_2024_a/questions.md
    python python_scripts/8_generate_manifest.py
    ```
 4. **Launch Local Web App**:

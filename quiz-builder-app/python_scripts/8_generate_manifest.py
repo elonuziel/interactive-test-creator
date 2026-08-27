@@ -1,7 +1,7 @@
 """
 8_generate_manifest.py — Auto-generate manifest.json for the quiz web app.
 
-Scans a tests directory for subdirectories containing `questions.json` and
+Scans a tests directory for subdirectories containing `questions.md` (or legacy `questions.json`) and
 writes a manifest.json that the web app uses to populate the test selection menu.
 
 Usage:
@@ -35,7 +35,9 @@ def scan_tests(tests_dir):
         if not os.path.isdir(entry_path):
             continue
 
-        questions_file = os.path.join(entry_path, 'questions.json')
+        questions_file = os.path.join(entry_path, 'questions.md')
+        if not os.path.isfile(questions_file):
+            questions_file = os.path.join(entry_path, 'questions.json')
         if os.path.isfile(questions_file):
             # Path relative to repo root (what the web app expects)
             relative_path = os.path.join(tests_dir, entry).replace('\\', '/')
@@ -67,7 +69,7 @@ def main():
     manifest = scan_tests(tests_dir)
 
     if not manifest:
-        print(f"No test folders with questions.json found in '{tests_dir}'.")
+        print(f"No test folders with questions.md/questions.json found in '{tests_dir}'.")
         print(f"Writing empty manifest to {output_path}")
 
     os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)

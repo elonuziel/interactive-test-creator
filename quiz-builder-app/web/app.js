@@ -1,6 +1,25 @@
 import { createQuizState, loadProgress, saveProgress, storageKey } from './player-state.js';
 import { applyTheme, toggleTheme } from './player-theme.js';
 
+function parseQuestionsMarkdown(markdown) {
+    const questions = [];
+    const blocks = markdown.split(/^##+\s+Question\s+\d+\s*$/m).slice(1);
+    for (const block of blocks) {
+        const lines = block.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        const optionStart = lines.findIndex(line => /^[-*+]\s+/.test(line));
+        if (optionStart < 1) continue;
+        const question = lines.slice(0, optionStart).filter(line => !/^pageImage:/i.test(line)).join(' ');
+        const options = lines.slice(optionStart).filter(line => /^[-*+]\s+/.test(line)).map(line => line.replace(/^[-*+]\s+/, ''));
+        const answer = lines.find(line => /^Answer:\s*[A-D]/i.test(line));
+        const correctIndex = answer ? answer.match(/^Answer:\s*([A-D])/i)[1].toUpperCase().charCodeAt(0) - 65 : 0;
+        const pageImageLine = lines.find(line => /^pageImage:/i.test(line));
+        const item = { question, options, correctIndex };
+        if (pageImageLine) item.pageImage = pageImageLine.replace(/^pageImage:\s*/i, '');
+        if (question && options.length) questions.push(item);
+    }
+    return questions;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // ── State ────────────────────────────────────────────────────────────────
@@ -244,16 +263,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (embeddedData) {
         initQuestions(embeddedData);
     } else {
-        const jsonUrl = testPath ? (`../${testPath}/questions.json?v=` + new Date().getTime()) : 'questions.json';
-        fetch(jsonUrl)
+        const questionsUrl = testPath ? (`../${testPath}/questions.md?v=` + new Date().getTime()) : 'questions.md';
+        fetch(questionsUrl)
             .then(r => {
-                if (!r.ok) throw new Error("Could not load " + jsonUrl);
-                return r.json();
+                if (!r.ok) throw new Error("Could not load " + questionsUrl);
+                return r.text();
             })
-            .then(data => initQuestions(data))
+            .then(markdown => initQuestions(parseQuestionsMarkdown(markdown)))
             .catch(err => {
                 console.error('Error loading questions:', err);
-                showError('שגיאה בטעינת המבחן. אנא ודא שהנתיב נכון וקיים קובץ questions.json בתיקיית המבחן.');
+                showError('שגיאה בטעינת המבחן. אנא ודא שהנתיב נכון וקיים קובץ questions.md בתיקיית המבחן.');
             });
     }
 

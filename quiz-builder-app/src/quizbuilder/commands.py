@@ -53,8 +53,9 @@ def process_workspace(
         images = workspace.path / "images"
         page_map = workspace.path / "page_map.json"
         runner.extract_text(selected_pdf, raw, images, page_map)
-        runner.parse_questions(raw, workspace.questions_path, images, page_map)
-        artifacts.extend((raw, workspace.questions_path))
+        markdown = workspace.path / "questions.md"
+        runner.parse_questions(raw, markdown, images, page_map)
+        artifacts.extend((raw, markdown))
     else:
         pages = workspace.path / "pages_output"
         merged = workspace.path / f"{workspace.name}_clean.pdf"

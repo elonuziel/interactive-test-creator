@@ -31,7 +31,7 @@ from ..commands import generate_workspace_prompt, process_workspace, process_wor
 from ..config import Config
 from ..documents import classify_pdf, DocumentError
 from ..exporter import build_run_standalone_quiz
-from ..persistence import write_json_atomic
+from ..markdown import write_questions
 from ..preview import render_pdf_page
 from ..providers import WEB_PROVIDERS, detect_providers, open_web_provider
 from ..prompts import send_to_provider
@@ -281,7 +281,7 @@ class MainWindow(QWidget):
                 QMessageBox.warning(self, "No exam selected", "Choose an exam first.")
             return False
         self.save_active_question()
-        write_json_atomic(self.state["workspace"].questions_path, self.state["questions"])
+        write_questions(self.state["workspace"].path / "questions.md", self.state["questions"])
         self.state["dirty"] = False
         self.setWindowTitle("Interactive Quiz Builder")
         self.refresh_question_list()
@@ -527,8 +527,8 @@ class MainWindow(QWidget):
         total = 0
         for workspace in selected:
             try:
-                total += len(json.loads(workspace.questions_path.read_text(encoding="utf-8")))
-            except (OSError, json.JSONDecodeError):
+                total += len(load_questions(workspace.questions_path))
+            except (OSError, ValidationError):
                 pass
         self.summary.setText(f"{len(selected)} exam(s), {total} question(s) ready\n{'Mixed mode' if self.mix_checkbox.isChecked() else 'Standard mode'}")
 

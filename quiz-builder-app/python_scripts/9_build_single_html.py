@@ -1,7 +1,7 @@
 """
 9_build_single_html.py — Build a single self-contained HTML quiz file.
 
-Merges index.html, style.css, app.js, questions.json, and optionally images
+Merges index.html, style.css, app.js, questions.md, and optionally images
 into one standalone HTML file that works by double-clicking (no server needed).
 
 Usage:
@@ -16,6 +16,10 @@ import json
 import mimetypes
 import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/src')
+from quizbuilder.markdown import load_questions as load_markdown_questions
 import sys
 
 if hasattr(sys.stdout, 'reconfigure'):
@@ -104,17 +108,22 @@ def build_html(test_dir, embed_images=True, title=None):
     html_path = resolve_web_asset('index.html')
     css_path = resolve_web_asset('style.css')
     js_path = resolve_web_asset('app.js')
-    questions_path = os.path.join(test_dir, 'questions.json')
-
+    questions_path = os.path.join(test_dir, 'questions.md')
+    legacy_path = os.path.join(test_dir, 'questions.json')
     if not os.path.isfile(questions_path):
-        raise FileNotFoundError(f"questions.json not found in {test_dir}")
+        questions_path = legacy_path
+    if not os.path.isfile(questions_path):
+        raise FileNotFoundError(f"questions.md not found in {test_dir}")
 
     html = read_file(html_path)
     css = read_file(css_path)
     js = read_file(js_path)
 
-    with open(questions_path, 'r', encoding='utf-8') as f:
-        questions = json.load(f)
+    if questions_path.lower().endswith('.md'):
+        questions = load_markdown_questions(Path(questions_path))
+    else:
+        with open(questions_path, 'r', encoding='utf-8') as f:
+            questions = json.load(f)
 
     # ── Process images ─────────────────────────────────────────────────────
     questions, img_bytes = process_questions(questions, test_dir, embed_images)
@@ -180,7 +189,7 @@ def main():
     )
     parser.add_argument(
         'test_dir',
-        help="Path to the test directory containing questions.json"
+        help="Path to the test directory containing questions.md"
     )
     parser.add_argument(
         '-o', '--output', default=None,

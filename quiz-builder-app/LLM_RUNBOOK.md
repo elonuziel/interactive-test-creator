@@ -5,36 +5,42 @@ This document is the definitive guide for an AI Agent (like yourself!) processin
 **CRITICAL UPDATE: You do NOT need to run any Python scripts.**
 The `start.bat` / `start.sh` wizard and `quizbuilder` CLI handle **all** pre-processing (detecting PDF types, rendering PDF pages to images, extracting answer keys from CSV) and **all** post-processing (merging answers, QA checks, building the standalone HTML file).
 
-Your **ONLY** job is to read the rendered images and extract the questions into `questions.json`.
+Your **ONLY** job is to read the rendered images and extract the questions into `questions.md`.
 
 ---
 
-## Your Task: Create `questions.json`
+## Your Task: Create `questions.md`
 
 When you are invoked by the CLI / wizard, you will be placed inside a test directory (e.g. `tests/2022_moed_b/`).
 You will see a folder named `pages_output/` containing images of the exam pages (e.g., `page_1.png`, `page_2.png`).
 
-You must read these images using your Vision capabilities, extract the multiple-choice questions, and output exactly one file: `questions.json`.
+You must read these images using your Vision capabilities, extract the multiple-choice questions, and output exactly one file: `questions.md`.
 
-### `questions.json` Schema Reference
+### `questions.md` Schema Reference
 Each question object in the JSON array must follow this exact structure:
-```json
-[
-  {
-    "question": "הטקסט המלא של השאלה בעברית...",
-    "options": ["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
-    "correctIndex": 0,
-    "pageImage": "pages_output/page_3.png"
-  }
-]
+```markdown
+# Quiz Questions
+
+## Question 1
+
+הטקסט המלא של השאלה בעברית...
+
+pageImage: pages_output/page_3.png
+
+- תשובה א
+- תשובה ב
+- תשובה ג
+- תשובה ד
+
+Answer: A
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `question` | string | **Yes** | Full question text in Hebrew in natural logical reading order. |
-| `options` | string[] | **Yes** | Answer options (usually 4). Extract them exactly as they appear. |
-| `correctIndex` | number | **Yes** | 0-based index of the correct option. Just put `0` as a placeholder (start.bat will merge the real answers later from the answer key!). |
-| `pageImage` | string | No | Relative path to the full-page scan where this question appears (e.g., `"pages_output/page_3.png"`). Set ONLY for questions with diagrams/images/tables. Omit for text-only questions. |
+| `question` | text | **Yes** | Full question text in Hebrew in natural logical reading order. |
+| options | bullets | **Yes** | Answer options, usually four or more. |
+| `Answer` | A, B, C... | No | Correct option; use `A` as a placeholder when answer keys are merged later. |
+| `pageImage` | path | No | Relative path to the full-page scan for diagrams/images/tables. |
 
 ---
 
@@ -53,7 +59,7 @@ If Question 15 mentions a graph and appears on `pages_output/page_5.png`, set `"
 
 ## Agent Proofreading Protocol
 
-Before saving the final `questions.json`, perform a proofreading audit using your native LLM capabilities against this checklist:
+Before saving the final `questions.md`, perform a proofreading audit using your native LLM capabilities against this checklist:
 1. **Audit Hebrew Word Order:** Ensure phrases are in correct logical order. Do not output reversed text.
 2. **Audit Mixed Language Terms:** Correct reversed parentheses or English terms inside Hebrew text.
 3. **Verify Option Boundaries:** Ensure each question has clean, non-truncated option strings.
@@ -67,5 +73,5 @@ Before saving the final `questions.json`, perform a proofreading audit using you
 2. Extract text and options.
 3. Apply the Fast Image Reference Rule (set `"pageImage"`).
 4. Proofread.
-5. Save `questions.json`.
-6. Terminate. (Do not run any python scripts — `start.bat` is waiting for `questions.json` to appear and will take over immediately!)
+5. Save `questions.md`.
+6. Terminate. (Do not run any python scripts — `start.bat` is waiting for `questions.md` to appear and will take over immediately!)

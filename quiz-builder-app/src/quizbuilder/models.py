@@ -14,7 +14,8 @@ class Workspace:
 
     @property
     def questions_path(self) -> Path:
-        return self.path / "questions.json"
+        markdown = self.path / "questions.md"
+        return markdown if markdown.is_file() else self.path / "questions.json"
 
 
 @dataclass(frozen=True)
