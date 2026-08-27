@@ -35,10 +35,13 @@ WEB_PROVIDERS = (
 
 def local_providers(freebuff_commands=("freebuff", "freebuff-cli")):
     return (
-        Provider("agy", "agy", "local", commands=("agy",)),
-        Provider("gemini", "Gemini CLI", "local", commands=("gemini",)),
-        Provider("claude", "Claude CLI", "local", commands=("claude",)),
+        Provider("agy", "Antigravity (agy)", "local", commands=("agy",)),
         Provider("freebuff", "Freebuff CLI", "freebuff", commands=tuple(freebuff_commands)),
+        Provider("claude", "Claude Code CLI", "local", commands=("claude",)),
+        Provider("chatgpt", "ChatGPT CLI", "local", commands=("chatgpt", "sgpt", "openai")),
+        Provider("gemini", "Gemini CLI", "local", commands=("gemini",)),
+        Provider("ollama", "Ollama CLI", "local", commands=("ollama",)),
+        Provider("llm", "LLM CLI", "local", commands=("llm",)),
     )
 
 

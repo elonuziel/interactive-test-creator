@@ -27,12 +27,39 @@ def generate_prompt(runner, workspace: Path, test_name: str, form_number: str, h
     return output
 
 
-def send_to_provider(provider: Provider, command: str, prompt: Path) -> subprocess.Popen:
-    if provider.kind != "freebuff" and provider.kind != "local":
+import re
+
+
+def extract_markdown_from_response(text: str) -> str:
+    """Extract markdown content from an LLM response if wrapped in code blocks or headers."""
+    text = text.strip()
+    match = re.search(r"```(?:markdown)?\s*\n(.*?)\n```", text, re.DOTALL | re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return text
+
+
+def send_to_provider(provider: Provider, command: str, prompt: Path, cwd: Path | None = None) -> str:
+    if provider.kind not in {"freebuff", "local"}:
         raise PromptError(f"Provider {provider.id} cannot receive stdin prompts.")
-    with prompt.open("r", encoding="utf-8") as prompt_file:
-        process = subprocess.Popen([command], stdin=prompt_file)
-        return_code = process.wait()
-    if return_code:
-        raise PromptError(f"{provider.label} exited with status {return_code}.")
-    return process
+    prompt_text = prompt.read_text(encoding="utf-8")
+    cmd_list = [command]
+    if "freebuff" in Path(command).name.lower() and cwd:
+        cmd_list = [command, "--cwd", str(cwd)]
+    try:
+        process = subprocess.run(
+            cmd_list,
+            input=prompt_text,
+            text=True,
+            capture_output=True,
+            cwd=str(cwd) if cwd else None,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as exc:
+        raise PromptError(f"Could not execute '{command}': {exc}") from exc
+
+    if process.returncode != 0:
+        err = (process.stderr or process.stdout or f"status {process.returncode}").strip()
+        raise PromptError(f"{provider.label} exited with status {process.returncode}: {err}")
+    return process.stdout or ""

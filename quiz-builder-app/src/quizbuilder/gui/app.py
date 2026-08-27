@@ -38,7 +38,7 @@ from ..exporter import build_run_standalone_quiz
 from ..markdown import dump_questions, write_questions
 from ..preview import render_pdf_page
 from ..providers import WEB_PROVIDERS, detect_providers, open_web_provider
-from ..prompts import send_to_provider
+from ..prompts import extract_markdown_from_response, send_to_provider
 from ..runs import RunError, assemble_run, write_run_questions
 from ..validation import ValidationError, load_questions
 from ..workspace import discover_sources
@@ -156,11 +156,13 @@ class MainWindow(QWidget):
         self.ai_hint = QLabel("Digital PDFs can be extracted automatically. Scanned PDFs need an AI prompt. Results are saved as questions.md.")
         self.ai_hint.setWordWrap(True)
         self.ai_provider_combo = QComboBox()
+        local_items = detect_providers(self.config.provider.freebuff_commands)
+        for provider, command in local_items:
+            self.ai_provider_combo.addItem(f"Local: {provider.label} ({command})", (provider, command))
         for provider in WEB_PROVIDERS:
             self.ai_provider_combo.addItem(f"Web: {provider.label}", (provider, None))
-        for provider, command in detect_providers(self.config.provider.freebuff_commands):
-            self.ai_provider_combo.addItem(f"Local: {provider.label} ({command})", (provider, command))
         self.launch_ai_button = QPushButton("Create AI prompt")
+        self._on_ai_provider_changed()
         self.launch_ai_button.setToolTip("Create a prompt for extracting questions into questions.md.")
         self.answer_combo = QComboBox()
         self.answer_combo.addItem("No answer key", None)
@@ -319,6 +321,7 @@ class MainWindow(QWidget):
         self.save_as_button.clicked.connect(self.save_questions_as)
         self.extract_button.clicked.connect(self.process_selected_exam)
         self.batch_button.clicked.connect(self.process_batch_checked)
+        self.ai_provider_combo.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.launch_ai_button.clicked.connect(self.launch_ai)
         self.preview_button.clicked.connect(self.preview_first_page)
         self.next_review_button.clicked.connect(lambda: self.tabs.setCurrentIndex(1))
@@ -792,26 +795,98 @@ class MainWindow(QWidget):
         worker.signals.failed.connect(lambda error: QMessageBox.critical(self, "Batch processing failed", f"{error}\n\nCheck the PDFs and answer keys, then reload the exam list."))
         self.start_worker(worker)
 
+    def _on_ai_provider_changed(self) -> None:
+        data = self.ai_provider_combo.currentData()
+        if not data:
+            return
+        provider, command = data
+        if provider.kind == "web":
+            self.launch_ai_button.setText(f"🌐 Open {provider.label}")
+            self.launch_ai_button.setToolTip(f"Generate prompt and open {provider.label} in browser (prompt is automatically copied to clipboard).")
+        else:
+            self.launch_ai_button.setText(f"⚡ Generate with {provider.label}")
+            self.launch_ai_button.setToolTip(f"Directly pipe prompt into {provider.label} ({command}) and save questions.md in exam folder.")
+
     def launch_ai(self) -> None:
         workspace = self.state["workspace"]
         if not workspace:
             QMessageBox.warning(self, "No exam selected", "Choose an exam first.")
             return
-        provider, command = self.ai_provider_combo.currentData()
-
-        def launch():
-            prompt = generate_workspace_prompt(self.config_for_root(self.state["root"]), workspace.path, "web" if provider.kind == "web" else "local")
-            if provider.kind == "web":
-                if self.config.provider.open_browser and not open_web_provider(provider):
-                    raise RuntimeError(f"Could not open {provider.label} in the browser.")
-            else:
-                send_to_provider(provider, command, prompt)
-            return prompt
+        data = self.ai_provider_combo.currentData()
+        if not data:
+            QMessageBox.warning(self, "No provider selected", "Choose an AI provider first.")
+            return
+        provider, command = data
 
         self.launch_ai_button.setEnabled(False)
+        is_web = provider.kind == "web"
+        if is_web:
+            self.status_label.setText(f"Generating prompt for {provider.label}...")
+        else:
+            self.status_label.setText(f"Running {provider.label} to generate questions directly into {workspace.name}...")
+
+        def launch():
+            prompt = generate_workspace_prompt(
+                self.config_for_root(self.state["root"]),
+                workspace.path,
+                "web" if is_web else "local",
+            )
+            if is_web:
+                if self.config.provider.open_browser and not open_web_provider(provider):
+                    raise RuntimeError(f"Could not open {provider.label} in the browser.")
+                return "web", prompt, None
+            else:
+                stdout = send_to_provider(provider, command, prompt, cwd=workspace.path)
+                questions_file = workspace.path / "questions.md"
+                if stdout:
+                    extracted = extract_markdown_from_response(stdout)
+                    if not questions_file.exists() or any(k in extracted for k in ("## Question", "### שאלה", "## שאלה")):
+                        questions_file.write_text(extracted, encoding="utf-8")
+                return "local", prompt, questions_file
+
+        def done(result):
+            kind, prompt, questions_file = result
+            self.launch_ai_button.setEnabled(True)
+            if kind == "web":
+                try:
+                    prompt_text = prompt.read_text(encoding="utf-8")
+                    QApplication.clipboard().setText(prompt_text)
+                except Exception:
+                    pass
+                self.status_label.setText(f"Prompt copied to clipboard. Opened {provider.label} in browser.")
+                QMessageBox.information(
+                    self,
+                    "AI Prompt Ready",
+                    f"Prompt generated and copied to your clipboard!\n\nSaved at:\n{prompt}\n\nPaste it into {provider.label} and save the result as questions.md in the exam folder.",
+                )
+            else:
+                self._load_questions(workspace)
+                self.update_summary()
+                q_count = len(self.state["questions"])
+                if q_count > 0:
+                    self.status_label.setText(f"Generated {q_count} question(s) with {provider.label} in questions.md.")
+                    self.tabs.setCurrentIndex(1)
+                    QMessageBox.information(
+                        self,
+                        "Questions Created Directly",
+                        f"Successfully generated {q_count} question(s) with {provider.label} directly in:\n\n{questions_file}\n\nThey are now loaded and ready for review in Tab 2.",
+                    )
+                else:
+                    self.status_label.setText(f"{provider.label} finished, but no questions were parsed into questions.md.")
+                    QMessageBox.warning(
+                        self,
+                        "No Questions Parsed",
+                        f"{provider.label} completed execution, but no questions could be parsed into questions.md.\n\nPrompt used:\n{prompt}",
+                    )
+
+        def failed(error):
+            self.launch_ai_button.setEnabled(True)
+            self.status_label.setText(f"Failed to execute {provider.label}.")
+            QMessageBox.critical(self, "AI Provider Execution Failed", f"Error running {provider.label}:\n\n{error}")
+
         worker = Worker(launch)
-        worker.signals.finished.connect(lambda prompt: (self.launch_ai_button.setEnabled(True), QMessageBox.information(self, "Prompt ready", f"Created prompt at:\n{prompt}")))
-        worker.signals.failed.connect(lambda error: (self.launch_ai_button.setEnabled(True), QMessageBox.critical(self, "Could not launch AI provider", error)))
+        worker.signals.finished.connect(done)
+        worker.signals.failed.connect(failed)
         self.start_worker(worker)
 
     def checked_play_workspaces(self) -> list:
