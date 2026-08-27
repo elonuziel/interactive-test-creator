@@ -5,8 +5,9 @@ import logging
 import os
 from pathlib import Path
 import webbrowser
+import threading
 
-from PySide6.QtCore import QSettings, QThreadPool, Qt
+from PySide6.QtCore import QSettings, QThreadPool, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QKeySequence, QPixmap, QShortcut, QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -15,9 +16,13 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGroupBox,
+    QHeaderView,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
+    QProgressBar,
+    QSpinBox,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
@@ -25,6 +30,9 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -32,9 +40,10 @@ from PySide6.QtWidgets import (
 
 from ..batch import discover_batch
 from ..commands import generate_workspace_prompt, process_workspace, process_workspaces
+from ..super_batch import build_plan, classify_plan_item, default_decision, process_plan
 from ..config import Config
 from ..documents import classify_pdf, clean_pdf, convert_docx_with_soffice, describe_page_cleaning, DocumentError
-from ..exporter import build_run_standalone_quiz
+from ..exporter import build_run_standalone_quiz, build_standalone_quiz
 from ..markdown import dump_questions, write_questions
 from ..preview import render_pdf_page
 from ..providers import WEB_PROVIDERS, detect_providers, open_web_provider
@@ -133,9 +142,12 @@ class MainWindow(QWidget):
         self.exam_search.setPlaceholderText("Search exams...")
         self.exam_list = QListWidget()
         self.batch_button = QPushButton("Process selected exams")
+        self.super_batch_button = QPushButton("Super Batch (local AI)")
+        self.super_batch_button.setToolTip("Review and generate questions.md for multiple exams using a detected local CLI AI.")
         left.addWidget(self.exam_search)
         left.addWidget(self.exam_list, 1)
         left.addWidget(self.batch_button)
+        left.addWidget(self.super_batch_button)
         layout.addWidget(self.exam_group, 4)
 
         self.extract_group = QGroupBox("2. Prepare questions (saved as questions.md)")
@@ -321,6 +333,7 @@ class MainWindow(QWidget):
         self.save_as_button.clicked.connect(self.save_questions_as)
         self.extract_button.clicked.connect(self.process_selected_exam)
         self.batch_button.clicked.connect(self.process_batch_checked)
+        self.super_batch_button.clicked.connect(self.open_super_batch)
         self.ai_provider_combo.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.launch_ai_button.clicked.connect(self.launch_ai)
         self.preview_button.clicked.connect(self.preview_first_page)
@@ -393,7 +406,7 @@ class MainWindow(QWidget):
         event.accept()
 
     def config_for_root(self, root: Path) -> Config:
-        return Config(root, self.config.scripts_root, self.config.default_form, self.config.default_discard_pages, self.config.auto_build, self.config.provider)
+        return Config(root, self.config.scripts_root, self.config.default_form, self.config.default_discard_pages, self.config.auto_build, self.config.super_batch_workers, self.config.super_batch_ai_mode, self.config.provider)
 
     def mark_dirty(self) -> None:
         if self.state["workspace"] is not None:
@@ -797,6 +810,359 @@ class MainWindow(QWidget):
         worker.signals.finished.connect(lambda _result: self.populate_tests())
         worker.signals.failed.connect(lambda error: QMessageBox.critical(self, "Batch processing failed", f"{error}\n\nCheck the PDFs and answer keys, then reload the exam list."))
         self.start_worker(worker)
+
+    def open_super_batch(self) -> None:
+        if not self.state["root"]:
+            QMessageBox.warning(self, "No exam folder", "Choose an exam folder before starting Super Batch.")
+            return
+        local = [self.ai_provider_combo.itemData(i) for i in range(self.ai_provider_combo.count()) if self.ai_provider_combo.itemData(i) and self.ai_provider_combo.itemData(i)[0].kind in {"local", "freebuff"}]
+        if not local:
+            QMessageBox.warning(self, "No local CLI AI found", "Super Batch requires a detected local CLI AI provider. Install or configure one, then reload providers.")
+            return
+        try:
+            plan = build_plan(self.state["root"])
+            for item in plan.items:
+                classify_plan_item(item)
+                if item.decision is None:
+                    item.decision = default_decision(item)
+            if not plan.items:
+                QMessageBox.information(self, "Super Batch", "No PDF exams were found recursively.")
+                return
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Review Super Batch Exams")
+            dialog.resize(1050, 680)
+            layout = QVBoxLayout(dialog)
+
+            layout.addWidget(QLabel("Review discovered exams below. Configure settings, uncheck unwanted items, and click <b>Start Super Batch</b>."))
+
+            form = QFormLayout()
+            provider_combo = QComboBox()
+            for provider_option, command_option in local:
+                provider_combo.addItem(f"{provider_option.label} ({command_option})", (provider_option, command_option))
+            form.addRow("Local CLI AI:", provider_combo)
+
+            workers = QSpinBox()
+            workers.setRange(1, 16)
+            workers.setValue(max(1, self.config.super_batch_workers))
+            form.addRow("Parallel workers:", workers)
+
+            mode = QComboBox()
+            mode.addItem("Two phases (overview + questions)", "two_phase")
+            mode.addItem("Single invocation (all-in-one)", "single_invocation")
+            mode.setCurrentIndex(0 if self.config.super_batch_ai_mode == "two_phase" else 1)
+            form.addRow("AI mode:", mode)
+
+            clean = QCheckBox("Apply configured digital PDF page cleaning (discard blank/boilerplate pages)")
+            clean.setChecked(True)
+            form.addRow("PDF cleanup:", clean)
+            layout.addLayout(form)
+
+            # Bulk Actions Toolbar
+            btn_bar = QHBoxLayout()
+            btn_select_all = QPushButton("Select All")
+            btn_deselect_all = QPushButton("Deselect All")
+            btn_set_zero_test = QPushButton("Set Digital to Zero-Test")
+            btn_auto_match = QPushButton("Auto-Match Keys")
+            btn_bar.addWidget(btn_select_all)
+            btn_bar.addWidget(btn_deselect_all)
+            btn_bar.addWidget(btn_set_zero_test)
+            btn_bar.addWidget(btn_auto_match)
+            btn_bar.addStretch()
+            layout.addLayout(btn_bar)
+
+            # Review Table
+            table = QTableWidget(len(plan.items), 8, dialog)
+            table.setHorizontalHeaderLabels([
+                "Include", "Exam Name", "Type", "Metadata", "Answer Key", "Decision", "Overwrite?", "Dedicated Instructions"
+            ])
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+
+            rows_data = []
+            for row_idx, item in enumerate(plan.items):
+                # 0: Include checkbox
+                include_box = QCheckBox()
+                include_box.setChecked(True)
+                include_widget = QWidget()
+                include_layout = QHBoxLayout(include_widget)
+                include_layout.addWidget(include_box)
+                include_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                include_layout.setContentsMargins(0, 0, 0, 0)
+                table.setCellWidget(row_idx, 0, include_widget)
+
+                # 1: Exam Name
+                name_item = QTableWidgetItem(item.overview.name)
+                name_item.setToolTip(f"PDF: {item.overview.pdf}\nWorkspace: {item.overview.workspace}")
+                table.setItem(row_idx, 1, name_item)
+
+                # 2: Type
+                type_str = "📄 Digital" if item.overview.is_digital else "📷 Scanned"
+                type_item = QTableWidgetItem(type_str)
+                table.setItem(row_idx, 2, type_item)
+
+                # 3: Metadata
+                info_parts = []
+                if item.overview.test_number:
+                    info_parts.append(f"Test {item.overview.test_number}")
+                if item.overview.year:
+                    info_parts.append(item.overview.year)
+                if item.overview.variant:
+                    info_parts.append(f"Moed {item.overview.variant.upper()}")
+                table.setItem(row_idx, 3, QTableWidgetItem(" | ".join(info_parts) or "-"))
+
+                # 4: Answer Key
+                key_combo = QComboBox()
+                key_combo.addItem("No answer key", None)
+                for candidate in item.answer_keys:
+                    label = candidate.path.name
+                    if candidate.answers:
+                        label += f" ({len(candidate.answers)} ans)"
+                    key_combo.addItem(label, candidate.path)
+                if item.selected_answer_key:
+                    for i in range(key_combo.count()):
+                        if key_combo.itemData(i) == item.selected_answer_key:
+                            key_combo.setCurrentIndex(i)
+                            break
+                table.setCellWidget(row_idx, 4, key_combo)
+
+                # 5: Decision
+                decision_combo = QComboBox()
+                decision_combo.addItem("Use answer key", "use_answer_key")
+                decision_combo.addItem("Generate only (unanswered)", "generate_only")
+                decision_combo.addItem("Zero test (all A)", "zero_test")
+                if item.overview.is_digital:
+                    decision_combo.setCurrentIndex(2)
+                elif item.selected_answer_key:
+                    decision_combo.setCurrentIndex(0)
+                else:
+                    decision_combo.setCurrentIndex(1)
+                table.setCellWidget(row_idx, 5, decision_combo)
+
+                # 6: Overwrite
+                exists = (item.overview.workspace / "questions.md").exists()
+                overwrite_box = QCheckBox("⚠️ Exists" if exists else "New")
+                overwrite_box.setChecked(not exists)
+                if exists:
+                    overwrite_box.setToolTip(f"questions.md already exists in {item.overview.workspace}. Check to overwrite.")
+                overwrite_widget = QWidget()
+                overwrite_layout = QHBoxLayout(overwrite_widget)
+                overwrite_layout.addWidget(overwrite_box)
+                overwrite_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                overwrite_layout.setContentsMargins(0, 0, 0, 0)
+                table.setCellWidget(row_idx, 6, overwrite_widget)
+
+                # 7: Instructions
+                instructions = QLineEdit()
+                instructions.setPlaceholderText("Optional dedicated prompt instructions...")
+                table.setCellWidget(row_idx, 7, instructions)
+
+                rows_data.append((item, include_box, key_combo, decision_combo, overwrite_box, instructions))
+
+            # Connect bulk actions
+            def select_all(checked: bool):
+                for _, inc, _, _, _, _ in rows_data:
+                    inc.setChecked(checked)
+
+            def set_all_zero_test():
+                for itm, _, _, dec, _, _ in rows_data:
+                    if itm.overview.is_digital:
+                        dec.setCurrentIndex(2)
+
+            def auto_match_all():
+                for itm, _, k_combo, _, _, _ in rows_data:
+                    if itm.answer_keys:
+                        k_combo.setCurrentIndex(1)
+
+            btn_select_all.clicked.connect(lambda: select_all(True))
+            btn_deselect_all.clicked.connect(lambda: select_all(False))
+            btn_set_zero_test.clicked.connect(set_all_zero_test)
+            btn_auto_match.clicked.connect(auto_match_all)
+
+            layout.addWidget(table)
+
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+            buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Start Super Batch")
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+
+            selected_items = []
+            for item, include_box, key_combo, decision_combo, overwrite_box, instructions in rows_data:
+                if not include_box.isChecked():
+                    continue
+                item.selected_answer_key = key_combo.currentData()
+                item.decision = decision_combo.currentData()
+                item.overwrite = overwrite_box.isChecked()
+                item.dedicated_instructions = instructions.text().strip()
+                if item.decision == "use_answer_key" and not item.selected_answer_key and not item.overview.is_digital:
+                    item.decision = "generate_only"
+                selected_items.append(item)
+
+            if not selected_items:
+                QMessageBox.information(self, "Super Batch", "No exams were selected to process.")
+                return
+
+            exec_plan = SuperBatchPlan(plan.root, tuple(selected_items))
+            self.super_batch_button.setEnabled(False)
+            self.status_label.setText(f"Super Batch starting: {len(exec_plan.items)} exam(s)...")
+            provider, command = provider_combo.currentData()
+            cancel_event = threading.Event()
+
+            # Live Progress Dialog
+            progress_dialog = QDialog(self)
+            progress_dialog.setWindowTitle("Super Batch in Progress")
+            progress_dialog.resize(800, 500)
+            progress_dialog.setModal(True)
+            p_layout = QVBoxLayout(progress_dialog)
+
+            header_label = QLabel(f"<b>Running Super Batch:</b> {len(exec_plan.items)} exam(s) with {provider.label}")
+            p_layout.addWidget(header_label)
+
+            p_bar = QProgressBar()
+            p_bar.setRange(0, len(exec_plan.items))
+            p_bar.setValue(0)
+            p_bar.setFormat("%v / %m exams completed (%p%)")
+            p_layout.addWidget(p_bar)
+
+            p_table = QTableWidget(len(exec_plan.items), 4, progress_dialog)
+            p_table.setHorizontalHeaderLabels(["Exam", "Type", "Status", "Details"])
+            p_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            p_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+            p_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+            p_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+
+            item_row_map = {}
+            for r_idx, itm in enumerate(exec_plan.items):
+                item_row_map[id(itm)] = r_idx
+                p_table.setItem(r_idx, 0, QTableWidgetItem(itm.overview.name))
+                p_table.setItem(r_idx, 1, QTableWidgetItem("Digital" if itm.overview.is_digital else "Scanned"))
+                p_table.setItem(r_idx, 2, QTableWidgetItem("⏳ Pending"))
+                p_table.setItem(r_idx, 3, QTableWidgetItem(""))
+            p_layout.addWidget(p_table)
+
+            cancel_btn = QPushButton("Cancel Super Batch")
+            p_layout.addWidget(cancel_btn)
+            cancel_btn.clicked.connect(lambda: (cancel_event.set(), cancel_btn.setEnabled(False), cancel_btn.setText("Cancelling… waiting for active jobs to terminate")))
+
+            completed_count = [0]
+
+            def on_progress(updated_item: SuperBatchItem):
+                def update_ui():
+                    r_idx = item_row_map.get(id(updated_item))
+                    if r_idx is not None:
+                        status_icons = {
+                            "pending": "⏳ Pending",
+                            "classifying": "🔍 Classifying",
+                            "extracting": "⚙️ Extracting",
+                            "generating": "🤖 Generating",
+                            "saved": "✅ Saved",
+                            "failed": "❌ Failed",
+                            "cancelled": "🚫 Cancelled",
+                        }
+                        status_text = status_icons.get(updated_item.status, updated_item.status)
+                        p_table.setItem(r_idx, 2, QTableWidgetItem(status_text))
+                        detail = updated_item.error or (f"Saved questions.md in {updated_item.overview.workspace.name}" if updated_item.status == "saved" else "")
+                        p_table.setItem(r_idx, 3, QTableWidgetItem(detail))
+                        if updated_item.status in {"saved", "failed", "cancelled"}:
+                            completed_count[0] += 1
+                            p_bar.setValue(completed_count[0])
+                        self.status_label.setText(f"Super Batch: {updated_item.overview.name} — {updated_item.status}")
+
+                QTimer.singleShot(0, update_ui)
+
+            def execute():
+                return process_plan(
+                    exec_plan,
+                    provider,
+                    command,
+                    workers=workers.value(),
+                    ai_mode=mode.currentData(),
+                    discard_pages=self.config.default_discard_pages if clean.isChecked() else "",
+                    clean_digital=clean.isChecked(),
+                    cancel_event=cancel_event,
+                    progress=on_progress,
+                )
+
+            worker = Worker(execute)
+            worker.signals.finished.connect(lambda results: (progress_dialog.accept(), self._finish_super_batch(results)))
+            worker.signals.failed.connect(lambda err: (progress_dialog.accept(), self.super_batch_button.setEnabled(True), QMessageBox.critical(self, "Super Batch Failed", str(err))))
+            self.start_worker(worker)
+            progress_dialog.exec()
+
+        except Exception as exc:
+            self.super_batch_button.setEnabled(True)
+            QMessageBox.critical(self, "Could not prepare Super Batch", str(exc))
+
+    def _finish_super_batch(self, results) -> None:
+        self.super_batch_button.setEnabled(True)
+        succeeded = [r for r in results if r.success]
+        failed = [r for r in results if not r.success]
+        self.status_label.setText(f"Super Batch complete: {len(succeeded)}/{len(results)} succeeded.")
+
+        # Summary Dialog
+        summary_dialog = QDialog(self)
+        summary_dialog.setWindowTitle("Super Batch Results")
+        summary_dialog.resize(750, 480)
+        s_layout = QVBoxLayout(summary_dialog)
+
+        headline = QLabel(f"<h3>Super Batch Complete</h3><p><b>{len(succeeded)}</b> succeeded, <b>{len(failed)}</b> failed out of <b>{len(results)}</b> total exams.</p>")
+        s_layout.addWidget(headline)
+
+        res_table = QTableWidget(len(results), 3, summary_dialog)
+        res_table.setHorizontalHeaderLabels(["Exam", "Result", "Output / Error Details"])
+        res_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        res_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        res_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+
+        for idx, res in enumerate(results):
+            res_table.setItem(idx, 0, QTableWidgetItem(res.item.overview.name))
+            res_table.setItem(idx, 1, QTableWidgetItem("✅ Succeeded" if res.success else "❌ Failed"))
+            detail_text = str(res.output) if res.success else str(res.error)
+            res_table.setItem(idx, 2, QTableWidgetItem(detail_text))
+        s_layout.addWidget(res_table)
+
+        btn_box = QHBoxLayout()
+        if succeeded:
+            build_html_btn = QPushButton("⚡ Build HTML Quizzes for Successful Items")
+            btn_box.addWidget(build_html_btn)
+
+            def build_htmls():
+                build_html_btn.setEnabled(False)
+                build_html_btn.setText("Building HTML quizzes...")
+                built_count = 0
+                errors = []
+                for res in succeeded:
+                    try:
+                        build_standalone_quiz(res.item.overview.workspace, self.config.scripts_root)
+                        built_count += 1
+                    except Exception as e:
+                        errors.append(f"{res.item.overview.name}: {e}")
+                build_html_btn.setText(f"Built {built_count} HTML Quiz(zes)")
+                if errors:
+                    QMessageBox.warning(summary_dialog, "HTML Quiz Build Warning", f"Built {built_count} quizzes, but encountered errors:\n" + "\n".join(errors))
+                else:
+                    QMessageBox.information(summary_dialog, "HTML Quizzes Built", f"Successfully built {built_count} standalone HTML quiz(zes)!")
+
+            build_html_btn.clicked.connect(build_htmls)
+
+        close_btn = QPushButton("Done")
+        close_btn.clicked.connect(summary_dialog.accept)
+        btn_box.addStretch()
+        btn_box.addWidget(close_btn)
+        s_layout.addLayout(btn_box)
+
+        summary_dialog.exec()
+        self.populate_tests()
 
     def _on_ai_provider_changed(self) -> None:
         data = self.ai_provider_combo.currentData()

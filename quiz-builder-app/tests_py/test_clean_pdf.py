@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-import fitz
+fitz = __import__("pytest").importorskip("fitz")
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")

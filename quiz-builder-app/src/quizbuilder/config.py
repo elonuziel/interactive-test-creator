@@ -20,6 +20,8 @@ class Config:
     default_form: str = "0"
     default_discard_pages: str = "std"
     auto_build: bool = True
+    super_batch_workers: int = 2
+    super_batch_ai_mode: str = "two_phase"
     provider: ProviderConfig = field(default_factory=ProviderConfig)
 
     @classmethod
@@ -45,6 +47,8 @@ class Config:
         config.default_form = str(data.get("default_form", config.default_form))
         config.default_discard_pages = str(data.get("default_discard_pages", config.default_discard_pages))
         config.auto_build = bool(data.get("auto_build", config.auto_build))
+        config.super_batch_workers = max(1, int(data.get("super_batch_workers", config.super_batch_workers)))
+        config.super_batch_ai_mode = str(data.get("super_batch_ai_mode", config.super_batch_ai_mode))
         provider = data.get("provider", {})
         config.provider = ProviderConfig(
             freebuff_commands=tuple(provider.get("freebuff_commands", config.provider.freebuff_commands)),
