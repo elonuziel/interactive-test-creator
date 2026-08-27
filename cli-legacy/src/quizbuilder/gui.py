@@ -186,76 +186,34 @@ def main() -> int:
 
     window = QWidget()
     window.setWindowTitle("Interactive Quiz Builder")
-    window.resize(1100, 760)
-    main_layout = QVBoxLayout(window)
-    main_layout.setSpacing(10)
     window.resize(1120, 780)
     window.setStyleSheet("background-color: #f8fafc;")
 
-    # ── Top Bar: Folder Selection ──────────────────────────────────────────
-    top_bar = QHBoxLayout()
-    root_label = QLabel("Projects Folder: (no folder chosen)")
-    root_label.setStyleSheet("font-weight: bold;")
-    choose_root = QPushButton("📁 Choose projects folder")
-    refresh_root = QPushButton("🔄 Refresh")
-    top_bar.addWidget(root_label, 1)
-    top_bar.addWidget(choose_root)
-    top_bar.addWidget(refresh_root)
-    main_layout.addLayout(top_bar)
     root_layout = QVBoxLayout(window)
     root_layout.setContentsMargins(14, 12, 14, 12)
     root_layout.setSpacing(10)
 
-    # ── Center Area: 3-Column Layout ───────────────────────────────────────
-    content = QHBoxLayout()
-    content.setSpacing(10)
     # ── Top Bar: Folder Selection & Breadcrumb ─────────────────────────────
     top_bar = QFrame()
     top_bar.setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px;")
     top_layout = QHBoxLayout(top_bar)
     top_layout.setContentsMargins(4, 4, 4, 4)
 
-    # Column 1: Test Projects List & Batch Selection
-    projects_group = QGroupBox("1. Projects & Selection")
-    projects_layout = QVBoxLayout(projects_group)
-    tests = QListWidget()
-    projects_layout.addWidget(tests)
-    mix = QCheckBox("Mix questions from checked tests")
-    projects_layout.addWidget(mix)
-    content.addWidget(projects_group, 2)
     root_label = QLabel("📁 Projects Folder: (no folder chosen)")
     root_label.setStyleSheet("font-weight: 600; color: #1e293b;")
     choose_root_btn = QPushButton("📁 Choose Folder...")
     choose_root_btn.setStyleSheet("background-color: #2563eb; color: #ffffff; font-weight: 600; border-color: #1d4ed8;")
     refresh_root_btn = QPushButton("🔄 Refresh")
 
-    # Column 2: Source PDF & Preview
-    preview_group = QGroupBox("2. Source PDF & Preview")
-    preview_layout = QVBoxLayout(preview_group)
-    pdf_source_layout = QHBoxLayout()
-    pdf_source_layout.addWidget(QLabel("PDF:"))
-    pdf_source = QComboBox()
-    pdf_source.addItem("No PDF selected", None)
-    pdf_source_layout.addWidget(pdf_source, 1)
-    preview_layout.addLayout(pdf_source_layout)
     top_layout.addWidget(root_label, 1)
     top_layout.addWidget(choose_root_btn)
     top_layout.addWidget(refresh_root_btn)
     root_layout.addWidget(top_bar)
 
-    preview = QLabel("No PDF preview loaded")
-    preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    preview.setMinimumSize(260, 300)
-    preview.setFrameShape(QFrame.Shape.StyledPanel)
-    preview.setStyleSheet("background-color: #f5f5f5; border: 1px solid #ddd;")
-    preview_layout.addWidget(preview, 1)
     # ── Main 3-Tab Stepper ─────────────────────────────────────────────────
     tabs = QTabWidget()
     root_layout.addWidget(tabs, 1)
 
-    preview_button = QPushButton("🔍 Preview first page")
-    preview_layout.addWidget(preview_button)
-    content.addWidget(preview_group, 3)
     state = {
         "root": None,
         "workspace": None,
@@ -265,11 +223,6 @@ def main() -> int:
         "batch_candidates": [],
     }
 
-    # Column 3: Question Editor
-    editor_group = QGroupBox("3. Hebrew Question Editor (RTL)")
-    editor_layout = QVBoxLayout(editor_group)
-    question_list = QListWidget()
-    editor_layout.addWidget(question_list, 1)
     # =========================================================================
     # TAB 1: 📄 1. Select & Extract Exam
     # =========================================================================
@@ -278,83 +231,33 @@ def main() -> int:
     tab1_layout.setContentsMargins(10, 10, 10, 10)
     tab1_layout.setSpacing(12)
 
-    question_text_label = QLabel("Question Text:")
-    editor_layout.addWidget(question_text_label)
-    question_text = QLineEdit()
-    question_text.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-    question_text.setPlaceholderText("טקסט השאלה...")
-    editor_layout.addWidget(question_text)
     # Left: Exam list & search
     tab1_left = QGroupBox("Exams in Folder")
     tab1_left_layout = QVBoxLayout(tab1_left)
     tab1_left_layout.setSpacing(8)
 
-    editor_layout.addWidget(QLabel("Answer Options:"))
-    option_fields = [QLineEdit() for _ in range(4)]
-    placeholders = ["אפשרות 1 (א)...", "אפשרות 2 (ב)...", "אפשרות 3 (ג)...", "אפשרות 4 (ד)..."]
-    for field, placeholder in zip(option_fields, placeholders):
-        field.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        field.setPlaceholderText(placeholder)
-        editor_layout.addWidget(field)
     exam_search = QLineEdit()
     exam_search.setPlaceholderText("🔍 Filter exams...")
     tab1_left_layout.addWidget(exam_search)
 
-    correct_layout = QHBoxLayout()
-    correct_layout.addWidget(QLabel("Correct Answer:"))
-    correct_index = QComboBox()
-    correct_index.addItems([
-        "Option 1 (א)",
-        "Option 2 (ב)",
-        "Option 3 (ג)",
-        "Option 4 (ד)",
-    ])
-    correct_layout.addWidget(correct_index, 1)
-    editor_layout.addLayout(correct_layout)
     tab1_exam_list = QListWidget()
     tab1_left_layout.addWidget(tab1_exam_list, 1)
 
-    question_actions = QHBoxLayout()
-    add_question = QPushButton("➕ Add question")
-    remove_question = QPushButton("➖ Remove question")
-    save_project = QPushButton("💾 Save test")
-    question_actions.addWidget(add_question)
-    question_actions.addWidget(remove_question)
-    question_actions.addWidget(save_project)
-    editor_layout.addLayout(question_actions)
-    content.addWidget(editor_group, 4)
     batch_proc_btn = QPushButton("⚡ Process Checked Exams")
     batch_proc_btn.setStyleSheet("background-color: #f1f5f9; color: #334155; font-weight: 600;")
     tab1_left_layout.addWidget(batch_proc_btn)
     tab1_layout.addWidget(tab1_left, 4)
 
-    main_layout.addLayout(content, 1)
     # Right: Source PDF, Smart Detection, Preview & Actions
     tab1_right = QGroupBox("Document Inspection & Extraction")
     tab1_right_layout = QVBoxLayout(tab1_right)
     tab1_right_layout.setSpacing(10)
 
-    # ── Bottom Control Panels: Action Groups ───────────────────────────────
-    bottom_panels = QHBoxLayout()
-    bottom_panels.setSpacing(10)
     # Header with active exam name
     current_exam_title = QLabel("Select an exam from the list")
     current_exam_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #0f172a;")
     tab1_right_layout.addWidget(current_exam_title)
 
-    # Action Group 1: Pipeline & Extraction
-    process_group = QGroupBox("Pipeline & Extraction")
-    process_layout = QVBoxLayout(process_group)
-    key_form_layout = QHBoxLayout()
-    key_form_layout.addWidget(QLabel("Key:"))
-    answer_key = QComboBox()
-    answer_key.addItem("No answer key", None)
-    key_form_layout.addWidget(answer_key, 1)
-    key_form_layout.addWidget(QLabel("Form:"))
-    form_number = QLineEdit("0")
-    form_number.setMaximumWidth(60)
-    key_form_layout.addWidget(form_number)
-    process_layout.addLayout(key_form_layout)
     # PDF source picker
     pdf_source_row = QHBoxLayout()
     pdf_source_row.addWidget(QLabel("Source PDF:"))
@@ -363,13 +266,6 @@ def main() -> int:
     pdf_source_row.addWidget(pdf_source_combo, 1)
     tab1_right_layout.addLayout(pdf_source_row)
 
-    proc_btn_layout = QHBoxLayout()
-    process_button = QPushButton("⚙️ Process selected test")
-    process_batch_button = QPushButton("⚡ Process checked")
-    proc_btn_layout.addWidget(process_button)
-    proc_btn_layout.addWidget(process_batch_button)
-    process_layout.addLayout(proc_btn_layout)
-    bottom_panels.addWidget(process_group, 3)
     # Smart Detection Banner
     detection_card = QFrame()
     detection_card.setStyleSheet("background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px;")
@@ -383,42 +279,16 @@ def main() -> int:
     detection_layout.addWidget(detection_desc)
     tab1_right_layout.addWidget(detection_card)
 
-    # Action Group 2: AI Assistance
-    ai_group = QGroupBox("AI Prompts & Assistance")
-    ai_layout = QVBoxLayout(ai_group)
-    provider_layout = QHBoxLayout()
-    provider_layout.addWidget(QLabel("Target:"))
-    provider = QComboBox()
-    for web_provider in WEB_PROVIDERS:
-        provider.addItem(web_provider.label, (web_provider, None))
-    for local_provider, command in detect_providers():
-        provider.addItem(f"{local_provider.label} ({command})", (local_provider, command))
-    provider_layout.addWidget(provider, 1)
-    ai_layout.addLayout(provider_layout)
     # Extraction Actions
     action_box = QFrame()
     action_box.setStyleSheet("background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px;")
     action_box_layout = QVBoxLayout(action_box)
     action_box_layout.setSpacing(8)
 
-    ai_btn_layout = QHBoxLayout()
-    launch_provider = QPushButton("🚀 Launch provider")
-    prompt_button = QPushButton("📄 Offline prompt")
-    ai_btn_layout.addWidget(launch_provider)
-    ai_btn_layout.addWidget(prompt_button)
-    ai_layout.addLayout(ai_btn_layout)
-    bottom_panels.addWidget(ai_group, 3)
     extract_digital_btn = QPushButton("⚡ Extract Questions Automatically (Digital)")
     extract_digital_btn.setStyleSheet("background-color: #16a34a; color: #ffffff; font-weight: bold; padding: 9px; font-size: 13px;")
     action_box_layout.addWidget(extract_digital_btn)
 
-    # Action Group 3: Standalone Quiz Run
-    run_group = QGroupBox("Standalone Quiz Run")
-    run_layout = QVBoxLayout(run_group)
-    run_button = QPushButton("▶️ Prepare & Open Standalone Quiz")
-    run_button.setStyleSheet("font-weight: bold; padding: 10px;")
-    run_layout.addWidget(run_button)
-    bottom_panels.addWidget(run_group, 2)
     ai_row = QHBoxLayout()
     ai_provider_combo = QComboBox()
     for web_p in WEB_PROVIDERS:
@@ -426,14 +296,12 @@ def main() -> int:
     for local_p, cmd in detect_providers():
         ai_provider_combo.addItem(f"Local: {local_p.label} ({cmd})", (local_p, cmd))
 
-    main_layout.addLayout(bottom_panels)
     launch_ai_btn = QPushButton("🤖 Generate AI Prompt & Launch")
     launch_ai_btn.setStyleSheet("background-color: #6366f1; color: #ffffff; font-weight: 600; padding: 8px;")
     ai_row.addWidget(ai_provider_combo, 2)
     ai_row.addWidget(launch_ai_btn, 3)
     action_box_layout.addLayout(ai_row)
 
-    # ── Status Bar ─────────────────────────────────────────────────────────
     # Expandable Answer Key row
     key_row = QHBoxLayout()
     key_row.addWidget(QLabel("Answer Key:"))
@@ -640,13 +508,10 @@ def main() -> int:
     status_layout = QHBoxLayout(status_bar)
     status_layout.setContentsMargins(4, 2, 4, 2)
     status_label = QLabel("Ready")
-    status_label.setStyleSheet("color: #555; padding: 2px;")
-    main_layout.addWidget(status_label)
     status_label.setStyleSheet("color: #64748b; font-size: 12px;")
     status_layout.addWidget(status_label, 1)
     root_layout.addWidget(status_bar)
 
-    state = {"root": None, "workspace": None, "questions": [], "index": -1}
     # =========================================================================
     # CORE LOGIC & EVENT HANDLERS
     # =========================================================================
@@ -696,24 +561,15 @@ def main() -> int:
 
     def update_editor_fields(question: dict | None) -> None:
         if question is None:
-            question_text.clear()
-            for field in option_fields:
-                field.clear()
-            correct_index.setCurrentIndex(0)
             q_text_edit.clear()
             for opt_field in option_edits:
                 opt_field.clear()
             if option_radios:
                 option_radios[0].setChecked(True)
             return
-        question_text.setText(question.get("question", ""))
 
         q_text_edit.setPlainText(question.get("question", ""))
         options = question.get("options", [])
-        for option_number, field in enumerate(option_fields):
-            field.setText(options[option_number] if option_number < len(options) else "")
-        answer = question.get("correctIndex", 0)
-        correct_index.setCurrentIndex(answer if isinstance(answer, int) and 0 <= answer < 4 else 0)
         for i, opt_field in enumerate(option_edits):
             opt_field.setText(options[i] if i < len(options) else "")
         ans_idx = question.get("correctIndex", 0)
@@ -722,27 +578,7 @@ def main() -> int:
         elif option_radios:
             option_radios[0].setChecked(True)
 
-    def refresh_question_list_labels() -> None:
-        question_list.clear()
-        for number, question in enumerate(state["questions"], 1):
-            title = (question.get("question", "") or "שאלה ללא טקסט").strip()[:80]
-            question_list.addItem(f"{number}. {title}")
-
-    def save_question() -> None:
-        index = state["index"]
-        if index < 0 or index >= len(state["questions"]):
-            return
-        question = state["questions"][index]
-        question["question"] = question_text.text()
-        question["options"] = [field.text() for field in option_fields if field.text()]
-        question["correctIndex"] = correct_index.currentIndex()
-        item = question_list.item(index)
-        if item:
-            title = (question["question"] or "שאלה ללא טקסט").strip()[:80]
-            item.setText(f"{index + 1}. {title}")
-
     def show_question(index: int) -> None:
-        save_question()
         save_active_question()
         state["index"] = index
         if 0 <= index < len(state["questions"]):
@@ -812,17 +648,11 @@ def main() -> int:
             state["workspace"] = None
             state["questions"] = []
             state["index"] = -1
-            question_list.clear()
             current_exam_title.setText("Select an exam from the list")
             update_editor_fields(None)
-            pdf_source.clear()
-            pdf_source.addItem("No PDF selected", None)
-            answer_key.clear()
-            answer_key.addItem("No answer key", None)
             refresh_question_list_ui()
             return
 
-        pdf_source.clear()
         state["workspace"] = workspace
         state["index"] = -1
         current_exam_title.setText(f"Exam: {workspace.name}")
@@ -831,37 +661,24 @@ def main() -> int:
         pdf_source_combo.clear()
         pdf_paths = [workspace.source_pdf] if workspace.source_pdf else (
             sorted(
-                (item for item in workspace.path.iterdir() if item.is_file() and item.suffix.lower() == ".pdf"),
-                key=lambda item: item.name.lower(),
                 (p for p in workspace.path.iterdir() if p.is_file() and p.suffix.lower() == ".pdf"),
                 key=lambda p: p.name.lower(),
             )
             if workspace.path.is_dir()
             else []
         )
-        for path in pdf_paths:
-            if path:
-                pdf_source.addItem(path.name, path)
-        if pdf_source.count() == 0:
-            pdf_source.addItem("No PDF selected", None)
         for p in pdf_paths:
             if p:
                 pdf_source_combo.addItem(p.name, p)
         if pdf_source_combo.count() == 0:
             pdf_source_combo.addItem("No PDF selected", None)
 
-        answer_key.clear()
-        answer_key.addItem("No answer key", None)
-        for path in discover_sources(workspace).answer_keys:
-            answer_key.addItem(path.name, path)
         # Update Answer Keys dropdown
         answer_key_combo.clear()
         answer_key_combo.addItem("No answer key", None)
         for key_path in discover_sources(workspace).answer_keys:
             answer_key_combo.addItem(key_path.name, key_path)
 
-        state["workspace"] = workspace
-        state["index"] = -1
         # Smart classification
         chosen_pdf = pdf_source_combo.currentData()
         if chosen_pdf and chosen_pdf.is_file():
@@ -873,26 +690,18 @@ def main() -> int:
         try:
             questions = load_questions(workspace.questions_path)
             state["questions"] = questions
-            refresh_question_list_labels()
             refresh_question_list_ui()
             if questions:
-                question_list.setCurrentRow(0)
                 q_list.setCurrentRow(0)
             else:
                 update_editor_fields(None)
             status_label.setText(f"Loaded {workspace.name} ({len(questions)} questions)")
         except (ValidationError, OSError):
             state["questions"] = []
-            question_list.clear()
             refresh_question_list_ui()
             update_editor_fields(None)
-            status_label.setText(f"Selected {workspace.name} (no questions.json yet)")
             status_label.setText(f"Selected {workspace.name} (not extracted yet)")
 
-    def save_workspace() -> None:
-        workspace = state["workspace"]
-        if workspace is None:
-            QMessageBox.warning(window, "No test selected", "Choose a test first.")
         update_tab3_summary()
 
     def preview_first_page(pdf_path: Path | None = None) -> None:
@@ -900,16 +709,7 @@ def main() -> int:
         if not target or not Path(target).is_file():
             tab1_preview.setText("No PDF selected to preview")
             return
-        save_question()
-        workspace.questions_path.parent.mkdir(parents=True, exist_ok=True)
-        workspace.questions_path.write_text(
-            json.dumps(state["questions"], ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        status_label.setText(f"Saved {len(state['questions'])} questions to {workspace.questions_path.name}")
-        QMessageBox.information(window, "Saved", f"Successfully saved {len(state['questions'])} question(s) to:\n{workspace.questions_path}")
 
-    def populate_tests_list() -> None:
         tab1_preview.setText("Rendering PDF preview...")
         status_label.setText(f"Rendering page preview for {target.name}...")
 
@@ -934,61 +734,22 @@ def main() -> int:
     def populate_tests() -> None:
         if state["root"] is None:
             return
-        tests.clear()
-        for candidate in discover_batch(state["root"]):
-            label = candidate.workspace.name
-            if candidate.issues:
-                label += f"  ({'; '.join(candidate.issues)})"
-            item = QListWidgetItem(label, tests)
-            item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
-            item.setCheckState(Qt.CheckState.Unchecked)
-        root_label.setText(f"Projects Folder: {state['root']}")
-        status_label.setText(f"Discovered {tests.count()} project(s) in {state['root'].name}")
         candidates = discover_batch(state["root"])
         state["batch_candidates"] = candidates
 
-    def refresh() -> None:
-        root = QFileDialog.getExistingDirectory(window, "Choose projects folder")
-        if not root:
-            return
-        state["root"] = Path(root)
-        populate_tests_list()
         tab1_exam_list.clear()
         tab3_exam_list.clear()
 
-    def prepare() -> None:
-        selected = [
-            tests.item(index).data(Qt.ItemDataRole.UserRole)
-            for index in range(tests.count())
-            if tests.item(index).checkState() == Qt.CheckState.Checked
-        ]
-        if not selected and state["workspace"]:
-            selected = [state["workspace"]]
         for c in candidates:
             label = c.workspace.name
             if c.issues:
                 label += f"  ({'; '.join(c.issues)})"
 
-        if not selected:
-            QMessageBox.warning(window, "No tests selected", "Select or check at least one test first.")
-            return
             # Tab 1 List
             item1 = QListWidgetItem(label, tab1_exam_list)
             item1.setData(Qt.ItemDataRole.UserRole, c.workspace)
             item1.setCheckState(Qt.CheckState.Unchecked)
 
-        try:
-            save_question()
-            run = assemble_run(selected, mix=mix.isChecked())
-            root = state["root"] or (selected[0].path.parent if selected else None)
-            if root is None:
-                raise RunError("Choose a projects folder first.")
-            output = root / "runs" / f"{run.name}.json"
-            write_run_questions(run, output)
-            html_output = output.with_suffix(".html")
-            build_run_standalone_quiz(run, html_output)
-        except RunError as exc:
-            QMessageBox.warning(window, "Cannot prepare run", str(exc))
             # Tab 3 List
             item3 = QListWidgetItem(label, tab3_exam_list)
             item3.setData(Qt.ItemDataRole.UserRole, c.workspace)
@@ -1005,24 +766,9 @@ def main() -> int:
         chosen = QFileDialog.getExistingDirectory(window, "Choose Projects Folder")
         if not chosen:
             return
-        except (OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.critical(window, "Cannot export run", str(exc))
-            return
-        webbrowser.open(html_output.as_uri())
-        status_label.setText(f"Prepared run: {html_output.name}")
-        QMessageBox.information(
-            window,
-            "Run prepared",
-            f"{len(run.questions)} question(s) from {len(run.sources)} test(s)\n{html_output}",
-        )
         state["root"] = Path(chosen)
         populate_tests()
 
-    def process_selected() -> None:
-        workspace = state["workspace"]
-        root = state["root"] or (workspace.path.parent if workspace else None)
-        if workspace is None or root is None:
-            QMessageBox.warning(window, "No test selected", "Choose a test first.")
     def filter_exams(query: str) -> None:
         query = query.strip().lower()
         for i in range(tab1_exam_list.count()):
@@ -1035,13 +781,7 @@ def main() -> int:
         if not ws or not root:
             QMessageBox.warning(window, "No exam selected", "Select an exam from the list first.")
             return
-        process_button.setEnabled(False)
-        process_batch_button.setEnabled(False)
-        run_button.setEnabled(False)
-        status_label.setText(f"Processing {workspace.name}...")
 
-        selected_answer_key = answer_key.currentData()
-        selected_pdf = pdf_source.currentData()
         extract_digital_btn.setEnabled(False)
         launch_ai_btn.setEnabled(False)
         status_label.setText(f"Processing {ws.name}...")
@@ -1053,23 +793,12 @@ def main() -> int:
         worker = Worker(
             lambda: process_workspace(
                 Config.defaults(root=root),
-                workspace.path,
-                selected_answer_key,
-                form_number.text().strip() or "0",
-                selected_pdf,
                 ws.path,
                 sel_key,
                 f_num,
                 sel_pdf,
             )
         )
-        worker.signals.finished.connect(
-            lambda _result: (
-                process_button.setEnabled(True),
-                process_batch_button.setEnabled(True),
-                run_button.setEnabled(True),
-                status_label.setText(f"Processed {workspace.name}"),
-                load_workspace(workspace),
 
         def on_done(_res):
             extract_digital_btn.setEnabled(True)
@@ -1082,16 +811,6 @@ def main() -> int:
                 f"Successfully extracted {ws.name}!\nWould you like to review and edit the questions now?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-        )
-        worker.signals.failed.connect(
-            lambda message: (
-                process_button.setEnabled(True),
-                process_batch_button.setEnabled(True),
-                run_button.setEnabled(True),
-                status_label.setText("Processing failed"),
-                QMessageBox.critical(window, "Cannot process test", message),
-            )
-        )
             if reply == QMessageBox.StandardButton.Yes:
                 tabs.setCurrentIndex(1)
 
@@ -1105,57 +824,27 @@ def main() -> int:
         worker.signals.failed.connect(on_fail)
         thread_pool.start(worker)
 
-    def process_batch() -> None:
     def process_batch_checked() -> None:
         root = state["root"]
         selected = [
-            tests.item(index).data(Qt.ItemDataRole.UserRole)
-            for index in range(tests.count())
-            if tests.item(index).checkState() == Qt.CheckState.Checked
             tab1_exam_list.item(i).data(Qt.ItemDataRole.UserRole)
             for i in range(tab1_exam_list.count())
             if tab1_exam_list.item(i).checkState() == Qt.CheckState.Checked
         ]
-        if root is None or not selected:
-            QMessageBox.warning(window, "No tests checked", "Check at least one test in the list first.")
         if not root or not selected:
             QMessageBox.warning(window, "No exams checked", "Check the boxes next to the exams you want to batch-process.")
             return
-        process_batch_button.setEnabled(False)
-        process_button.setEnabled(False)
-        run_button.setEnabled(False)
-        status_label.setText(f"Processing {len(selected)} test(s)...")
 
-        def process_all():
-            results = process_workspaces(
-                Config.defaults(root=root), selected
-            )
         batch_proc_btn.setEnabled(False)
         status_label.setText(f"Batch processing {len(selected)} exam(s)...")
 
         def run_all():
             results = process_workspaces(Config.defaults(root=root), selected)
             return (
-                [result.workspace.name for result in results if result.success],
-                [f"{result.workspace.name}: {result.error}" for result in results if not result.success],
                 [r.workspace.name for r in results if r.success],
                 [f"{r.workspace.name}: {r.error}" for r in results if not r.success],
             )
 
-        worker = Worker(process_all)
-        worker.signals.finished.connect(
-            lambda result: (
-                process_batch_button.setEnabled(True),
-                process_button.setEnabled(True),
-                run_button.setEnabled(True),
-                status_label.setText(f"Batch complete: {len(result[0])} succeeded"),
-                load_workspace(state["workspace"]) if state["workspace"] else None,
-                QMessageBox.information(
-                    window,
-                    "Batch processing complete",
-                    "Succeeded: " + (", ".join(result[0]) or "none")
-                    + "\nFailed: " + ("\n".join(result[1]) or "none"),
-                ),
         worker = Worker(run_all)
 
         def on_batch_done(res):
@@ -1168,98 +857,29 @@ def main() -> int:
                 "Batch Processing Complete",
                 f"Succeeded: {', '.join(res[0]) or 'None'}\nFailed: {'\n'.join(res[1]) or 'None'}",
             )
-        )
-        worker.signals.failed.connect(
-            lambda message: (
-                process_batch_button.setEnabled(True),
-                process_button.setEnabled(True),
-                run_button.setEnabled(True),
-                status_label.setText("Batch processing failed"),
-                QMessageBox.critical(window, "Batch processing failed", message),
-            )
-        )
-        thread_pool.start(worker)
 
-    def create_prompt() -> None:
-        workspace = state["workspace"]
-        root = state["root"] or (workspace.path.parent if workspace else None)
-        if workspace is None or root is None:
-            QMessageBox.warning(window, "No test selected", "Choose a test first.")
-            return
-        try:
-            prompt_path = generate_workspace_prompt(Config.defaults(root=root), workspace.path)
-        except (OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.critical(window, "Cannot create prompt", str(exc))
-            return
-        status_label.setText(f"Prompt created: {prompt_path.name}")
-        QMessageBox.information(window, "Prompt created", str(prompt_path))
         def on_batch_fail(err):
             batch_proc_btn.setEnabled(True)
             status_label.setText("Batch processing failed")
             QMessageBox.critical(window, "Batch Processing Failed", err)
 
-    def preview_selected() -> None:
-        workspace = state["workspace"]
-        source = pdf_source.currentData() or (discover_sources(workspace).pdf if workspace else None)
-        if source is None:
-            QMessageBox.warning(window, "No PDF selected", "This test has no PDF source selected.")
-            return
-        preview.setText("Rendering preview...")
-        status_label.setText(f"Rendering preview for {source.name}...")
-        worker = Worker(lambda: render_pdf_page(source))
-        worker.signals.finished.connect(
-            lambda image: (
-                preview.setPixmap(
-                    QPixmap.fromImage(QImage.fromData(image)).scaled(
-                        preview.width() - 10,
-                        preview.height() - 10,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                ),
-                status_label.setText(f"Preview ready for {source.name}"),
-            )
-        )
-        worker.signals.failed.connect(
-            lambda message: (
-                preview.setText(message),
-                status_label.setText("Preview failed"),
-            )
-        )
         worker.signals.finished.connect(on_batch_done)
         worker.signals.failed.connect(on_batch_fail)
         thread_pool.start(worker)
 
-    def launch_generation_provider() -> None:
-        workspace = state["workspace"]
-        root = state["root"] or (workspace.path.parent if workspace else None)
-        if workspace is None or root is None:
-            QMessageBox.warning(window, "No test selected", "Choose a test first.")
     def launch_ai() -> None:
         ws = state["workspace"]
         root = state["root"] or (ws.path.parent if ws else None)
         if not ws or not root:
             QMessageBox.warning(window, "No exam selected", "Select an exam first.")
             return
-        selected_provider, command = provider.currentData()
 
         prov, cmd = ai_provider_combo.currentData()
         try:
-            if selected_provider.kind == "web":
-                prompt_path = generate_workspace_prompt(
-                    Config.defaults(root=root), workspace.path, "web"
-                )
-                open_web_provider(selected_provider)
             if prov.kind == "web":
                 prompt_path = generate_workspace_prompt(Config.defaults(root=root), ws.path, "web")
                 open_web_provider(prov)
             else:
-                prompt_path = generate_workspace_prompt(
-                    Config.defaults(root=root), workspace.path, "local"
-                )
-                send_to_provider(selected_provider, command, prompt_path)
-        except (OSError, RuntimeError, ValueError) as exc:
-            QMessageBox.critical(window, "Cannot launch provider", str(exc))
                 prompt_path = generate_workspace_prompt(Config.defaults(root=root), ws.path, "local")
                 send_to_provider(prov, cmd, prompt_path)
             status_label.setText(f"AI Prompt generated: {prompt_path.name}")
@@ -1272,8 +892,6 @@ def main() -> int:
         if not ws:
             QMessageBox.warning(window, "No test selected", "Select a test first.")
             return
-        status_label.setText(f"Provider launched for {workspace.name}")
-        QMessageBox.information(window, "Prompt ready", str(prompt_path))
         save_active_question()
         ws.questions_path.parent.mkdir(parents=True, exist_ok=True)
         ws.questions_path.write_text(
@@ -1285,8 +903,6 @@ def main() -> int:
         status_label.setText(f"Saved {len(state['questions'])} question(s) to {ws.questions_path.name}")
         QMessageBox.information(window, "Saved", f"Successfully saved {len(state['questions'])} question(s) to:\n{ws.questions_path}")
 
-    def on_add_question() -> None:
-        save_question()
     def add_question() -> None:
         save_active_question()
         new_q = {
@@ -1295,31 +911,20 @@ def main() -> int:
             "correctIndex": 0,
         }
         state["questions"].append(new_q)
-        refresh_question_list_labels()
-        question_list.setCurrentRow(len(state["questions"]) - 1)
         refresh_question_list_ui()
         q_list.setCurrentRow(len(state["questions"]) - 1)
 
-    def on_remove_question() -> None:
     def delete_question() -> None:
         idx = state["index"]
         if 0 <= idx < len(state["questions"]):
             state["questions"].pop(idx)
             state["index"] = -1
-            refresh_question_list_labels()
             refresh_question_list_ui()
             if state["questions"]:
-                new_idx = min(idx, len(state["questions"]) - 1)
-                question_list.setCurrentRow(new_idx)
                 q_list.setCurrentRow(min(idx, len(state["questions"]) - 1))
             else:
                 update_editor_fields(None)
 
-    choose_root.clicked.connect(refresh)
-    refresh_root.clicked.connect(populate_tests_list)
-    tests.currentItemChanged.connect(
-        lambda current, _previous: load_workspace(current.data(Qt.ItemDataRole.UserRole))
-        if current else None
     def prepare_and_play_quiz(custom_export_path: Path | None = None) -> None:
         selected = get_selected_workspaces_for_play()
         if not selected:
@@ -1383,20 +988,9 @@ def main() -> int:
     tab1_exam_list.currentItemChanged.connect(
         lambda curr, _prev: load_workspace(curr.data(Qt.ItemDataRole.UserRole)) if curr else None
     )
-    question_list.currentRowChanged.connect(
-        lambda index: show_question(index) if index >= 0 else None
     pdf_source_combo.currentIndexChanged.connect(
         lambda _i: preview_first_page()
     )
-    add_question.clicked.connect(on_add_question)
-    remove_question.clicked.connect(on_remove_question)
-    save_project.clicked.connect(save_workspace)
-    preview_button.clicked.connect(preview_selected)
-    process_button.clicked.connect(process_selected)
-    process_batch_button.clicked.connect(process_batch)
-    prompt_button.clicked.connect(create_prompt)
-    launch_provider.clicked.connect(launch_generation_provider)
-    run_button.clicked.connect(prepare)
 
     extract_digital_btn.clicked.connect(process_selected_exam)
     batch_proc_btn.clicked.connect(process_batch_checked)
