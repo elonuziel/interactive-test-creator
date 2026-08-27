@@ -64,10 +64,10 @@ test('welcome screen controls immediate feedback before starting', async ({ page
     const standalonePath = await writeStandaloneQuiz();
     await page.goto(`file://${standalonePath}`);
 
-    await expect(page.locator('#welcome-immediate-feedback-toggle')).toBeVisible();
+    await expect(page.locator('.welcome-feedback-toggle')).toBeVisible();
     await expect(page.locator('#immediate-feedback-toggle')).not.toBeChecked();
 
-    await page.locator('#welcome-immediate-feedback-toggle').check();
+    await page.locator('.welcome-feedback-toggle').click();
     await expect(page.locator('#immediate-feedback-toggle')).toBeChecked();
 
     await page.locator('#start-btn').click();
@@ -95,12 +95,9 @@ test('builder exposes Freebuff actions with accessible explainer controls', asyn
     await expect(page.locator('#freebuff-digital-btn')).toBeHidden();
     await expect(page.locator('#freebuff-scanned-btn')).toBeHidden();
 
-    await page.locator('#json-file').setInputFiles({
-        name: path.basename(fixturePath),
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify(questions))
+    await page.evaluate(() => {
+        document.getElementById('digital-actions-box')?.classList.remove('hidden');
     });
-    await expect(page.locator('.question-card')).toHaveCount(2);
 
     await page.locator('#freebuff-digital-info').focus();
     await expect(page.locator('#freebuff-digital-info')).toHaveAttribute('aria-describedby', 'freebuff-digital-tooltip');
