@@ -60,6 +60,26 @@ test('builder exports a standalone quiz with embedded questions', async ({ page 
     expect(exportedHtml).not.toContain('<script src="app.js"></script>');
 });
 
+test('welcome screen controls immediate feedback before starting', async ({ page }) => {
+    const standalonePath = await writeStandaloneQuiz();
+    await page.goto(`file://${standalonePath}`);
+
+    await expect(page.locator('#welcome-immediate-feedback-toggle')).toBeVisible();
+    await expect(page.locator('#welcome-immediate-feedback-toggle')).toBeChecked();
+    await expect(page.locator('#immediate-feedback-toggle')).toBeChecked();
+
+    await page.locator('#welcome-immediate-feedback-toggle').uncheck();
+    await expect(page.locator('#immediate-feedback-toggle')).not.toBeChecked();
+
+    await page.locator('#welcome-immediate-feedback-toggle').check();
+    await expect(page.locator('#immediate-feedback-toggle')).toBeChecked();
+
+    await page.locator('#start-btn').click();
+    await expect(page.locator('#quiz-screen')).toHaveClass(/active/);
+    await expect(page.locator('#immediate-feedback-toggle')).toBeChecked();
+    await expect(page.locator('#immediate-feedback-toggle')).not.toBeChecked();
+});
+
 test('standalone player loads embedded questions and persists answers', async ({ page }) => {
     const standalonePath = await writeStandaloneQuiz();
     await page.goto(`file://${standalonePath}`);

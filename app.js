@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
     let userFlags = []; // boolean per question
     let isImmediateFeedback = false;
+    let isImmediateFeedback = true;
     let autoAdvanceTimer = null;
     let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered' | 'flagged'
     let isReviewMode = false; // true when reviewing from results screen
@@ -65,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let croppedImages       = {}; // Store crop data URLs per full image path
     const themeToggle    = document.getElementById('theme-toggle');
     const feedbackToggle = document.getElementById('immediate-feedback-toggle');
+    const welcomeFeedbackToggle = document.getElementById('welcome-immediate-feedback-toggle');
     const themeIcon      = document.getElementById('theme-icon');
     const filterBtns     = document.querySelectorAll('.filter-btn');
     const builderNavLink = document.getElementById('builder-nav-link');
@@ -120,7 +122,16 @@ document.addEventListener('DOMContentLoaded', () => {
     setTheme(theme);
 
     themeToggle.addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
-    feedbackToggle.addEventListener('change', e => { isImmediateFeedback = e.target.checked; });
+
+    function setImmediateFeedback(enabled) {
+        isImmediateFeedback = enabled;
+        if (feedbackToggle) feedbackToggle.checked = enabled;
+        if (welcomeFeedbackToggle) welcomeFeedbackToggle.checked = enabled;
+    }
+    setImmediateFeedback(true);
+
+    feedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
+    welcomeFeedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
 
     function escapeHtml(str) {
         if (!str) return '';

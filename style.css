@@ -485,6 +485,19 @@ button[disabled],
     justify-content: center;
 }
 
+.welcome-feedback-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.welcome-feedback-toggle .toggle-label {
+    font-size: 0.875rem;
+}
+
 .hidden {
     display: none !important;
 }
