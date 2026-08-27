@@ -7,19 +7,19 @@ def generate_prompts(test_dir, test_name, form_number, has_answers, target="all"
     # Ensure test directory exists
     os.makedirs(test_dir, exist_ok=True)
 
-    # Check if questions.json already exists (meaning it was auto-extracted from a digital PDF)
-    questions_json_path = os.path.join(test_dir, "questions.json")
-    is_proofread = os.path.exists(questions_json_path)
+    # Check if the Markdown source already exists (meaning it is ready for proofreading).
+    questions_md_path = os.path.join(test_dir, "questions.md")
+    is_proofread = os.path.exists(questions_md_path)
 
     # 1. Local Agent Prompts (Extraction vs Proofread)
     if is_proofread:
         local_prompt = f"""[TASK: HEBREW EXAM QUESTION PROOFREADING & FORMATTING]
 
 Context:
-Automated text extraction generated `{test_dir}/questions.json` from a digital PDF for test "{test_name}". Hebrew PDF text extraction often suffers from reversed word order, backwards punctuation, and mixed language glitches.
+Automated text extraction generated `{test_dir}/questions.md` from a digital PDF for test "{test_name}". Hebrew PDF text extraction often suffers from reversed word order, backwards punctuation, and mixed language glitches.
 
 Your Instructions:
-1. Open and read `{test_dir}/questions.json`.
+1. Open and read `{test_dir}/questions.md`.
 2. Inspect every question text and option string carefully for Hebrew formatting glitches:
    - Fix reversed Hebrew words or letters (e.g., "םימ" -> "מים").
    - Correct reversed parentheses and quotes when mixing English & Hebrew (e.g., "(DNA) לשרשרת" -> "לשרשרת (DNA)").
@@ -56,7 +56,7 @@ Required Markdown Example:
 
     # 2. Web AI Prompts (Extraction vs Proofread)
     if is_proofread:
-        web_prompt = f"""I am attaching the auto-extracted `questions.json` file for the Hebrew exam "{test_name}".
+        web_prompt = f"""I am attaching the auto-extracted `questions.md` file for the Hebrew exam "{test_name}".
 
 Because this file was generated automatically from a PDF, it may contain reversed Hebrew words, inverted parentheses, or minor formatting errors.
 
@@ -118,7 +118,7 @@ STRICT EXTRACTION & PROOFREADING RULES:
         local_prompt_enhanced = f"""[TASK: HEBREW EXAM QUESTION PROOFREADING & FORMATTING - IMAGE-OPTION SAFE MODE]
 
 Context:
-Automated extraction produced `{test_dir}/questions.json` for test "{test_name}".
+Automated extraction produced `{test_dir}/questions.md` for test "{test_name}".
 This exam may include options that are images/graphs/tables/diagrams.
 
 Important schema constraint:
@@ -126,7 +126,7 @@ Important schema constraint:
 - Do NOT introduce unsupported JSON fields such as optionImages or nested option objects.
 
 Your Instructions:
-1. Open and read `{test_dir}/questions.json`.
+1. Open and read `{test_dir}/questions.md`.
 2. Fix Hebrew order/punctuation/parentheses issues.
 3. Preserve option placeholders for visual choices, for example:
    - "ראה דיאגרמה א"

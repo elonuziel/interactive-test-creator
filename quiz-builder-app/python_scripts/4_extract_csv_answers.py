@@ -58,7 +58,7 @@ def main():
     parser = argparse.ArgumentParser(description="Extract correct answers from a CSV or Excel file based on the form number.")
     parser.add_argument("csv_file", help="Path to the CSV or Excel file")
     parser.add_argument("form_num", help="Test form number (e.g. '76', '32', or '0' for Form Zero)")
-    parser.add_argument("-o", "--output", help="Output JSON file", default="answers.json")
+    parser.add_argument("-o", "--output", help="Output JSON file", default="answers.md")
     
     args = parser.parse_args()
 
@@ -163,8 +163,16 @@ def main():
         print(f"No answers found for form {args.form_num}. Check if the form number exists in the CSV.")
         return 1
 
-    with open(args.output, 'w', encoding='utf-8') as f:
-        json.dump(dict(sorted(answers_map.items(), key=lambda item: int(item[0]))), f, ensure_ascii=False, indent=2)
+    sorted_answers = dict(sorted(answers_map.items(), key=lambda item: int(item[0])))
+    if str(args.output).lower().endswith('.md'):
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write('# Answer Key\n\n')
+            for number, answer in sorted_answers.items():
+                letter = chr(ord('A') + int(answer) - 1) if answer else 'A'
+                f.write(f'- {number}: {letter}\n')
+    else:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(sorted_answers, f, ensure_ascii=False, indent=2)
 
     print(f"Successfully extracted {len(answers_map)} answers to {args.output}")
     return 0

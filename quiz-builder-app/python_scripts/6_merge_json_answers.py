@@ -20,7 +20,7 @@ def main():
     p1 = Path(args.questions_file)
     if p1.is_dir():
         q_path = p1 / ("questions.md" if (p1 / "questions.md").exists() else "questions.json")
-        a_path = Path(args.answers_file) if args.answers_file else p1 / "answers.json"
+        a_path = Path(args.answers_file) if args.answers_file else (p1 / "answers.md" if (p1 / "answers.md").exists() else p1 / "answers.json")
         out_path = Path(args.output) if args.output else q_path
     else:
         q_path = p1
@@ -35,7 +35,13 @@ def main():
     try:
         questions = (load_markdown_questions(q_path) if q_path.suffix.lower() == '.md'
                      else json.loads(q_path.read_text(encoding='utf-8')))
-        answers = json.loads(a_path.read_text(encoding='utf-8'))
+        if a_path.suffix.lower() == '.md':
+            answers = {}
+            for line in a_path.read_text(encoding='utf-8').splitlines():
+                match = __import__('re').match(r'^[-*]\s*(\d+)\s*:\s*([A-D])', line, __import__('re').I)
+                if match: answers[match.group(1)] = ord(match.group(2).upper()) - ord('A') + 1
+        else:
+            answers = json.loads(a_path.read_text(encoding='utf-8'))
     except Exception as exc:
         print(f"Error reading files: {exc}")
         return 1

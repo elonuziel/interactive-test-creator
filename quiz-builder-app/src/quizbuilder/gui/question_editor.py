@@ -32,14 +32,17 @@ class QuestionEditorWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        layout.addWidget(QLabel("Question Text (נוסח השאלה):"))
+        intro = QLabel("Edit the question and answer choices below. Changes are marked unsaved until you save questions.md.")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        layout.addWidget(QLabel("Question text (נוסח השאלה):"))
         self.text_edit = QPlainTextEdit()
         self.text_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.text_edit.setPlaceholderText("הקלד את נוסח השאלה בעברית...")
         self.text_edit.setMaximumHeight(110)
         layout.addWidget(self.text_edit)
 
-        layout.addWidget(QLabel("Answer Options & Correct Answer (בחר את התשובה הנכונה):"))
+        layout.addWidget(QLabel("Answer choices — select the correct answer (בחר את התשובה הנכונה):"))
 
         self.option_edits: list[QLineEdit] = []
         self.option_radios: list[QRadioButton] = []

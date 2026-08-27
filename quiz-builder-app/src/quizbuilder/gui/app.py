@@ -6,7 +6,7 @@ from pathlib import Path
 import webbrowser
 
 from PySide6.QtCore import QSettings, QThreadPool, Qt
-from PySide6.QtGui import QImage, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QImage, QKeySequence, QPixmap, QShortcut, QAction
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -14,9 +14,12 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGroupBox,
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -39,7 +42,7 @@ from ..runs import RunError, assemble_run, write_run_questions
 from ..validation import ValidationError, load_questions
 from ..workspace import discover_sources
 from .question_editor import QuestionEditorWidget
-from .styles import LITE_STYLESHEET
+from .styles import DARK_STYLESHEET, LITE_STYLESHEET
 from .workers import Worker
 
 LOGGER = logging.getLogger(__name__)
@@ -61,10 +64,24 @@ class MainWindow(QWidget):
         }
         self.setWindowTitle("Interactive Quiz Builder")
         self.resize(1120, 780)
-        self.setStyleSheet("background-color: #f8fafc;")
+        self.dark_mode = self.settings.value("dark_mode", False, type=bool)
+        self.setStyleSheet(DARK_STYLESHEET if self.dark_mode else LITE_STYLESHEET)
         self._build_ui()
+        self._show_welcome_if_needed()
         self._connect_signals()
+        self._add_theme_action()
         self._restore_session()
+
+    def _add_theme_action(self) -> None:
+        self.theme_button = QPushButton("Switch to light theme" if self.dark_mode else "Switch to dark theme")
+        self.theme_button.clicked.connect(self.toggle_theme)
+        self.layout().itemAt(0).widget().layout().addWidget(self.theme_button)
+
+    def toggle_theme(self) -> None:
+        self.dark_mode = not self.dark_mode
+        self.settings.setValue("dark_mode", self.dark_mode)
+        self.setStyleSheet(DARK_STYLESHEET if self.dark_mode else LITE_STYLESHEET)
+        self.theme_button.setText("Switch to light theme" if self.dark_mode else "Switch to dark theme")
 
     def _build_ui(self) -> None:
         root_layout = QVBoxLayout(self)
@@ -75,8 +92,11 @@ class MainWindow(QWidget):
         top_bar.setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px;")
         top_layout = QHBoxLayout(top_bar)
         self.root_label = QLabel("Exam folder: (not selected)")
+        self.root_label.setToolTip("Choose the parent folder containing your exam folders.")
         self.choose_root_btn = QPushButton("Choose exam folder...")
-        self.refresh_root_btn = QPushButton("Reload")
+        self.choose_root_btn.setToolTip("Select the parent folder that contains your exam projects.")
+        self.refresh_root_btn = QPushButton("Reload exams")
+        self.refresh_root_btn.setToolTip("Scan the selected folder again for exam projects.")
         top_layout.addWidget(self.root_label, 1)
         top_layout.addWidget(self.choose_root_btn)
         top_layout.addWidget(self.refresh_root_btn)
@@ -91,7 +111,8 @@ class MainWindow(QWidget):
         status_bar = QFrame()
         status_bar.setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 10px;")
         status_layout = QHBoxLayout(status_bar)
-        self.status_label = QLabel("Choose an exam folder to begin.")
+        self.status_label = QLabel("Welcome! Choose an exam folder to begin. Each exam folder should contain a PDF and questions.md.")
+        self.status_label.setWordWrap(True)
         status_layout.addWidget(self.status_label, 1)
         root_layout.addWidget(status_bar)
 
@@ -109,7 +130,7 @@ class MainWindow(QWidget):
         left.addWidget(self.batch_button)
         layout.addWidget(self.exam_group, 4)
 
-        self.extract_group = QGroupBox("2. Prepare questions")
+        self.extract_group = QGroupBox("2. Prepare questions (saved as questions.md)")
         right = QVBoxLayout(self.extract_group)
         self.current_exam_title = QLabel("Choose an exam from the list")
         self.pdf_combo = QComboBox()
@@ -121,7 +142,7 @@ class MainWindow(QWidget):
         self.detection_description = QLabel("Choose an exam to check whether its text can be extracted automatically.")
         self.detection_description.setWordWrap(True)
         self.extract_button = QPushButton("Extract questions from PDF")
-        self.ai_hint = QLabel("For scanned exams, create an AI prompt and open it in your selected AI tool.")
+        self.ai_hint = QLabel("Digital PDFs can be extracted automatically. Scanned PDFs need an AI prompt. Results are saved as questions.md.")
         self.ai_hint.setWordWrap(True)
         self.ai_provider_combo = QComboBox()
         for provider in WEB_PROVIDERS:
@@ -129,6 +150,7 @@ class MainWindow(QWidget):
         for provider, command in detect_providers(self.config.provider.freebuff_commands):
             self.ai_provider_combo.addItem(f"Local: {provider.label} ({command})", (provider, command))
         self.launch_ai_button = QPushButton("Create AI prompt")
+        self.launch_ai_button.setToolTip("Create a prompt for extracting questions into questions.md.")
         self.answer_combo = QComboBox()
         self.answer_combo.addItem("No answer key", None)
         self.form_edit = QLineEdit(self.config.default_form)
@@ -180,7 +202,8 @@ class MainWindow(QWidget):
         edit_group = QGroupBox("Review and edit questions")
         edit_layout = QVBoxLayout(edit_group)
         self.question_editor = QuestionEditorWidget()
-        self.save_button = QPushButton("Save changes")
+        self.save_button = QPushButton("Save questions.md")
+        self.save_button.setToolTip("Save the current questions to questions.md. Shortcut: Ctrl+S")
         self.next_export_button = QPushButton("Next: play or export")
         edit_layout.addWidget(self.question_editor, 1)
         edit_actions = QHBoxLayout()
@@ -199,7 +222,8 @@ class MainWindow(QWidget):
         self.play_list = QListWidget()
         self.select_all_button = QPushButton("Select all")
         self.clear_all_button = QPushButton("Clear all")
-        self.mix_checkbox = QCheckBox("Mix and shuffle questions")
+        self.mix_checkbox = QCheckBox("Mix and shuffle questions (mixed mode)")
+        self.mix_checkbox.setToolTip("Combine the checked exams into one shuffled quiz.")
         selection_layout.addWidget(self.play_list, 1)
         selection_layout.addWidget(self.select_all_button)
         selection_layout.addWidget(self.clear_all_button)
@@ -207,11 +231,11 @@ class MainWindow(QWidget):
         layout.addWidget(selection_group, 5)
         action_group = QGroupBox("Play or export your quiz")
         action_layout = QVBoxLayout(action_group)
-        self.summary = QLabel("No exams selected")
+        self.summary = QLabel("No exams selected. Check one or more exams to continue.")
         self.summary.setWordWrap(True)
         self.play_button = QPushButton("Play quiz in browser")
         self.export_button = QPushButton("Export quiz as HTML...")
-        self.open_runs_button = QPushButton("Open saved quizzes")
+        self.open_runs_button = QPushButton("Open saved quizzes folder")
         action_layout.addWidget(self.summary)
         action_layout.addWidget(self.play_button)
         action_layout.addWidget(self.export_button)
@@ -246,6 +270,35 @@ class MainWindow(QWidget):
         self.open_runs_button.clicked.connect(self.open_runs_folder)
         QShortcut(QKeySequence("Ctrl+S"), self).activated.connect(self.save_test)
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(lambda: (self.exam_search.setFocus(), self.exam_search.selectAll()))
+
+    def _show_welcome_if_needed(self) -> None:
+        if self.settings.value("welcome_shown", False, type=bool):
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Welcome to Quiz Builder")
+        layout = QVBoxLayout(dialog)
+        title = QLabel("Create an interactive quiz in a few steps")
+        title.setStyleSheet("font-size: 18px; font-weight: 700;")
+        layout.addWidget(title)
+        instructions = QLabel(
+            "1. Choose the folder containing your exam folders.\n"
+            "2. Select an exam and extract questions or create an AI prompt.\n"
+            "3. Review questions and save them as questions.md.\n"
+            "4. Select an exam to play or export it as HTML.\n\n"
+            "Each exam folder normally contains a PDF, questions.md, and optionally an answer key."
+        )
+        instructions.setWordWrap(True)
+        layout.addWidget(instructions)
+        example = QPlainTextEdit("## Question 1\n\nWhat is the answer?\n\n- Choice A\n- Choice B\n\nAnswer: A")
+        example.setReadOnly(True)
+        example.setMaximumHeight(150)
+        layout.addWidget(QLabel("Markdown example:"))
+        layout.addWidget(example)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.exec()
+        self.settings.setValue("welcome_shown", True)
 
     def _restore_session(self) -> None:
         saved = self.settings.value("last_exam_folder", "")
@@ -388,8 +441,9 @@ class MainWindow(QWidget):
     def _load_questions(self, workspace) -> None:
         try:
             self.state["questions"] = load_questions(workspace.questions_path)
-        except (ValidationError, OSError):
+        except (ValidationError, OSError) as exc:
             self.state["questions"] = []
+            self.status_label.setText(f"Could not load questions.md: {exc}. Use Add question or run extraction.")
         self.refresh_question_list()
         if self.state["questions"]:
             self.question_list.setCurrentRow(0)
@@ -444,7 +498,7 @@ class MainWindow(QWidget):
         def done(result):
             if isinstance(result, Exception):
                 self.detection_title.setText("PDF analysis unavailable")
-                self.detection_description.setText(str(result))
+                self.detection_description.setText(f"{result} You can still create an AI prompt or check the PDF manually.")
                 self.extract_button.setEnabled(True)
             elif result:
                 self.detection_title.setText("Digital PDF detected")
@@ -483,7 +537,7 @@ class MainWindow(QWidget):
         self.extract_button.setEnabled(False)
         worker = Worker(lambda: process_workspace(self.config_for_root(self.state["root"]), workspace.path, self.answer_combo.currentData(), self.form_edit.text().strip() or "0", self.pdf_combo.currentData()))
         worker.signals.finished.connect(lambda _result: (self.extract_button.setEnabled(True), self.load_workspace(workspace)))
-        worker.signals.failed.connect(lambda error: (self.extract_button.setEnabled(True), QMessageBox.critical(self, "Extraction failed", error)))
+        worker.signals.failed.connect(lambda error: (self.extract_button.setEnabled(True), QMessageBox.critical(self, "Extraction failed", f"{error}\n\nCheck that the PDF is readable and that the selected exam folder is writable.")))
         self.thread_pool.start(worker)
 
     def process_batch_checked(self) -> None:
@@ -493,7 +547,7 @@ class MainWindow(QWidget):
             return
         worker = Worker(lambda: process_workspaces(self.config_for_root(self.state["root"]), selected))
         worker.signals.finished.connect(lambda _result: self.populate_tests())
-        worker.signals.failed.connect(lambda error: QMessageBox.critical(self, "Batch processing failed", error))
+        worker.signals.failed.connect(lambda error: QMessageBox.critical(self, "Batch processing failed", f"{error}\n\nCheck the PDFs and answer keys, then reload the exam list."))
         self.thread_pool.start(worker)
 
     def launch_ai(self) -> None:
@@ -585,7 +639,7 @@ class MainWindow(QWidget):
         def failed(error):
             self.play_button.setEnabled(True)
             self.export_button.setEnabled(True)
-            QMessageBox.critical(self, "Could not build quiz", error)
+            QMessageBox.critical(self, "Could not build quiz", f"{error}\n\nMake sure the selected exams contain valid questions.md files.")
 
         worker.signals.finished.connect(done)
         worker.signals.failed.connect(failed)

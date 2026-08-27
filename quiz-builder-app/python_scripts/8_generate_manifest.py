@@ -24,7 +24,7 @@ def derive_display_name(folder_name):
 
 
 def scan_tests(tests_dir):
-    """Walk the tests directory and find all folders with questions.json."""
+    """Walk the tests directory and find all folders with questions.md or legacy JSON."""
     manifest = []
 
     if not os.path.isdir(tests_dir):

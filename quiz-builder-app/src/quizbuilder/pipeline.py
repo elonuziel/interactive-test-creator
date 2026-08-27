@@ -114,7 +114,7 @@ class PipelineRunner:
         return self.require_success("6_merge_json_answers.py", str(workspace))
 
     def validate(self, questions: Path) -> StageResult:
-        return self.require_success("7_check_json.py", str(questions))
+        return self.require_success("7_check_questions.py", str(questions))
 
     def generate_manifest(self) -> StageResult:
         return self.require_success("8_generate_manifest.py")

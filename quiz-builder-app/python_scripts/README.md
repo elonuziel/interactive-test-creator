@@ -7,7 +7,7 @@ This folder contains the Python pipeline for extracting Hebrew exam PDFs into th
 pip install pymupdf pandas openpyxl
 ```
 
-`pandas` and `openpyxl` are only needed if you plan to read Excel answer keys with `4_extract_csv_answers.py`.
+`pandas` and `openpyxl` are only needed if you plan to read Excel answer keys with `4_extract_csv_answers.py` (writes `answers.md` by default).
 
 ## Drop Folder Location & Input Files
 
@@ -92,10 +92,10 @@ Renders a PDF to PNG images per page.
 
 ### 4. Answer Extraction and Merging
 
-**A. `4_extract_csv_answers.py`**
+**A. `4_extract_csv_answers.py` (writes `answers.md` by default)**
 Extracts the correct answers for a specific exam form from the master student answers CSV or Excel export.
 The script scans for the row containing `שאלון` and handles the `3 (2) [15] {4}`-style cell format. Recommend using `encoding='utf-8-sig'` when reading CSV files to properly process Windows Byte Order Marks (BOM) in Hebrew CSVs.
-**Usage:** `python 4_extract_csv_answers.py "answers.xlsx" "76" -o "answers.json"`
+**Usage:** `python 4_extract_csv_answers.py "answers.xlsx" "76" -o "answers.md"`
 *(Where "76" is the test form number)*
 
 **B. `6_merge_json_answers.py`**
@@ -104,9 +104,9 @@ Merges the extracted answers from the CSV with the Markdown question source and 
 
 ### 5. Quality Assurance
 
-**`7_check_json.py`**
+**`7_check_questions.py`**
 Checks the final Markdown question file for dropped options, empty questions, duplicate option text, or out-of-bounds `correctIndex` values. Run this before deploying!
-**Usage:** `python 7_check_json.py "final_questions.json"`
+**Usage:** `python 7_check_questions.py "final_questions.json"`
 **Options:** `--expected-options N` (default: 4; mismatched counts produce a warning instead of an error)
 
 ### 6. Auto-Generate Test Manifest

@@ -27,7 +27,7 @@ A command-oriented CLI with an optional guided wizard automates:
 1. Environment & package prerequisite verification (`pymupdf`, `pandas`, `openpyxl`).
 2. Test folder creation and exam source drop-folder setup (`.pdf` or `.docx`) plus answer-key sheets.
 3. PDF type detection & page image rendering for Vision LLM extraction.
-4. Automatic answer key merging, schema QA validation (`7_check_json.py`), and test manifest updates (`8_generate_manifest.py`).
+4. Automatic answer key merging, schema QA validation (`7_check_questions.py`), and test manifest updates (`8_generate_manifest.py`).
 5. Building portable single-file HTML apps or starting local web servers.
 6. Detecting an installed `freebuff` or `freebuff-cli` command and offering it as a prompt-helper destination.
 
@@ -74,7 +74,7 @@ quiz-builder-app/
 │   ├── 4_extract_csv_answers.py# Extract answer keys from CSV/XLSX
 │   ├── 5_parse_questions_md.py# Heuristic Markdown question parser
 │   ├── 6_merge_json_answers.py# Merge answer keys with questions JSON
-│   ├── 7_check_json.py        # QA validator for question JSON schema
+│   ├── 7_check_questions.py        # QA validator for question JSON schema
 │   ├── 8_generate_manifest.py # Auto-generate tests menu manifest
 │   ├── 9_build_single_html.py # Pack single-file standalone HTML quiz
 │   ├── generate_prompts.py    # Generate LLM extraction prompts
@@ -149,7 +149,7 @@ Copy `quizbuilder.toml.example` to `quizbuilder.toml` and customize workspace de
    - Follow [LLM_RUNBOOK.md](LLM_RUNBOOK.md) for Vision LLMs or check [python_scripts/README.md](python_scripts/README.md) for script usages (`1_detect_pdf_type.py` through `6_merge_json_answers.py`).
 3. **Validate & Update Manifest**:
    ```bash
-   python python_scripts/7_check_json.py tests/botany_2024_a/questions.md
+   python python_scripts/7_check_questions.py tests/botany_2024_a/questions.md
    python python_scripts/8_generate_manifest.py
    ```
 4. **Launch Local Web App**:

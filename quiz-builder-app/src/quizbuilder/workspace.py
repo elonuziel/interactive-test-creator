@@ -14,7 +14,7 @@ SCRATCH_NAMES = {
     "prompt_local_agent.txt", "prompt_local_agent_enhanced.txt",
     "prompt_web_ai.txt", "prompt_web_ai_enhanced.txt",
     "prompt_proofread.txt", "prompt_proofread_local.txt", "prompt_proofread_web.txt",
-    "final_questions.json", "output.json", "response.json", "data.json",
+    "final_questions.json", "output.json", "response.json", "data.json", "answers.md",
 }
 
 

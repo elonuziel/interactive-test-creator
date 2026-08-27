@@ -70,7 +70,7 @@ def image_to_data_uri(image_path):
 
 def process_questions(questions, test_dir, embed_images=True):
     """
-    Process questions.json: optionally convert image paths to data URIs.
+    Process parsed questions.md data: optionally convert image paths to data URIs.
     Returns the processed questions list and total image bytes embedded.
     """
     total_img_bytes = 0
