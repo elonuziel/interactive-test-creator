@@ -1,23 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const STORAGE = {
-        theme: 'theme'
-    };
-
-    const EMBEDDED_KEY = {
-        encryptedKeyB64: 'Hv6PPzBzdBiwexOLNv2KF4vTQZCo0clZUyZNkw0zSWH/+pWkySSOJEZnv585nIoFtl/3ovyRf5vaaBE1GB2NOJKRHvyN',
-        ivB64: '/5FGe5eK7voMUlB/',
-        saltB64: '0FgJhVvq66HJ3YTs6XHn3Q=='
-    };
-
-    const GEMINI_CONFIG = {
-        apiVersions: ['v1', 'v1beta'],
-        preferredModels: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
-        maxQuotaRetries: 5,
-        initialRetryDelayMs: 5000,
-        maxRetryDelayMs: 60000,
-        interPageDelayMs: 8000,
-        ocrChunkSize: 20
-    };
+    'use strict';
 
     const state = {
         questions: [],
@@ -26,7 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
         proofPageImages: [],
         proofMode: true,
         pdfArrayBuffer: null,
-        pdfPagesState: []
+        pdfBytes: null,
+        pdfPagesState: [],
+        evenOddMode: null
     };
 
     const elements = {
@@ -52,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         digitalActionsBox: document.getElementById('digital-actions-box'),
         runDigitalLocalBtn: document.getElementById('run-digital-local-btn'),
         digitalPromptExpandable: document.getElementById('digital-prompt-expandable'),
+        showDigitalPromptBtn: document.getElementById('show-digital-prompt-btn'),
         copyDigitalPromptBtn: document.getElementById('copy-digital-prompt-btn'),
         digitalLlmPromptBox: document.getElementById('digital-llm-prompt-box'),
         toggleProcessingSettingsBtn: document.getElementById('toggle-processing-settings-btn'),
@@ -113,3652 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
         themeIcon: document.getElementById('theme-icon')
     };
 
-    let theme = localStorage.getItem(STORAGE.theme) || 'light';
-
-    function setTheme(nextTheme) {
-        theme = nextTheme;
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem(STORAGE.theme, theme);
-        if (theme === 'dark') {
-            elements.themeIcon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>';
-        } else {
-            elements.themeIcon.innerHTML = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>';
-        }
-    }
-
-    setTheme(theme);
-    elements.themeToggle.addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
-    if (elements.proofModeToggle) {
-        state.proofMode = !!elements.proofModeToggle.checked;
-        elements.proofModeToggle.addEventListener('change', () => {
-            state.proofMode = !!elements.proofModeToggle.checked;
-            renderPreview();
-        });
-    }
-    function updateVerificationUI() {
-        if (!elements.enableLlmVerification) return;
-        const isChecked = elements.enableLlmVerification.checked;
-        if (elements.verificationWarningBox) {
-            elements.verificationWarningBox.classList.toggle('hidden', !isChecked);
-        }
-        if (elements.verificationBadge) {
-            if (isChecked) {
-                elements.verificationBadge.textContent = '🔍 2 קריאות API';
-                elements.verificationBadge.style.background = 'rgba(217, 119, 6, 0.15)';
-                elements.verificationBadge.style.color = '#d97706';
-                elements.verificationBadge.style.borderColor = 'rgba(217, 119, 6, 0.35)';
-            } else {
-                elements.verificationBadge.textContent = '⚡ קריאה 1 (מהיר)';
-                elements.verificationBadge.style.background = 'rgba(16, 185, 129, 0.12)';
-                elements.verificationBadge.style.color = '#059669';
-                elements.verificationBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-            }
-        }
-    }
-
-    if (elements.enableLlmVerification) {
-        updateVerificationUI();
-        elements.enableLlmVerification.addEventListener('change', updateVerificationUI);
-    }
-
-    function showToast(message, type = 'success', duration = 4000) {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-
-        const iconMap = {
-            success: '✅',
-            error: '⚠️',
-            info: '💡'
-        };
-
-        const iconSpan = document.createElement('span');
-        iconSpan.textContent = iconMap[type] || 'ℹ️';
-
-        const textSpan = document.createElement('span');
-        textSpan.textContent = message;
-
-        toast.append(iconSpan, textSpan);
-        container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(10px)';
-            toast.style.transition = 'all 0.3s ease';
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    }
-
-    // ── Global & Integrated Progress System ───────────────────────────────────
-    const ProgressController = {
-        activeTask: null,
-        dismissTimeout: null,
-
-        startTask(title, { cancellable = true, icon = '⚡', detail = 'מתחיל בעיבוד...', indeterminate = false } = {}) {
-            if (this.dismissTimeout) {
-                clearTimeout(this.dismissTimeout);
-                this.dismissTimeout = null;
-            }
-
-            const abortController = new AbortController();
-            const taskId = Symbol('task');
-
-            const task = {
-                id: taskId,
-                title,
-                cancellable,
-                abortController,
-                signal: abortController.signal,
-                isAborted: () => abortController.signal.aborted,
-                update: (percent, newDetail, opts) => this.update(taskId, percent, newDetail, opts),
-                finish: (msg, opts) => this.finish(taskId, msg, opts),
-                fail: (err, opts) => this.fail(taskId, err, opts),
-                abort: (reason) => this.abort(taskId, reason)
-            };
-
-            this.activeTask = task;
-
-            if (elements.progressCard) {
-                elements.progressCard.classList.remove('hidden', 'is-success', 'is-error', 'is-aborted');
-            }
-            if (elements.stickyProgressBanner) {
-                elements.stickyProgressBanner.classList.remove('hidden', 'is-success', 'is-error', 'is-aborted');
-            }
-
-            if (elements.progressTitle) elements.progressTitle.textContent = title;
-            if (elements.stickyProgressTitle) elements.stickyProgressTitle.textContent = title;
-            if (elements.progressDetail) elements.progressDetail.textContent = detail;
-            if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = detail;
-            if (elements.progressIcon) elements.progressIcon.textContent = icon;
-
-            if (elements.progressAbortBtn) {
-                elements.progressAbortBtn.style.display = cancellable ? 'inline-flex' : 'none';
-                elements.progressAbortBtn.disabled = false;
-            }
-            if (elements.stickyProgressAbortBtn) {
-                elements.stickyProgressAbortBtn.style.display = cancellable ? 'inline-flex' : 'none';
-                elements.stickyProgressAbortBtn.disabled = false;
-            }
-
-            this.update(taskId, indeterminate ? 0 : 0, detail, { indeterminate });
-            return task;
-        },
-
-        update(taskId, percent, detailText, { indeterminate = false } = {}) {
-            if (this.activeTask && this.activeTask.id !== taskId) return;
-            const clamped = Math.max(0, Math.min(100, Math.round(percent || 0)));
-
-            if (elements.progressFill) {
-                elements.progressFill.classList.toggle('indeterminate', !!indeterminate);
-                if (!indeterminate) elements.progressFill.style.width = `${clamped}%`;
-            }
-            if (elements.stickyProgressFill) {
-                elements.stickyProgressFill.classList.toggle('indeterminate', !!indeterminate);
-                if (!indeterminate) elements.stickyProgressFill.style.width = `${clamped}%`;
-            }
-
-            const percentLabel = indeterminate ? '...' : `${clamped}%`;
-            if (elements.progressPercent) elements.progressPercent.textContent = percentLabel;
-            if (elements.stickyProgressPercent) elements.stickyProgressPercent.textContent = percentLabel;
-
-            if (elements.mainProgressBar) {
-                elements.mainProgressBar.setAttribute('aria-valuenow', String(indeterminate ? 50 : clamped));
-            }
-
-            if (detailText !== undefined) {
-                if (elements.progressDetail) elements.progressDetail.textContent = detailText;
-                if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = detailText;
-            }
-        },
-
-        finish(taskId, successMessage = 'הפעולה הסתיימה בהצלחה!', { duration = 2000 } = {}) {
-            if (this.activeTask && this.activeTask.id !== taskId) return;
-            this.update(taskId, 100, successMessage, { indeterminate: false });
-
-            if (elements.progressCard) elements.progressCard.classList.add('is-success');
-            if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('is-success');
-            if (elements.progressIcon) elements.progressIcon.textContent = '✅';
-
-            if (elements.progressAbortBtn) elements.progressAbortBtn.style.display = 'none';
-            if (elements.stickyProgressAbortBtn) elements.stickyProgressAbortBtn.style.display = 'none';
-
-            setStatus(successMessage, false);
-
-            this.dismissTimeout = setTimeout(() => {
-                if (elements.progressCard) elements.progressCard.classList.add('hidden');
-                if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('hidden');
-                this.activeTask = null;
-            }, duration);
-        },
-
-        fail(taskId, errorMessage = 'אירעה שגיאה בתהליך.') {
-            if (this.activeTask && this.activeTask.id !== taskId) return;
-            if (elements.progressCard) elements.progressCard.classList.add('is-error');
-            if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('is-error');
-            if (elements.progressIcon) elements.progressIcon.textContent = '⚠️';
-            if (elements.progressDetail) elements.progressDetail.textContent = errorMessage;
-            if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = errorMessage;
-
-            if (elements.progressAbortBtn) elements.progressAbortBtn.style.display = 'none';
-            if (elements.stickyProgressAbortBtn) elements.stickyProgressAbortBtn.style.display = 'none';
-
-            setStatus(errorMessage, true, true);
-
-            this.dismissTimeout = setTimeout(() => {
-                if (elements.progressCard) elements.progressCard.classList.add('hidden');
-                if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('hidden');
-                this.activeTask = null;
-            }, 4500);
-        },
-
-        abort(taskId, reason = 'הפעולה בוטלה על ידי המשתמש.') {
-            if (this.activeTask && this.activeTask.id !== taskId) return;
-            if (this.activeTask) {
-                this.activeTask.abortController.abort();
-            }
-
-            if (elements.progressCard) elements.progressCard.classList.add('is-aborted');
-            if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('is-aborted');
-            if (elements.progressIcon) elements.progressIcon.textContent = '🛑';
-            if (elements.progressDetail) elements.progressDetail.textContent = reason;
-            if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = reason;
-
-            if (elements.progressAbortBtn) elements.progressAbortBtn.disabled = true;
-            if (elements.stickyProgressAbortBtn) elements.stickyProgressAbortBtn.disabled = true;
-
-            setStatus(reason, true, true);
-
-            this.dismissTimeout = setTimeout(() => {
-                if (elements.progressCard) elements.progressCard.classList.add('hidden');
-                if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('hidden');
-                this.activeTask = null;
-            }, 2500);
-        }
-    };
-
-    elements.progressAbortBtn?.addEventListener('click', () => {
-        if (ProgressController.activeTask) {
-            ProgressController.abort(ProgressController.activeTask.id);
-        }
-    });
-    elements.stickyProgressAbortBtn?.addEventListener('click', () => {
-        if (ProgressController.activeTask) {
-            ProgressController.abort(ProgressController.activeTask.id);
-        }
-    });
-
-    // ── Image Lightbox ──
-    // Shows an image in a fullscreen overlay. If pageNum is provided and
-    // PDF bytes are available, re-renders the page at high resolution
-    // (scale 2.5) and swaps the image in once ready.
-    async function showImageZoom(src, pageNum = null) {
-        let overlay = document.getElementById('gen-zoom-overlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'gen-zoom-overlay';
-            overlay.style.cssText = [
-                'position:fixed;inset:0;z-index:99999',
-                'background:rgba(0,0,0,0.88)',
-                'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px',
-                'cursor:zoom-out;padding:24px;box-sizing:border-box'
-            ].join(';');
-
-            const spinner = document.createElement('div');
-            spinner.id = 'gen-zoom-spinner';
-            spinner.style.cssText = [
-                'width:40px;height:40px',
-                'border:4px solid rgba(255,255,255,0.2)',
-                'border-top-color:#fff',
-                'border-radius:50%',
-                'animation:gen-spin 0.7s linear infinite',
-                'display:none'
-            ].join(';');
-            if (!document.getElementById('gen-spin-style')) {
-                const s = document.createElement('style');
-                s.id = 'gen-spin-style';
-                s.textContent = '@keyframes gen-spin{to{transform:rotate(360deg)}}';
-                document.head.appendChild(s);
-            }
-
-            const zoomImg = document.createElement('img');
-            zoomImg.id = 'gen-zoom-img';
-            zoomImg.style.cssText = [
-                'max-width:100%;max-height:88vh',
-                'border-radius:10px',
-                'box-shadow:0 8px 40px rgba(0,0,0,0.7)',
-                'object-fit:contain'
-            ].join(';');
-
-            overlay.appendChild(spinner);
-            overlay.appendChild(zoomImg);
-
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay || e.target === zoomImg) {
-                    overlay.style.display = 'none';
-                    document.body.style.overflow = '';
-                }
-            });
-            document.body.appendChild(overlay);
-            // Single persistent Escape handler — registered once on the overlay element
-            overlay._keyHandler = (e) => {
-                if (e.key === 'Escape' && overlay.style.display !== 'none') {
-                    overlay.style.display = 'none';
-                    document.body.style.overflow = '';
-                }
-            };
-            document.addEventListener('keydown', overlay._keyHandler);
-        }
-
-        const zoomImg = document.getElementById('gen-zoom-img');
-        const spinner = document.getElementById('gen-zoom-spinner');
-
-        // Show placeholder (low-res thumbnail) immediately
-        zoomImg.src = src;
-        zoomImg.style.opacity = '1';
-        overlay.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-
-        // If we have the PDF and a page number, render hi-res in the background
-        if (pageNum && state.pdfBytes && state.pdfBytes.length > 0) {
-            const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-            if (pdfjs?.getDocument) {
-                spinner.style.display = 'block';
-                zoomImg.style.opacity = '0.4';
-                try {
-                    const pdfDoc = await pdfjs.getDocument({ data: new Uint8Array(state.pdfBytes) }).promise;
-                    const page = await pdfDoc.getPage(pageNum);
-                    const hiResSrc = 'data:image/png;base64,' + await renderPageImageData(page);
-                    // Only update if overlay is still open
-                    if (overlay.style.display !== 'none') {
-                        zoomImg.src = hiResSrc;
-                        zoomImg.style.opacity = '1';
-                    }
-                } catch (err) {
-                    console.warn('Hi-res zoom render failed:', err);
-                } finally {
-                    spinner.style.display = 'none';
-                    zoomImg.style.opacity = '1';
-                }
-            }
-        }
-    }
-
-    function setStatus(message, isError = false, triggerToast = false) {
-        elements.status.textContent = message;
-        elements.status.classList.toggle('muted', !isError);
-        elements.status.style.color = isError ? 'var(--danger)' : 'var(--text-primary)';
-        if (triggerToast || isError) {
-            showToast(message, isError ? 'error' : 'success');
-        }
-    }
-
-    function getQuestionValidationErrors() {
-        return validateQuestions(state.questions);
-    }
-
-    function updateValidationUI() {
-        const errors = getQuestionValidationErrors();
-        const invalidQuestionNumbers = new Set(
-            errors.map((error) => {
-                const match = String(error).match(/^שאלה\s+(\d+)/);
-                return match ? Number(match[1]) : null;
-            }).filter(Boolean)
-        );
-
-        elements.preview?.querySelectorAll('.question-card').forEach((card, index) => {
-            const invalid = invalidQuestionNumbers.has(index + 1);
-            card.classList.toggle('is-invalid', invalid);
-            card.setAttribute('aria-invalid', String(invalid));
-
-            const cardErrors = errors.filter((err) => err.startsWith(`שאלה ${index + 1}:`));
-            let errorBox = card.querySelector('.question-validation-error');
-            if (cardErrors.length) {
-                if (!errorBox) {
-                    errorBox = document.createElement('div');
-                    errorBox.className = 'question-validation-error';
-                    errorBox.setAttribute('role', 'alert');
-                    card.appendChild(errorBox);
-                }
-                errorBox.textContent = cardErrors.join(' ');
-            } else if (errorBox) {
-                errorBox.remove();
-            }
-        });
-
-        if (elements.validationSummary) {
-            elements.validationSummary.classList.toggle('hidden', errors.length === 0);
-            elements.validationSummary.textContent = errors.length
-                ? `נמצאו ${invalidQuestionNumbers.size} שאלות לא תקינות (${errors.length} בעיות): ${errors.slice(0, 3).join(' ')}`
-                : '';
-        }
-        return errors;
-    }
-
-    function disableOutputActions(disabled) {
-        const hasValidationErrors = getQuestionValidationErrors().length > 0;
-        const outputDisabled = disabled || hasValidationErrors;
-        if (elements.downloadQuiz) elements.downloadQuiz.disabled = outputDisabled;
-        if (elements.takeQuiz) elements.takeQuiz.disabled = outputDisabled;
-        if (elements.compressSettingsBtn) elements.compressSettingsBtn.disabled = outputDisabled;
-        if (elements.compressExportImages) elements.compressExportImages.disabled = outputDisabled;
-    }
-
-    function setPdfTypeNote(message = '', tone = 'neutral') {
-        if (!elements.pdfTypeNote) return;
-        elements.pdfTypeNote.textContent = message;
-        elements.pdfTypeNote.classList.toggle('hidden', !message);
-        elements.pdfTypeNote.classList.remove('is-loading', 'is-digital', 'is-scanned', 'is-error');
-        if (!message) return;
-        if (tone === 'loading') elements.pdfTypeNote.classList.add('is-loading');
-        else if (tone === 'digital') elements.pdfTypeNote.classList.add('is-digital');
-        else if (tone === 'scanned') elements.pdfTypeNote.classList.add('is-scanned');
-        else if (tone === 'error') elements.pdfTypeNote.classList.add('is-error');
-    }
-
-    function decodeBase64(base64) {
-        const str = atob(base64);
-        const bytes = new Uint8Array(str.length);
-        for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
-        return bytes;
-    }
-
-    async function decryptSingleKey(passcode, keyObj) {
-        if (!keyObj || !keyObj.encryptedKeyB64 || !keyObj.ivB64 || !keyObj.saltB64 || !passcode) {
-            return '';
-        }
-
-        try {
-            const encoder = new TextEncoder();
-            const keyMaterial = await crypto.subtle.importKey(
-                'raw',
-                encoder.encode(passcode),
-                'PBKDF2',
-                false,
-                ['deriveKey']
-            );
-
-            const aesKey = await crypto.subtle.deriveKey(
-                {
-                    name: 'PBKDF2',
-                    salt: decodeBase64(keyObj.saltB64),
-                    iterations: 100000,
-                    hash: 'SHA-256'
-                },
-                keyMaterial,
-                { name: 'AES-GCM', length: 256 },
-                false,
-                ['decrypt']
-            );
-
-            const decrypted = await crypto.subtle.decrypt(
-                {
-                    name: 'AES-GCM',
-                    iv: decodeBase64(keyObj.ivB64)
-                },
-                aesKey,
-                decodeBase64(keyObj.encryptedKeyB64)
-            );
-
-            return new TextDecoder().decode(decrypted).trim();
-        } catch {
-            return '';
-        }
-    }
-
-    async function decryptEmbeddedApiKey(passcode) {
-        const gemini = await decryptSingleKey(passcode, EMBEDDED_KEY);
-        if (!gemini) return null;
-        return gemini;
-    }
-
-    function requestGeminiCredentials() {
-        return new Promise((resolve, reject) => {
-            const popup = elements.credentialPopup;
-            const apiKeyInput = elements.credentialApiKey;
-            const passcodeInput = elements.credentialPasscode;
-            const submitButton = elements.credentialSubmit;
-            const cancelButton = elements.credentialCancel;
-
-            if (!popup || !apiKeyInput || !passcodeInput || !submitButton || !cancelButton) {
-                reject(new Error('ממשק הזנת האישורים לא נטען. רענן את העמוד ונסה שוב.'));
-                return;
-            }
-
-            apiKeyInput.value = elements.apiKey.value.trim();
-            passcodeInput.value = '';
-            popup.classList.add('show');
-
-            const cleanup = () => {
-                popup.classList.remove('show');
-                submitButton.removeEventListener('click', handleSubmit);
-                cancelButton.removeEventListener('click', handleCancel);
-            };
-
-            const handleSubmit = () => {
-                const apiKey = apiKeyInput.value.trim();
-                const passcode = passcodeInput.value.trim();
-                cleanup();
-                resolve({ apiKey, passcode });
-            };
-
-            const handleCancel = () => {
-                cleanup();
-                reject(new Error('העיבוד הנוכחי דורש Gemini. הזן API Key או Passcode כדי להמשיך, או עבור למצב ללא LLM.'));
-            };
-
-            submitButton.addEventListener('click', handleSubmit);
-            cancelButton.addEventListener('click', handleCancel);
-            apiKeyInput.focus();
-        });
-    }
-
-    async function resolveGeminiApiKey(allowPrompt = false) {
-        const typedApiKey = elements.apiKey.value.trim();
-        if (typedApiKey) {
-            if (typedApiKey.toLowerCase().includes('elza')) {
-                throw new Error('שרת Elza בביטול / יוצא משימוש (Phasing Out). אנא הזן מפתח AQ API תקין (AQ...) מ-Google AI Studio.');
-            }
-            return typedApiKey;
-        }
-
-        const currentPasscode = elements.passcode.value.trim();
-        if (currentPasscode) {
-            const decrypted = await decryptEmbeddedApiKey(currentPasscode);
-            if (decrypted) {
-                elements.apiKey.value = decrypted;
-                return decrypted;
-            }
-            if (!allowPrompt) {
-                throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
-            }
-        }
-
-        if (!allowPrompt) {
-            return '';
-        }
-
-        const { apiKey: promptedApiKey, passcode: promptedPasscode } = await requestGeminiCredentials();
-        if (promptedApiKey) {
-            if (promptedApiKey.toLowerCase().includes('elza')) {
-                throw new Error('שרת Elza בביטול / יוצא משימוש (Phasing Out). אנא הזן מפתח AQ API תקין (AQ...) מ-Google AI Studio.');
-            }
-            elements.apiKey.value = promptedApiKey;
-            return promptedApiKey;
-        }
-
-        if (promptedPasscode) {
-            elements.passcode.value = promptedPasscode;
-            const decrypted = await decryptEmbeddedApiKey(promptedPasscode);
-            if (decrypted) {
-                elements.apiKey.value = decrypted;
-                return decrypted;
-            }
-            throw new Error('ה-Passcode שגוי או שמפתח ה-API המוצפן לא הוגדר נכון בקובץ generator.js.');
-        }
-
-        throw new Error('העיבוד הנוכחי דורש Gemini. הזן API Key או Passcode כדי להמשיך, או עבור למצב ללא LLM.');
-    }
-
-    function normalizeWhitespace(value) {
-        return value.replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
-    }
-
-    function stripExamFooterArtifacts(value) {
-        if (!value) return '';
-        return value
-            .replace(/\[cite:\s*\d+\]/gi, '')
-            .replace(/-+\s*סוף\s+המבחן\s*-+/g, ' ');
-    }
-
-    function stripQuestionHeaderPrefix(value) {
-        if (!value) return '';
-        let t = value.replace(/^#+\s*/, '').trim();
-        const prefixPattern = /^(?:(?:שאלה(?:\s+מספר)?\s*:?\s*:?\d+\s*:?|:?\d+\s*:?\s*(?:שאלה(?:\s+מספר)?|מספר\s+שאלה)|מספר\s+שאלה\s*:?\s*:?\d+\s*:?|\d+\s*[\.\)\(-])\s*)+:?\s*/i;
-        const cleaned = t.replace(prefixPattern, '').trim();
-        return cleaned || t;
-    }
-
-    function fixHebrewWordOrder(text) {
-        return text
-            .split('\n')
-            .map((line) => {
-                const trimmed = line.trim();
-                if (!trimmed) return '';
-                return trimmed.split(/\s+/).reverse().join(' ');
-            })
-            .join('\n');
-    }
-
-    function maybeFixHebrewWordOrder(text) {
-        const lines = text
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter(Boolean)
-            .slice(0, 200);
-
-        if (!lines.length) {
-            return text;
-        }
-
-        // If key phrases are mostly reversed (e.g. "מספר שאלה"), reorder words.
-        // Keep this conservative so digital PDFs that are already logical are
-        // not accidentally flipped.
-        let normalSignals = 0;
-        let reversedSignals = 0;
-
-        for (const line of lines) {
-            if (/שאלה\s+מספר|מבחן\s+מס/.test(line)) {
-                normalSignals++;
-            }
-            if (/מספר\s+שאלה|מס\s+מבחן/.test(line)) {
-                reversedSignals++;
-            }
-        }
-
-        const strongReversedEvidence = reversedSignals >= 4 && reversedSignals >= (normalSignals + 2);
-        return strongReversedEvidence ? fixHebrewWordOrder(text) : text;
-    }
-
-    function hasHebrew(text) {
-        return /[\u0590-\u05FF]/.test(text || '');
-    }
-
-    function detectLineDirection(chunks) {
-        let rtlScore = 0;
-        let ltrScore = 0;
-
-        for (const chunk of chunks) {
-            const t = chunk.text || '';
-            if (!t) continue;
-
-            if (chunk.dir === 'rtl') rtlScore += 2;
-            if (chunk.dir === 'ltr') ltrScore += 2;
-
-            if (hasHebrew(t)) rtlScore += 1;
-            if (/[A-Za-z]/.test(t)) ltrScore += 1;
-            if (/\d/.test(t) && !hasHebrew(t)) ltrScore += 1;
-        }
-
-        return rtlScore > ltrScore ? 'rtl' : 'ltr';
-    }
-
-    function joinChunksByGeometry(chunks, direction) {
-        if (!chunks || !chunks.length) return '';
-        if (chunks.length === 1) return chunks[0].text || '';
-
-        const charWidths = chunks
-            .map((c) => {
-                const t = String(c.text || '');
-                const w = Number(c.w || 0);
-                return (t.length > 0 && w > 0) ? (w / t.length) : 0;
-            })
-            .filter((v) => v > 0 && Number.isFinite(v));
-
-        const avgCharWidth = charWidths.length
-            ? (charWidths.reduce((sum, v) => sum + v, 0) / charWidths.length)
-            : 6;
-
-        const gapThreshold = Math.max(1.2, avgCharWidth * 0.45);
-        let out = String(chunks[0].text || '');
-
-        for (let i = 1; i < chunks.length; i++) {
-            const prev = chunks[i - 1];
-            const curr = chunks[i];
-            const prevText = String(prev.text || '');
-            const currText = String(curr.text || '');
-
-            const prevW = Number(prev.w || 0);
-            const currW = Number(curr.w || 0);
-
-            let gap = gapThreshold + 1;
-            if (prevW > 0 && currW > 0) {
-                if (direction === 'rtl') {
-                    // For RTL sorting (right -> left): gap is distance between
-                    // previous chunk's left edge and current chunk's right edge.
-                    gap = prev.x - (curr.x + currW);
-                } else {
-                    // For LTR sorting (left -> right): gap is distance between
-                    // previous chunk's right edge and current chunk's left edge.
-                    gap = curr.x - (prev.x + prevW);
-                }
-            }
-
-            const needsSpace = gap > gapThreshold;
-            out += (needsSpace ? ' ' : '') + currText;
-        }
-
-        return out.replace(/\s+/g, ' ').trim();
-    }
-
-    function buildLinesFromStreamOrder(items) {
-        const lines = [];
-        let current = '';
-
-        for (const item of (items || [])) {
-            const raw = item && typeof item.str === 'string' ? item.str : '';
-            const text = raw.replace(/\u00A0/g, ' ').trim();
-            const hasEOL = Boolean(item && item.hasEOL);
-
-            if (text) {
-                if (!current) {
-                    current = text;
-                } else {
-                    const noLeadingSpace = /^[\)\]\}\.,:;!?%]/.test(text);
-                    const noTrailingSpace = /[\(\[\{\-\/]$/.test(current);
-                    current += (noLeadingSpace || noTrailingSpace ? '' : ' ') + text;
-                }
-            }
-
-            if (hasEOL) {
-                if (current.trim()) lines.push(current.trim());
-                current = '';
-            }
-        }
-
-        if (current.trim()) lines.push(current.trim());
-        return lines;
-    }
-
-    function computeHebrewBreakageScore(text) {
-        const tokens = String(text || '').split(/\s+/).filter(Boolean);
-        if (!tokens.length) return 1;
-
-        const hebTokens = tokens.filter((t) => /[\u0590-\u05FF]/.test(t));
-        if (!hebTokens.length) return 1;
-
-        const singleHeb = hebTokens.filter((t) => /^[\u0590-\u05FF]$/.test(t)).length;
-        const tinyHeb = hebTokens.filter((t) => /^[\u0590-\u05FF]{1,2}$/.test(t)).length;
-
-        // Lower is better.
-        return (singleHeb / hebTokens.length) + ((tinyHeb / hebTokens.length) * 0.35);
-    }
-
-    function computeStructureSignal(lines) {
-        const qLike = /(?:^#*\s*שאלה\s+\d+|^#*\s*שאלה\s+מספר\s*:?\d+|^\d+\s*[\)\(\.-]\s*)/;
-        const aLike = /^(?:[-\*\+\u2022]\s*)?[אבגדהוזחטי]\s*[\.)]/;
-
-        let score = 0;
-        for (const line of (lines || [])) {
-            const l = String(line || '').trim();
-            if (!l) continue;
-            if (qLike.test(l)) score += 2;
-            if (aLike.test(l)) score += 1;
-        }
-        return score;
-    }
-
-    function chooseBestPageText(linesA, linesB) {
-        const textA = (linesA || []).join('\n');
-        const textB = (linesB || []).join('\n');
-
-        if (!textA && !textB) return '';
-        if (!textA) return textB;
-        if (!textB) return textA;
-
-        const breakA = computeHebrewBreakageScore(textA);
-        const breakB = computeHebrewBreakageScore(textB);
-        const structA = computeStructureSignal(linesA);
-        const structB = computeStructureSignal(linesB);
-
-        const qualityA = structA - (breakA * 8);
-        const qualityB = structB - (breakB * 8);
-
-        return qualityB > qualityA ? textB : textA;
-    }
-
-    function groupPdfTextItemsToLines(items) {
-        const normalized = items
-            .filter((item) => item.str && item.str.trim())
-            .map((item) => ({
-                text: item.str.trim(),
-                x: item.transform[4],
-                y: item.transform[5],
-                dir: item.dir || '',
-                w: item.width || 0
-            }));
-
-        normalized.sort((a, b) => {
-            if (Math.abs(a.y - b.y) > 4) return b.y - a.y;
-            return a.x - b.x;
-        });
-
-        const lines = [];
-        for (const item of normalized) {
-            const line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 4);
-            if (!line) {
-                lines.push({ y: item.y, chunks: [item] });
-            } else {
-                line.chunks.push(item);
-            }
-        }
-
-        lines.sort((a, b) => b.y - a.y);
-
-        return lines.map((line) => {
-            const direction = detectLineDirection(line.chunks);
-            const sorted = [...line.chunks].sort((a, b) => direction === 'rtl' ? b.x - a.x : a.x - b.x);
-            return joinChunksByGeometry(sorted, direction);
-        });
-    }
-
-    async function extractPageImage(page) {
-        // Render the full page to a canvas and return it as a base64 PNG data URL.
-        const viewport = page.getViewport({ scale: 1.5 });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        return canvas.toDataURL('image/png');
-    }
-
-    async function extractPdfText(inputBuffer) {
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (!pdfjs?.getDocument) {
-            throw new Error('PDF.js לא נטען. רענן את העמוד ונסה שוב.');
-        }
-
-        const freshData = new Uint8Array(inputBuffer);
-        const loadingTask = pdfjs.getDocument({ data: freshData });
-        const pdf = await loadingTask.promise;
-        const pages = [];
-        const pageImages = []; // index = pageNumber-1, value = base64 data URL or null
-        let nonWhitespaceChars = 0;
-
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            const page = await pdf.getPage(pageNumber);
-            const textContent = await page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: false });
-            const geoLines = groupPdfTextItemsToLines(textContent.items);
-            const streamLines = buildLinesFromStreamOrder(textContent.items);
-            const lineText = chooseBestPageText(geoLines, streamLines);
-            pages.push(lineText);
-            nonWhitespaceChars += lineText.replace(/\s/g, '').length;
-
-            // Detect if this page has embedded images via operator list.
-            // Fallback to hardcoded PDF.js OPS values if .OPS is not exported.
-            try {
-                const ops = await page.getOperatorList();
-                const PAINT_IMAGE = (pdfjs.OPS && pdfjs.OPS.paintImageXObject) || 85;
-                const PAINT_INLINE = (pdfjs.OPS && pdfjs.OPS.paintInlineImageXObject) || 86;
-                const hasPaintOp = ops.fnArray.some((fn) => fn === PAINT_IMAGE || fn === PAINT_INLINE);
-                pageImages.push(hasPaintOp ? await extractPageImage(page) : null);
-            } catch {
-                pageImages.push(null);
-            }
-        }
-
-        return {
-            pdf,
-            pageImages,
-            isScanned: nonWhitespaceChars < Math.max(pdf.numPages * 60, 120),
-            text: maybeFixHebrewWordOrder(pages.join('\n')),
-            rawPages: pages // preserve per-page text for image association
-        };
-    }
-
-    async function detectPdfType(inputBuffer) {
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (!pdfjs?.getDocument) {
-            throw new Error('PDF.js לא נטען. אם העמוד נפתח ישירות מהדיסק (file://), יש להשתמש בשרת מקומי (start_test_server.bat) או לוודא חיבור לרשת.');
-        }
-
-        const freshData = new Uint8Array(inputBuffer);
-        const loadingTask = pdfjs.getDocument({ data: freshData });
-        const pdf = await loadingTask.promise;
-        let nonWhitespaceChars = 0;
-
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            const page = await pdf.getPage(pageNumber);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map((item) => (item.str || '').trim()).join(' ');
-            nonWhitespaceChars += pageText.replace(/\s/g, '').length;
-        }
-
-        const isScanned = nonWhitespaceChars < Math.max(pdf.numPages * 60, 120);
-        return {
-            isScanned,
-            pdfTypeLabel: isScanned ? '📷 PDF סרוק (תמונה)' : '📄 PDF דיגיטלי (עם טקסט)',
-            recommendation: isScanned
-                ? 'יזדקק ל-OCR. אפשר להשתמש ב-Gemini או ב-OCR החינמי בדפדפן.'
-                : 'יעובד מקומית בלחיצת כפתור ללא OCR וללא צורך ב-API Key.'
-        };
-    }
-
-    async function renderPageImageData(page, scale = 2.5) {
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        await page.render({ canvasContext: context, viewport }).promise;
-        return canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
-    }
-
-    function fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = String(reader.result || '');
-                const commaIdx = result.indexOf(',');
-                if (commaIdx < 0) {
-                    reject(new Error('לא ניתן היה לקודד את קובץ ה-PDF לבסיס64.'));
-                    return;
-                }
-                resolve(result.slice(commaIdx + 1));
-            };
-            reader.onerror = () => {
-                reject(new Error('קריאת קובץ ה-PDF נכשלה.'));
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-
-    async function renderAllPdfPageImages(pdf, task = null) {
-        const imageDatas = [];
-        const pagePreviews = [];
-
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            if (task && task.isAborted()) {
-                throw new Error('הפעולה בוטלה על ידי המשתמש.');
-            }
-            if (task) {
-                const prepPercent = Math.round((pageNumber / pdf.numPages) * 25);
-                task.update(prepPercent, `מכין עמוד ${pageNumber} מתוך ${pdf.numPages} לשליחה...`);
-            } else {
-                setStatus(`מכין עמוד ${pageNumber}/${pdf.numPages} לשליחה...`);
-            }
-            const page = await pdf.getPage(pageNumber);
-            const imageData = await renderPageImageData(page);
-            imageDatas.push(imageData);
-            pagePreviews.push(`data:image/png;base64,${imageData}`);
-        }
-
-        return { imageDatas, pagePreviews };
-    }
-
-    async function extractTextViaOfflineOcr(pdf, task = null) {
-        if (!window.Tesseract?.createWorker) {
-            throw new Error('רכיב OCR חינמי לא נטען בדפדפן. רענן את העמוד ונסה שוב, או בחר Gemini.');
-        }
-
-        if (task) {
-            task.update(5, 'מכין OCR חינמי בדפדפן...');
-        } else {
-            setStatus('מכין OCR חינמי בדפדפן. האיכות כנראה תהיה נמוכה יותר מ-Gemini...');
-        }
-
-        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf, task);
-        const pages = [];
-        const worker = await window.Tesseract.createWorker('heb');
-
-        try {
-            for (let i = 0; i < imageDatas.length; i++) {
-                if (task && task.isAborted()) {
-                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
-                }
-                const ocrPercent = 25 + Math.round(((i + 1) / imageDatas.length) * 65);
-                if (task) {
-                    task.update(ocrPercent, `OCR מקומי מעבד עמוד ${i + 1} מתוך ${imageDatas.length} (${ocrPercent}%)...`);
-                } else {
-                    setStatus(`OCR חינמי מעבד עמוד ${i + 1}/${imageDatas.length}... האיכות כנראה תהיה נמוכה יותר מ-Gemini.`);
-                }
-                const { data } = await worker.recognize(`data:image/png;base64,${imageDatas[i]}`);
-                pages.push(maybeFixHebrewWordOrder((data && data.text) || ''));
-            }
-        } finally {
-            await worker.terminate();
-        }
-
-        return {
-            pages,
-            pagePreviews,
-            text: pages.join('\n')
-        };
-    }
-
-    function buildGeminiEndpoint(version, model, apiKey) {
-        return `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    }
-
-    function normalizeModelName(name) {
-        if (!name) return '';
-        return name.startsWith('models/') ? name.slice('models/'.length) : name;
-    }
-
-    async function discoverGeminiModelCandidates(apiKey) {
-        if (state.geminiModelCandidates) {
-            return state.geminiModelCandidates;
-        }
-
-        const discovered = [];
-        const seen = new Set();
-
-        for (const version of GEMINI_CONFIG.apiVersions) {
-            const endpoint = `https://generativelanguage.googleapis.com/${version}/models?key=${encodeURIComponent(apiKey)}`;
-            try {
-                const response = await fetch(endpoint);
-                if (!response.ok) {
-                    continue;
-                }
-
-                const payload = await response.json();
-                const models = payload.models || [];
-                for (const model of models) {
-                    const modelName = normalizeModelName(model.name || '');
-                    const supportedMethods = model.supportedGenerationMethods || [];
-                    if (!modelName || !supportedMethods.includes('generateContent')) {
-                        continue;
-                    }
-
-                    if (!modelName.includes('gemini') || !modelName.includes('flash')) {
-                        continue;
-                    }
-
-                    const key = `${version}:${modelName}`;
-                    if (seen.has(key)) {
-                        continue;
-                    }
-
-                    seen.add(key);
-                    discovered.push({ version, model: modelName });
-                }
-            } catch {
-                // Fall through to static fallback list.
-            }
-        }
-
-        if (!discovered.length) {
-            for (const version of GEMINI_CONFIG.apiVersions) {
-                for (const model of GEMINI_CONFIG.preferredModels) {
-                    discovered.push({ version, model });
-                }
-            }
-        }
-
-        state.geminiModelCandidates = discovered;
-        return discovered;
-    }
-
-    function sortGeminiModelCandidates(candidates) {
-        const priority = [
-            'gemini-2.5-flash',
-            'gemini-2.0-flash',
-            'gemini-1.5-flash',
-            'gemini-2.0-flash-lite',
-            'gemini-2.5-flash-lite'
-        ];
-
-        return [...candidates].sort((a, b) => {
-            const idxA = priority.indexOf(a.model);
-            const idxB = priority.indexOf(b.model);
-
-            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-            if (idxA !== -1) return -1;
-            if (idxB !== -1) return 1;
-
-            const isExpA = a.model.includes('3.5') || a.model.includes('3.6') || a.model.includes('experimental') || a.model.includes('preview');
-            const isExpB = b.model.includes('3.5') || b.model.includes('3.6') || b.model.includes('experimental') || b.model.includes('preview');
-
-            if (isExpA && !isExpB) return 1;
-            if (!isExpA && isExpB) return -1;
-
-            if (a.version !== b.version) return a.version === 'v1beta' ? -1 : 1;
-            return a.model.localeCompare(b.model);
-        });
-    }
-
-    function getGeminiErrorInfo(status, errorText) {
-        const raw = String(errorText || '');
-        let parsedMessage = '';
-
-        try {
-            const parsed = JSON.parse(raw);
-            parsedMessage = parsed?.error?.message || '';
-        } catch {
-            parsedMessage = raw;
-        }
-
-        const message = String(parsedMessage || raw || '').trim();
-        const normalized = message.toLowerCase();
-
-        if (status === 401 || status === 403) {
-            return {
-                code: 'auth',
-                retryNextModel: false,
-                userMessage: 'מפתח Gemini לא תקין, חסום או חסרות הרשאות (401/403).'
-            };
-        }
-
-        if (status === 429) {
-            return {
-                code: 'quota',
-                retryNextModel: true,
-                userMessage: 'חריגה ממכסה או קצב בקשות Gemini (429). מנסה מודל חלופי...'
-            };
-        }
-
-        if (
-            status === 404 ||
-            normalized.includes('not found') ||
-            normalized.includes('not supported for generatecontent') ||
-            normalized.includes('is not supported for generatecontent') ||
-            normalized.includes('only supports interactions api')
-        ) {
-            return {
-                code: 'model_not_found',
-                retryNextModel: true,
-                userMessage: 'המודל אינו זמין עבור המפתח/גרסת API, מנסה מודל חלופי...'
-            };
-        }
-
-        if (status >= 500 || status === 503) {
-            return {
-                code: 'server',
-                retryNextModel: true,
-                userMessage: 'שגיאת שרת זמנית של Gemini (500/503). מנסה מודל חלופי...'
-            };
-        }
-
-        return {
-            code: 'unknown',
-            retryNextModel: true,
-            userMessage: message || `Gemini request failed (${status}).`
-        };
-    }
-
-    function delay(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
-    function computeRetryDelayMs(response, retryCount) {
-        const retryAfter = response.headers.get('Retry-After');
-        if (retryAfter) {
-            const asSeconds = Number(retryAfter);
-            if (Number.isFinite(asSeconds) && asSeconds > 0) {
-                return Math.min(asSeconds * 1000, GEMINI_CONFIG.maxRetryDelayMs);
-            }
-
-            const asDate = Date.parse(retryAfter);
-            if (!Number.isNaN(asDate)) {
-                const delta = asDate - Date.now();
-                if (delta > 0) {
-                    return Math.min(delta, GEMINI_CONFIG.maxRetryDelayMs);
-                }
-            }
-        }
-
-        const exponential = GEMINI_CONFIG.initialRetryDelayMs * (2 ** retryCount);
-        const jitter = Math.floor(Math.random() * 500);
-        return Math.min(exponential + jitter, GEMINI_CONFIG.maxRetryDelayMs);
-    }
-
-    async function callGeminiOcr(apiKey, imageDatas, task = null) {
-        const prompt = [
-            'You are an expert exam parser for Hebrew multiple-choice exams.',
-            'Extract all multiple-choice questions into a clean JSON array of objects.',
-            'JSON Schema per object:',
-            '  - "question": string (full question text in natural Hebrew reading order)',
-            '  - "options": array of strings (all answer choices, stripping option letter prefixes like "א." or "ב.")',
-            '  - "correctIndex": number (0 by default)',
-            '  - "sourcePage": number (1-based physical page number)',
-            '',
-            'Rules:',
-            '1. Do NOT reverse Hebrew word or letter order.',
-            '2. Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "pH", "DNA") read correctly.',
-            '3. Extract all options into the options array (questions can have 4, 5, 6 or more choices).',
-            '4. Output ONLY valid JSON array.'
-        ].join('\n');
-        const attemptErrors = [];
-        const candidates = await discoverGeminiModelCandidates(apiKey);
-
-        const parts = [{ text: prompt }];
-        for (const data of imageDatas) {
-            parts.push({ inlineData: { mimeType: 'image/png', data } });
-        }
-
-        const sortedCandidates = sortGeminiModelCandidates(candidates);
-
-        for (const candidate of sortedCandidates) {
-            if (task && task.isAborted()) {
-                throw new Error('הפעולה בוטלה על ידי המשתמש.');
-            }
-            const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-
-            for (let retryCount = 0; retryCount <= GEMINI_CONFIG.maxQuotaRetries; retryCount++) {
-                if (task && task.isAborted()) {
-                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
-                }
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    signal: task ? task.signal : undefined,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts }],
-                        generationConfig: {
-                            temperature: 0,
-                            topP: 0.1,
-                            maxOutputTokens: 16384,
-                            responseMimeType: "application/json"
-                        }
-                    })
-                });
-
-                if (response.ok) {
-                    const payload = await response.json();
-                    const responseParts = payload.candidates?.[0]?.content?.parts || [];
-                    const text = responseParts.map((part) => part.text || '').join('\n').trim();
-                    if (!text) {
-                        const finishReason = payload.candidates?.[0]?.finishReason || 'UNKNOWN';
-                        const promptFeedback = payload.promptFeedback?.blockReason || 'NONE';
-                        throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}, Prompt Blocked: ${promptFeedback}. Raw: ${JSON.stringify(payload)}`);
-                    }
-                    return [text];
-                }
-
-                const errorText = await response.text();
-                const errorInfo = getGeminiErrorInfo(response.status, errorText);
-
-                if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
-                    const delayMs = computeRetryDelayMs(response, retryCount);
-                    const waitSec = Math.ceil(delayMs / 1000);
-                    if (task) {
-                        task.update(task.percent || 30, `Gemini החזיר 429. ממתין ${waitSec} שניות ומנסה שוב...`);
-                    } else {
-                        setStatus(`Gemini החזיר 429. ממתין ${waitSec} שניות ומנסה שוב...`);
-                    }
-                    await delay(delayMs);
-                    continue;
-                }
-
-                attemptErrors.push(`[${candidate.version}/${candidate.model}] ${response.status} ${errorInfo.userMessage}`);
-
-                if (errorInfo.retryNextModel) {
-                    break;
-                }
-
-                throw new Error(`Gemini request failed: ${errorInfo.userMessage}`);
-            }
-        }
-
-        throw new Error(`Gemini request failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
-    }
-
-    async function extractTextViaGemini(pdf, apiKey, chunkSizeOverride = null, task = null) {
-        if (!apiKey) {
-            throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
-        }
-
-        const pages = [];
-        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf, task);
-
-        const CHUNK_SIZE = Math.max(1, Number(chunkSizeOverride || GEMINI_CONFIG.ocrChunkSize) || 1);
-        const totalChunks = Math.ceil(imageDatas.length / CHUNK_SIZE);
-        let chunkIndex = 0;
-
-        for (let i = 0; i < imageDatas.length; i += CHUNK_SIZE) {
-            if (task && task.isAborted()) {
-                throw new Error('הפעולה בוטלה על ידי המשתמש.');
-            }
-            chunkIndex++;
-            const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
-            const startPage = i + 1;
-            const endPage = Math.min(i + CHUNK_SIZE, imageDatas.length);
-            const currentPercent = 25 + Math.round((chunkIndex / totalChunks) * 65);
-
-            if (task) {
-                task.update(currentPercent, `מפענח עמודים ${startPage}-${endPage} מתוך ${imageDatas.length} ב-Gemini (צ'אנק ${chunkIndex}/${totalChunks})...`);
-            } else {
-                setStatus(`מפענח עמודים ${startPage}-${endPage} מתוך ${imageDatas.length} ב-Gemini...`);
-            }
-
-            const chunkPagesText = await callGeminiOcr(apiKey, chunk, task);
-            pages.push(...chunkPagesText.map((pageText) => maybeFixHebrewWordOrder(pageText || '')));
-
-            if (i + CHUNK_SIZE < imageDatas.length && GEMINI_CONFIG.interPageDelayMs > 0) {
-                if (task) {
-                    task.update(currentPercent, `ממתין בין קריאות API (${GEMINI_CONFIG.interPageDelayMs / 1000} שניות)...`);
-                }
-                await delay(GEMINI_CONFIG.interPageDelayMs);
-            }
-        }
-
-        return {
-            pages,
-            pagePreviews,
-            text: pages.join('\n')
-        };
-    }
-
-    async function extractTextViaGeminiNativePdf(pdfFile, pdf, apiKey, mode = 'schema', task = null) {
-        if (!apiKey) {
-            throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
-        }
-
-        if (task) {
-            task.update(15, 'מעלה את מסמך ה-PDF ישירות ל-Gemini (Native PDF)...', { indeterminate: true });
-        } else {
-            setStatus('מעלה את מסמך ה-PDF ישירות ל-Gemini (Native PDF)...');
-        }
-
-        const base64Pdf = await fileToBase64(pdfFile);
-        const prompt = [
-            'You are an expert exam parser for Hebrew multiple-choice exams.',
-            'Extract all multiple-choice questions into a clean JSON array of objects.',
-            'Rules:',
-            '1. Do NOT reverse Hebrew word or letter order.',
-            '2. Ensure mixed Hebrew and English/scientific terms (e.g. "ATP", "pH", "DNA") read correctly.',
-            '3. Extract all options into the options array (questions can have 4, 5, 6 or more choices).',
-            '4. Set "sourcePage" to 1-based physical page number.',
-            '5. Set "hasVisualElement" to true if the question references a diagram, graph, chart, table, or figure.',
-            '6. Output ONLY valid JSON array.'
-        ].join('\n');
-
-        const generationConfig = {
-            temperature: 0,
-            topP: 0.1,
-            maxOutputTokens: 16384,
-            responseMimeType: "application/json"
-        };
-
-        if (mode === 'schema') {
-            generationConfig.responseSchema = {
-                type: "ARRAY",
-                items: {
-                    type: "OBJECT",
-                    properties: {
-                        question: { type: "STRING" },
-                        options: {
-                            type: "ARRAY",
-                            items: { type: "STRING" }
-                        },
-                        sourcePage: { type: "INTEGER" },
-                        hasVisualElement: { type: "BOOLEAN" }
-                    },
-                    required: ["question", "options", "sourcePage"]
-                }
-            };
-        }
-
-        const attemptErrors = [];
-        const candidates = await discoverGeminiModelCandidates(apiKey);
-        const sortedCandidates = sortGeminiModelCandidates(candidates);
-        let extractedPages = null;
-
-        for (const candidate of sortedCandidates) {
-            if (task && task.isAborted()) {
-                throw new Error('הפעולה בוטלה על ידי המשתמש.');
-            }
-            const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-
-            for (let retryCount = 0; retryCount <= GEMINI_CONFIG.maxQuotaRetries; retryCount++) {
-                if (task && task.isAborted()) {
-                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
-                }
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    signal: task ? task.signal : undefined,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inlineData: { mimeType: 'application/pdf', data: base64Pdf } }
-                            ]
-                        }],
-                        generationConfig
-                    })
-                });
-
-                if (response.ok) {
-                    const payload = await response.json();
-                    const responseParts = payload.candidates?.[0]?.content?.parts || [];
-                    const text = responseParts.map((part) => part.text || '').join('\n').trim();
-
-                    if (!text) {
-                        const finishReason = payload.candidates?.[0]?.finishReason || 'UNKNOWN';
-                        throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}`);
-                    }
-
-                    extractedPages = text.split(/---PAGE_BOUNDARY---/i).map((s) => s.trim());
-                    break;
-                }
-
-                const errorText = await response.text();
-                const errorInfo = getGeminiErrorInfo(response.status, errorText);
-
-                if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
-                    const delayMs = computeRetryDelayMs(response, retryCount);
-                    const waitSec = Math.ceil(delayMs / 1000);
-                    if (task) {
-                        task.update(40, `Gemini החזיר 429 ב-Native PDF (${candidate.model}). ממתין ${waitSec} שניות ומנסה שוב...`);
-                    } else {
-                        setStatus(`Gemini החזיר 429 ב-Native PDF (${candidate.model}). ממתין ${waitSec} שניות ומנסה שוב...`);
-                    }
-                    await delay(delayMs);
-                    continue;
-                }
-
-                attemptErrors.push(`[${candidate.version}/${candidate.model}] ${response.status} ${errorInfo.userMessage}`);
-
-                if (errorInfo.retryNextModel) {
-                    break;
-                }
-
-                throw new Error(`Gemini Native PDF OCR failed: ${errorInfo.userMessage}`);
-            }
-
-            if (extractedPages) {
-                break;
-            }
-        }
-
-        if (!extractedPages) {
-            throw new Error(`Gemini Native PDF OCR failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
-        }
-
-        // Generate previews for proof mode
-        const pagePreviews = [];
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            if (task && task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
-            if (task) {
-                const prevPercent = 65 + Math.round((pageNumber / pdf.numPages) * 25);
-                task.update(prevPercent, `מכין תצוגות מקדימות לעמוד ${pageNumber}/${pdf.numPages}...`);
-            } else {
-                setStatus(`מכין תצוגות מקדימות לעמוד ${pageNumber}/${pdf.numPages}...`);
-            }
-            const page = await pdf.getPage(pageNumber);
-            const imageData = await renderPageImageData(page);
-            pagePreviews.push(`data:image/png;base64,${imageData}`);
-        }
-
-        return {
-            pages: extractedPages.map(p => maybeFixHebrewWordOrder(p || '')),
-            pagePreviews,
-            text: extractedPages.join('\n')
-        };
-    }
-
-
-    async function verifyTestWithGemini(parsedQuestions, apiKey, task = null) {
-        if (task) {
-            task.update(92, 'מבצע הגהה ותיקון שאלות עם Gemini (LLM Proofreader)...');
-        } else {
-            setStatus('מבצע הגהה ותיקון של המבחן עם Gemini...');
-        }
-        const prompt = [
-            'You are an expert exam proofreader.',
-            'I am providing you with a JSON array of parsed exam questions extracted via OCR.',
-            'Your task is to verify and fix the JSON:',
-            '1. Fix any OCR typos in the Hebrew text.',
-            '2. Ensure options are logically separated and not truncated.',
-            '3. Maintain the exact JSON schema provided.',
-            '4. Return ONLY the raw JSON array, without any markdown formatting or code blocks.',
-            '',
-            'JSON:',
-            JSON.stringify(parsedQuestions, null, 2)
-        ].join('\n');
-
-        const candidates = await discoverGeminiModelCandidates(apiKey);
-        const sortedCandidates = sortGeminiModelCandidates(candidates);
-
-        for (const candidate of sortedCandidates) {
-            if (task && task.isAborted()) break;
-            const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    signal: task ? task.signal : undefined,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            temperature: 0.1,
-                            topP: 0.8,
-                            maxOutputTokens: 8192
-                        }
-                    })
-                });
-
-                if (!response.ok) continue;
-
-                const payload = await response.json();
-                const responseParts = payload.candidates?.[0]?.content?.parts || [];
-                let text = responseParts.map((part) => part.text || '').join('\n').trim();
-
-                text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-
-                const verified = JSON.parse(text);
-                if (Array.isArray(verified) && verified.length > 0 && verified[0].question) {
-                    return verified;
-                }
-            } catch (e) {
-                console.warn(`Gemini verification failed for model ${candidate.model}:`, e);
-            }
-        }
-
-        return parsedQuestions;
-    }
-
-    function parseQuestionsFromMarkdown(markdownText) {
-        if (!markdownText) return [];
-
-        let cleanText = String(markdownText).trim();
-        cleanText = cleanText.replace(/^```(?:markdown|md|txt)?\s*/i, '').replace(/\s*```$/i, '').trim();
-        if (!cleanText) return [];
-
-        const lines = cleanText.split(/\r?\n/);
-        const headerRe = /^###\s*שאלה\s*(\d{1,3})\s*:\s*(.+?)\s*(?:\((?:עמוד|עמ'|page)\s*(\d{1,3})\))?\s*$/i;
-        const optionRe = /^[-*+]\s*([אבגדהוזחטי])\.\s*(.+)$/;
-
-        const parsed = [];
-        let current = null;
-
-        function pushCurrentIfValid() {
-            if (!current) return;
-            const questionText = normalizeWhitespace(String(current.question || ''));
-            const options = (current.options || []).map((opt) => normalizeWhitespace(String(opt || ''))).filter(Boolean);
-            if (questionText && options.length >= 2) {
-                parsed.push({
-                    question: questionText,
-                    options,
-                    correctIndex: 0,
-                    sourcePage: current.sourcePage || 1
-                });
-            }
-        }
-
-        for (const rawLine of lines) {
-            const line = String(rawLine || '').trim();
-            if (!line) continue;
-
-            const headerMatch = line.match(headerRe);
-            if (headerMatch) {
-                pushCurrentIfValid();
-                current = {
-                    question: normalizeWhitespace(headerMatch[2] || ''),
-                    options: [],
-                    sourcePage: Number(headerMatch[3]) || 1
-                };
-                continue;
-            }
-
-            if (!current) continue;
-
-            const optionMatch = line.match(optionRe);
-            if (optionMatch) {
-                current.options.push(optionMatch[2] || '');
-                continue;
-            }
-
-            if (current.options.length > 0) {
-                const lastIdx = current.options.length - 1;
-                current.options[lastIdx] = `${current.options[lastIdx]} ${line}`.trim();
-            } else {
-                current.question = `${current.question} ${line}`.trim();
-            }
-        }
-
-        pushCurrentIfValid();
-        return parsed;
-    }
-
-    function parseQuestionsFromText(text, rawPages, pageImages) {
-        if (!text) return [];
-
-        let cleanText = text.trim();
-        cleanText = cleanText.replace(/^```(?:markdown|md|json|txt)?\s*/i, '').replace(/\s*```$/i, '').trim();
-
-        if (cleanText.startsWith('[') || cleanText.startsWith('{')) {
-            try {
-                const parsed = JSON.parse(cleanText);
-                const questionsArray = Array.isArray(parsed) ? parsed : (parsed.questions || parsed.data);
-                if (Array.isArray(questionsArray) && questionsArray.length > 0) {
-                    return normalizeQuestionsJson(questionsArray);
-                }
-            } catch (e) {
-                console.warn('JSON parse attempt failed, falling back to line-by-line parser:', e);
-            }
-        }
-
-        const lines = cleanText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-        // Build linePageMap from the same processed text that lines[] comes from.
-        // We apply fixHebrewWordOrder per page and count non-empty lines to match the filter(Boolean).
-        const filteredLinePageMap = [];
-        if (rawPages && rawPages.length) {
-            rawPages.forEach((pageText, pageIdx) => {
-                const processedLines = maybeFixHebrewWordOrder(pageText || '')
-                    .split('\n')
-                    .map(l => l.trim())
-                    .filter(Boolean);
-                for (let i = 0; i < processedLines.length; i++) {
-                    filteredLinePageMap.push(pageIdx);
-                }
-            });
-        }
-        const qPatternTextual = /(?:^#*\s*(?:\*\*)?שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|^#*\s*(?:\*\*)?:?\d+\s*:?\s*מספר\s+שאלה)/i;
-        const qPatternNumeric = /(?:^\.?\s*#*\s*(?:\*\*)?\s*[\(\[]?\s*:?\d+\s*[\.\)\(\-\]]?\s+(?![אבגדהוזחטי]\s*$))/i;
-        const qNumericCapture = /^\.?\s*#*\s*(?:\*\*)?\s*[\(\[]?\s*:?\s*(\d{1,3})\s*[\.\)\(\-\]]?\s+/i;
-        // Matches: '- א. text', '- **א.** text', '* א. text', '(א) text', 'א. text', '1. text', 'א . text'
-        const ansPatternStart = /^(?:[-\*\+\u2022]\s*)?(?:\*\*)?[\(\[]?([אבגדהוזחטיa-e1-9])\s*[\)\]\.]\s*(?:\*\*)?\s*(.*)$|^[\.]\s*([אבגדהוזחטי])\s*(.*)$/i;
-        // Matches: 'text א.' or 'text .א' at end of line
-        const ansPatternEnd = /^(.*)\s+([אבגדהוזחטי1-9])\s*[\.\)]$|^(.*)\s+[\.]\s*([אבגדהוזחטי])$/;
-        const ansInlineGlobal = /(?:^|[\s\u2022\-\*\+\(\[])([אבגדהוזחטי])\s*[\.\)]\s*/g;
-        const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
-        const footerPattern = /^-+\s*סוף\s+המבחן\s*-+$/;
-        const qInlineLocator = /\s(#*\s*(?:שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|[\(\[]?\s*:??\d+\s*[\)\(\.-\]]?)\s+)/i;
-        const hebOptionOrder = { 'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5, 'ו': 6, 'ז': 7, 'ח': 8, 'ט': 9 };
-
-        function parseInlineAnswers(lineText) {
-            if (!lineText) return null;
-
-            const matches = [];
-            ansInlineGlobal.lastIndex = 0;
-            let m;
-            while ((m = ansInlineGlobal.exec(lineText)) !== null) {
-                matches.push({
-                    letter: m[1],
-                    markerStart: m.index,
-                    textStart: ansInlineGlobal.lastIndex
-                });
-            }
-
-            if (!matches.length) return null;
-
-            const prefix = lineText.slice(0, matches[0].markerStart).trim();
-            const hasOnlyTrivialPrefix = /^[-\*\+\u2022\(\[\]\)\.:\s]*$/.test(prefix);
-
-            // For regular lines like "- א. ..." or "א. ...", keep the standard
-            // answer parser path and only use inline parsing for genuine merged
-            // multi-option lines.
-            if (matches.length < 2 && hasOnlyTrivialPrefix) {
-                return null;
-            }
-
-            if (matches.length >= 2) {
-                // Accept only plausible option letter progression (א->ב->ג->ד...).
-                let prevOrder = 0;
-                let jumps = 0;
-                for (const mm of matches) {
-                    const ord = hebOptionOrder[mm.letter] || 0;
-                    if (!ord) return null;
-                    if (prevOrder > 0) {
-                        const delta = ord - prevOrder;
-                        if (delta <= 0) return null;
-                        if (delta > 2) jumps++;
-                    }
-                    prevOrder = ord;
-                }
-                if (jumps > 0) return null;
-            }
-
-            const options = [];
-            for (let k = 0; k < matches.length; k++) {
-                const cur = matches[k];
-                const next = matches[k + 1];
-                const textEnd = next ? next.markerStart : lineText.length;
-                const optionText = lineText.slice(cur.textStart, textEnd).trim();
-                options.push({ letter: cur.letter, text: optionText });
-            }
-
-            // One inline marker with no meaningful prefix is still a normal answer line.
-            if (options.length === 1 && !prefix) {
-                return null;
-            }
-
-            return { prefix, options };
-        }
-
-        function splitInlineQuestionHeader(lineText) {
-            if (!lineText) return null;
-            const m = lineText.match(qInlineLocator);
-            if (!m || typeof m.index !== 'number') return null;
-            const markerStart = m.index + 1; // skip the leading whitespace in regex
-            if (markerStart <= 0 || markerStart >= lineText.length) return null;
-            return {
-                before: lineText.slice(0, markerStart).trim(),
-                after: lineText.slice(markerStart).trim()
-            };
-        }
-
-        function splitAnswerLineWithEmbeddedHeader(lineText) {
-            if (!lineText) return null;
-            const ansStart = lineText.match(/^(\s*(?:[-\*\+\u2022]\s*)?[אבגדהוזחטי]\s*[\.)]\s*)(.*)$/);
-            if (!ansStart) return null;
-
-            const prefix = ansStart[1] || '';
-            const body = (ansStart[2] || '').trim();
-            if (!body) return null;
-
-            const headerTailRe1 = /([\?？][^\n]*[\)\(]\s*\d{1,3}\s*)$/;
-            const headerTailRe2 = /((?:על\s+פי|מהו|מה\s+יהיה|איזו|ממה|מטעמי|הינך|היכן|כיצד)[^\n]*[\)\(]\s*\d{1,3}\s*)$/;
-            const m = body.match(headerTailRe1) || body.match(headerTailRe2);
-            if (!m) return null;
-
-            const headerPart = (m[1] || '').trim();
-            if (!headerPart || headerPart.length < 8) return null;
-
-            const cutIdx = body.lastIndexOf(headerPart);
-            if (cutIdx <= 0) return null;
-
-            const optionPart = body.slice(0, cutIdx).trim();
-            if (!optionPart) return null;
-
-            let optionClean = optionPart;
-            let headerRaw = headerPart;
-
-            // If OCR placed part of the next question before the numeric marker,
-            // move suffix from last question-mark into the header fragment.
-            const qMarkIdx = optionClean.lastIndexOf('?');
-            if (qMarkIdx > 0 && (optionClean.length - qMarkIdx) <= 120) {
-                headerRaw = `${optionClean.slice(qMarkIdx).trim()} ${headerRaw}`.trim();
-                optionClean = optionClean.slice(0, qMarkIdx).trim();
-            }
-
-            if (!optionClean) return null;
-
-            let normalizedHeader = headerRaw;
-            if (!extractNumericHeaderNumber(normalizedHeader)) {
-                const rev = normalizedHeader.split(/\s+/).reverse().join(' ');
-                if (extractNumericHeaderNumber(rev) || qPatternNumeric.test(rev) || qPatternTextual.test(rev)) {
-                    normalizedHeader = rev;
-                }
-            }
-
-            return {
-                optionLine: `${prefix}${optionClean}`.trim(),
-                headerLine: normalizedHeader
-            };
-        }
-
-        function preprocessEmbeddedHeaders(inputLines) {
-            const out = [];
-            const source = [];
-            for (let i = 0; i < inputLines.length; i++) {
-                const line = String(inputLines[i] || '').trim();
-                if (!line) continue;
-                const split = splitAnswerLineWithEmbeddedHeader(line);
-                if (split) {
-                    if (split.optionLine) {
-                        out.push(split.optionLine.trim());
-                        source.push(i);
-                    }
-                    if (split.headerLine) {
-                        out.push(split.headerLine.trim());
-                        source.push(i);
-                    }
-                } else {
-                    out.push(line);
-                    source.push(i);
-                }
-            }
-            return { lines: out, sourceIdx: source };
-        }
-
-        function normalizeEmbeddedHeaderText(headerText) {
-            let t = normalizeWhitespace(String(headerText || ''));
-            t = t.replace(/^[:\-–—\s]+/, '').trim();
-
-            let m = t.match(/^(.*?)[\)\(]\s*(\d{1,3})\s*$/);
-            if (m) {
-                return normalizeWhitespace(`${m[2]}) ${m[1].trim()}`);
-            }
-
-            m = t.match(/^(.*?)(\d{1,3})\s*\)\s*$/);
-            if (m) {
-                return normalizeWhitespace(`${m[2]}) ${m[1].trim()}`);
-            }
-
-            m = t.match(/^(.*?)(\d{1,2})\s+(\d{1,2})\s*\)\s*$/);
-            if (m) {
-                return normalizeWhitespace(`${m[2]}${m[3]}) ${m[1].trim()}`);
-            }
-
-            return t;
-        }
-
-        function extractEmbeddedHeaderFromOptionText(optionText) {
-            const t = normalizeWhitespace(String(optionText || ''));
-            if (!t) return null;
-
-            const cueWords = /(?:על\s+פי|מהו|מה\s+יהיה|איזו|ממה|מטעמי|הינך|היכן|כיצד|מהם|מה\s+החשיבות|איזה\s+מערכת)/;
-            const numberMarkers = /(?:\)\s*\d{1,3}|\d{1,3}\s*\)|\d{1,2}\s+\d{1,2}\s*\))/g;
-
-            // 1) Prefer tail-like splits from a numeric marker through the end.
-            let marker;
-            while ((marker = numberMarkers.exec(t)) !== null) {
-                const start = marker.index;
-                const before = normalizeWhitespace(t.slice(0, start));
-                const after = normalizeWhitespace(t.slice(start));
-                if (!before || !after || after.length < 8) continue;
-                if (!/[\?？]/.test(after) && !cueWords.test(after)) continue;
-                const header = normalizeEmbeddedHeaderText(after);
-                if (!header) continue;
-                return { before, header };
-            }
-
-            // 2) Fallback: split before cue words when they appear after a marker.
-            const cueMatch = t.match(/(?:על\s+פי|מהו|מה\s+יהיה|איזו|ממה|מטעמי|הינך|היכן|כיצד|מהם|מה\s+החשיבות|איזה\s+מערכת)/);
-            if (cueMatch && typeof cueMatch.index === 'number' && cueMatch.index > 4) {
-                const before = normalizeWhitespace(t.slice(0, cueMatch.index));
-                const after = normalizeWhitespace(t.slice(cueMatch.index));
-                if (before && after && /(?:\)\s*\d{1,3}|\d{1,3}\s*\)|\d{1,2}\s+\d{1,2}\s*\))/.test(after)) {
-                    const header = normalizeEmbeddedHeaderText(after);
-                    if (header) return { before, header };
-                }
-            }
-
-            return null;
-        }
-
-        function splitMergedQuestions(rawQs) {
-            const out = [];
-
-            for (const q of rawQs) {
-                if (!q || !Array.isArray(q.answers) || q.answers.length <= 6) {
-                    out.push(q);
-                    continue;
-                }
-
-                let current = {
-                    text: Array.isArray(q.text) ? [...q.text] : [String(q.text || '')],
-                    answers: [],
-                    lineIdx: q.lineIdx
-                };
-
-                for (const a of q.answers) {
-                    const optionText = normalizeWhitespace(Array.isArray(a.text) ? a.text.join(' ') : String(a.text || ''));
-                    const split = extractEmbeddedHeaderFromOptionText(optionText);
-
-                    if (split) {
-                        current.answers.push({ text: [split.before] });
-                        out.push(current);
-                        current = {
-                            text: [split.header],
-                            answers: [],
-                            lineIdx: q.lineIdx
-                        };
-                    } else {
-                        current.answers.push({ text: optionText ? [optionText] : [] });
-                    }
-                }
-
-                if (current.text.length || current.answers.length) {
-                    out.push(current);
-                }
-            }
-
-            return out;
-        }
-
-        function splitCorruptedMergedOptions(rawQs) {
-            const out = [];
-
-            for (const q of rawQs) {
-                if (!q || !Array.isArray(q.answers)) {
-                    out.push(q);
-                    continue;
-                }
-
-                const nextAnswers = [];
-                for (const a of q.answers) {
-                    const t = normalizeWhitespace(Array.isArray(a.text) ? a.text.join(' ') : String(a.text || ''));
-                    const m = t.match(/^(.*?[\.!?])\s*\.?\s*\d+\s+(.+?)\s*[\.]\s*([אבגדהוזחטי])\s*$/);
-                    if (m) {
-                        const first = normalizeWhitespace(m[1]);
-                        const second = normalizeWhitespace(m[2]);
-                        if (first) nextAnswers.push({ text: [first] });
-                        if (second) nextAnswers.push({ text: [second] });
-                    } else {
-                        nextAnswers.push({ text: t ? [t] : [] });
-                    }
-                }
-
-                out.push({ ...q, answers: nextAnswers });
-            }
-
-            return out;
-        }
-
-        function expandInlineQuestionLines(inputLines) {
-            const expanded = [];
-            const sourceIdx = [];
-
-            for (let i = 0; i < inputLines.length; i++) {
-                const original = String(inputLines[i] || '').trim();
-                if (!original) continue;
-
-                const embeddedSplit = splitAnswerLineWithEmbeddedHeader(original);
-                if (embeddedSplit) {
-                    const first = embeddedSplit.optionLine.trim();
-                    const second = embeddedSplit.headerLine.trim();
-                    if (first) {
-                        expanded.push(first);
-                        sourceIdx.push(i);
-                    }
-                    if (second) {
-                        expanded.push(second);
-                        sourceIdx.push(i);
-                    }
-                    continue;
-                }
-
-                let segment = original;
-                let guard = 0;
-
-                while (segment && guard < 6) {
-                    guard++;
-                    const split = splitInlineQuestionHeader(segment);
-                    if (!split || !split.after) {
-                        expanded.push(segment.trim());
-                        sourceIdx.push(i);
-                        break;
-                    }
-
-                    const splitRev = split.after.split(/\s+/).reverse().join(' ');
-                    const splitIsHeader = qPatternTextual.test(split.after) || qPatternNumeric.test(split.after)
-                        || qPatternTextual.test(splitRev) || qPatternNumeric.test(splitRev);
-
-                    if (!splitIsHeader) {
-                        expanded.push(segment.trim());
-                        sourceIdx.push(i);
-                        break;
-                    }
-
-                    if (split.before) {
-                        expanded.push(split.before.trim());
-                        sourceIdx.push(i);
-                    }
-
-                    segment = split.after.trim();
-                }
-            }
-
-            return { expanded, sourceIdx };
-        }
-
-        function extractNumericHeaderNumber(lineText) {
-            if (!lineText) return null;
-            const m = lineText.match(qNumericCapture);
-            if (!m) return null;
-            const n = Number(m[1]);
-            return Number.isFinite(n) ? n : null;
-        }
-
-        function buildStrictNumericBlocks(inputLines) {
-            const strictHeaderRe = /^\s*(\d{1,3})\s*[\(\)\.\-]\s*/;
-            const optionStartRe = /^(?:[-\*\+\u2022]\s*)?([אבגדהוזחטי])\s*[\.)]\s*(.*)$/;
-
-            const headers = [];
-            for (let i = 0; i < inputLines.length; i++) {
-                const line = String(inputLines[i] || '').trim();
-                if (!line) continue;
-                const m = line.match(strictHeaderRe);
-                if (m) {
-                    headers.push({ idx: i, num: Number(m[1]) });
-                }
-            }
-
-            if (headers.length < 12) {
-                return null;
-            }
-
-            let sequentialHits = 0;
-            for (let i = 1; i < headers.length; i++) {
-                const d = headers[i].num - headers[i - 1].num;
-                if (d === 1 || d === 2) sequentialHits++;
-            }
-            const sequentialRatio = headers.length > 1 ? (sequentialHits / (headers.length - 1)) : 0;
-            if (sequentialRatio < 0.65) {
-                return null;
-            }
-
-            const out = [];
-            for (let h = 0; h < headers.length; h++) {
-                const start = headers[h].idx;
-                const end = h + 1 < headers.length ? headers[h + 1].idx : inputLines.length;
-                const block = inputLines.slice(start, end).map((l) => String(l || '').trim()).filter(Boolean);
-                if (!block.length) continue;
-
-                const qObj = { text: [block[0]], answers: [], lineIdx: start };
-                for (let bi = 1; bi < block.length; bi++) {
-                    const line = block[bi];
-                    const m = line.match(optionStartRe);
-                    if (m) {
-                        const t = (m[2] || '').trim();
-                        qObj.answers.push({ text: t ? [t] : [] });
-                        continue;
-                    }
-
-                    if (qObj.answers.length > 0) {
-                        qObj.answers[qObj.answers.length - 1].text.push(line);
-                    } else {
-                        qObj.text.push(line);
-                    }
-                }
-
-                out.push(qObj);
-            }
-
-            return out;
-        }
-
-        function detectQuestionHeaderNumber(lineText) {
-            if (!lineText) return null;
-            const textual = lineText.match(/שאלה(?:\s+מספר)?\s*:?[\s:]*?(\d{1,3})/i);
-            if (textual) {
-                const n = Number(textual[1]);
-                if (Number.isFinite(n)) return n;
-            }
-            return extractNumericHeaderNumber(lineText);
-        }
-
-        const preprocessed = preprocessEmbeddedHeaders(lines);
-        const baseLines = preprocessed.lines;
-        const baseSourceIdx = preprocessed.sourceIdx;
-
-        const strictBlocks = buildStrictNumericBlocks(baseLines);
-        const useStrictNumericMode = Array.isArray(strictBlocks) && strictBlocks.length >= 20;
-        const { expanded: workingLines, sourceIdx: workingLineSourceIdx } = useStrictNumericMode
-            ? { expanded: baseLines, sourceIdx: baseSourceIdx }
-            : expandInlineQuestionLines(baseLines);
-
-        const rawQuestions = [];
-        const headerIndices = [];
-
-        if (useStrictNumericMode) {
-            rawQuestions.push(...strictBlocks);
-        } else {
-
-        let lastHeaderNum = null;
-        for (let i = 0; i < workingLines.length; i++) {
-            const line = workingLines[i];
-            if (!line || noisePattern.test(line) || line.includes('קוד מבחן') || line.includes("מבחן מס") || line.includes('מבחן מס')) {
-                continue;
-            }
-            const reversedLine = line.split(/\s+/).reverse().join(' ');
-            if (footerPattern.test(line) || footerPattern.test(reversedLine)) {
-                continue;
-            }
-            const textualHeader = qPatternTextual.test(line) || qPatternTextual.test(reversedLine);
-            const directNumeric = extractNumericHeaderNumber(line);
-            const reverseNumeric = extractNumericHeaderNumber(reversedLine);
-
-            let numericCandidate = directNumeric;
-            if (!Number.isFinite(numericCandidate) && Number.isFinite(reverseNumeric)) {
-                numericCandidate = reverseNumeric;
-            }
-
-            let numericHeader = false;
-            if (Number.isFinite(numericCandidate) && numericCandidate >= 1 && numericCandidate <= 300) {
-                if (!Number.isFinite(lastHeaderNum)) {
-                    numericHeader = numericCandidate <= 80;
-                } else {
-                    const delta = numericCandidate - lastHeaderNum;
-                    numericHeader = delta === 1 || delta === 2;
-                }
-            }
-
-            const isQuestionHeader = textualHeader || numericHeader;
-            if (isQuestionHeader) {
-                headerIndices.push(i);
-                const detectedNum = detectQuestionHeaderNumber(line) || detectQuestionHeaderNumber(reversedLine);
-                if (Number.isFinite(detectedNum)) {
-                    lastHeaderNum = detectedNum;
-                }
-            }
-        }
-
-        for (let h = 0; h < headerIndices.length; h++) {
-            const startIdx = headerIndices[h];
-            const endIdx = h + 1 < headerIndices.length ? headerIndices[h + 1] : workingLines.length;
-            const blockLines = workingLines.slice(startIdx, endIdx);
-            if (!blockLines.length) continue;
-
-            const q = {
-                text: [blockLines[0]],
-                answers: [],
-                lineIdx: Number.isInteger(workingLineSourceIdx[startIdx]) ? workingLineSourceIdx[startIdx] : startIdx
-            };
-
-            for (let bi = 1; bi < blockLines.length; bi++) {
-                let line = blockLines[bi];
-                if (!line || noisePattern.test(line) || line.includes('קוד מבחן') || line.includes("מבחן מס") || line.includes('מבחן מס')) {
-                    continue;
-                }
-
-                const reversedLine = line.split(/\s+/).reverse().join(' ');
-                if (footerPattern.test(line) || footerPattern.test(reversedLine)) {
-                    continue;
-                }
-
-                // Within block parser, still guard for accidental inline next question.
-                const qSplit = splitInlineQuestionHeader(line);
-                const qSplitReversed = qSplit && qSplit.after ? qSplit.after.split(/\s+/).reverse().join(' ') : '';
-                const qSplitIsHeader = qSplit && qSplit.after && (
-                    qPatternTextual.test(qSplit.after)
-                    || qPatternTextual.test(qSplitReversed)
-                    || qPatternNumeric.test(qSplit.after)
-                    || qPatternNumeric.test(qSplitReversed)
-                );
-                if (qSplitIsHeader) {
-                    if (qSplit.before) {
-                        if (q.answers.length > 0) {
-                            q.answers[q.answers.length - 1].text.push(qSplit.before);
-                        } else {
-                            q.text.push(qSplit.before);
-                        }
-                    }
-                    break;
-                }
-
-                const inlineParsed = parseInlineAnswers(line);
-                if (inlineParsed && inlineParsed.options.length) {
-                    if (inlineParsed.prefix) {
-                        if (q.answers.length > 0) {
-                            q.answers[q.answers.length - 1].text.push(inlineParsed.prefix);
-                        } else {
-                            q.text.push(inlineParsed.prefix);
-                        }
-                    }
-                    for (const opt of inlineParsed.options) {
-                        q.answers.push({ text: opt.text ? [opt.text] : [] });
-                    }
-                    continue;
-                }
-
-                const isLineStartMatch = ansPatternStart.test(line);
-                let match = line.match(ansPatternStart) || reversedLine.match(ansPatternStart);
-                const isLineEndMatch = !match && ansPatternEnd.test(line);
-                let endMatch = (!match) && (line.match(ansPatternEnd) || reversedLine.match(ansPatternEnd));
-
-                if (match || endMatch) {
-                    let letter, answerText;
-                    if (match) {
-                        letter = match[1] || match[3] || match[5];
-                        answerText = (match[2] || match[4] || match[6] || '').trim();
-                        if (!isLineStartMatch && answerText) {
-                            answerText = answerText.split(/\s+/).reverse().join(' ');
-                        }
-                    } else {
-                        letter = endMatch[2] || endMatch[4];
-                        answerText = (endMatch[1] || endMatch[3] || '').trim();
-                        if (!isLineEndMatch && answerText) {
-                            answerText = answerText.split(/\s+/).reverse().join(' ');
-                        }
-                    }
-
-                    if (letter) {
-                        q.answers.push({ text: answerText ? [answerText] : [] });
-                    }
-                    continue;
-                }
-
-                if (q.answers.length > 0) {
-                    q.answers[q.answers.length - 1].text.push(line);
-                } else {
-                    q.text.push(line);
-                }
-            }
-
-            rawQuestions.push(q);
-        }
-        }
-
-        const normalizedRawQuestions = splitCorruptedMergedOptions(splitMergedQuestions(rawQuestions));
-
-        const imageKeywords = /(?:^|[\s\(\[\:\,"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
-
-        const diagnostics = [];
-        const formatted = normalizedRawQuestions
-            .map((q, idx) => {
-                let rawQuestionText = normalizeWhitespace(stripExamFooterArtifacts(q.text.join(' ')));
-                // Clean leading Markdown heading syntax & question header prefixes (e.g. ### שאלה 1:, שאלה מספר :1)
-                rawQuestionText = stripQuestionHeaderPrefix(rawQuestionText);
-
-                const mappedPageIdx = filteredLinePageMap[q.lineIdx];
-                let pageIdx = Number.isInteger(mappedPageIdx) ? mappedPageIdx : 0;
-                const pageMatch = rawQuestionText.match(/\((?:עמוד|עמ'|page)\s*(\d+)\)/i);
-                // Inline markers like "(עמוד 2)" are often logical-section pages, not
-                // physical PDF pages. Use them only when no line-to-page mapping exists.
-                if (pageMatch && !Number.isInteger(mappedPageIdx)) {
-                    pageIdx = Math.max(0, parseInt(pageMatch[1], 10) - 1);
-                }
-                const cleanQuestionText = stripQuestionHeaderPrefix(rawQuestionText.replace(/\s*\((?:עמוד|עמ'|page)\s*\d+\)$/i, '')).trim();
-
-                const options = q.answers
-                    .map((a) => normalizeWhitespace(stripExamFooterArtifacts(a.text.join(' '))))
-                    .filter(Boolean);
-
-                const obj = { question: cleanQuestionText, options, correctIndex: 0, sourcePage: pageIdx + 1 };
-
-                if (imageKeywords.test(cleanQuestionText)) {
-                    if (pageImages && pageIdx >= 0 && pageIdx < pageImages.length && pageImages[pageIdx]) {
-                        obj.image = pageImages[pageIdx];
-                    }
-                    obj._needsPageRender = true;
-                }
-
-                if (!cleanQuestionText || options.length < 2) {
-                    diagnostics.push({
-                        index: idx + 1,
-                        sourcePage: pageIdx + 1,
-                        lineIdx: q.lineIdx,
-                        questionPreview: cleanQuestionText.slice(0, 80),
-                        optionCount: options.length,
-                        dropReason: !cleanQuestionText ? 'empty-question' : 'insufficient-options'
-                    });
-                }
-
-                return obj;
-            })
-            .filter((q) => q.question && q.options.length >= 2);
-
-        if (diagnostics.length) {
-            console.warn(`[parseQuestionsFromText] Dropped ${diagnostics.length} question candidate(s).`, diagnostics);
-            const sample = diagnostics
-                .slice(0, 3)
-                .map((d) => `#${d.index}(${d.optionCount})`)
-                .join(', ');
-            setStatus(`זוהו ${formatted.length} שאלות תקינות. ${diagnostics.length} מועמדות הושמטו (דוגמאות: ${sample}).`, true);
-            showToast(`הושמטו ${diagnostics.length} מועמדות שאלה. דוגמאות: ${sample}`, 'error', 7000);
-        }
-
-        const suspicious = formatted
-            .map((q, idx) => ({ idx: idx + 1, n: q.options.length }))
-            .filter((x) => x.n > 6);
-        if (suspicious.length) {
-            const sample = suspicious.slice(0, 3).map((s) => `#${s.idx}(${s.n})`).join(', ');
-            showToast(`זוהו שאלות עם מספר תשובות חריג (חשד למיזוג): ${sample}`, 'error', 8000);
-        }
-
-        if (!formatted.length) {
-            throw new Error('לא נמצאו שאלות בפורמט הנתמך.');
-        }
-
-        return formatted;
-    }
-
-    const parseCsvRows = window.QuizCore.parseCsvRows;
-
-    function parseXlsxToRows(arrayBuffer) {
-        if (!window.XLSX) {
-            throw new Error('ספריית XLSX לא נטענה. אנא רענן את העמוד.');
-        }
-        const workbook = window.XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        // Convert to array of arrays, with raw cell values as strings
-        const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
-        // Filter out completely empty rows
-        return rows.filter((row) => row.some((cell) => String(cell).trim() !== ''));
-    }
-
-    const extractAnswersForForm = window.QuizCore.extractAnswersForForm;
-
-    const mergeAnswers = window.QuizCore.mergeAnswers;
-    const validateQuestions = window.QuizCore.validateQuestions;
-
-    // ── Interactive PDF Page Crop Modal Controller ───────────────────────────
-    let currentCropTargetIndex = null;
-    let currentCropPageNum = 1;
-    let cropSelection = { x: 0, y: 0, w: 0, h: 0 };
-    let isCroppingDrag = false;
-    let cropStartPos = { x: 0, y: 0 };
-    let baseCropImage = null;
-    const CROP_RENDER_SCALE = 3.0;
-    const CROP_EXPORT_RENDER_SCALE = 6.0;
-    const CROP_EXPORT_MIN_WIDTH = 2400;
-    const CROP_EXPORT_MAX_DIMENSION = 7000;
-    const CROP_EXPORT_MIME = 'image/png';
-
-    const cropElements = {
-        modal: document.getElementById('crop-modal'),
-        pageSelect: document.getElementById('crop-page-select'),
-        canvas: document.getElementById('crop-canvas'),
-        closeBtn: document.getElementById('crop-modal-close'),
-        cancelBtn: document.getElementById('crop-cancel-btn'),
-        resetBtn: document.getElementById('crop-reset-btn'),
-        saveBtn: document.getElementById('crop-save-btn'),
-        statusText: document.getElementById('crop-status-text')
-    };
-
-    // Keep crop modal at top-level so parent popups/hidden containers cannot
-    // block its visibility when opening from question cards.
-    if (cropElements.modal && cropElements.modal.parentElement !== document.body) {
-        document.body.appendChild(cropElements.modal);
-    }
-
-    async function getPdfBytesForCrop() {
-        if (state.pdfBytes && state.pdfBytes.length > 0) {
-            return new Uint8Array(state.pdfBytes);
-        }
-
-        if (state.pdfArrayBuffer && state.pdfArrayBuffer.byteLength > 0) {
-            state.pdfBytes = new Uint8Array(state.pdfArrayBuffer.slice(0));
-            return new Uint8Array(state.pdfBytes);
-        }
-
-        const pdfInput = elements.pdfFile?.files?.[0];
-        if (pdfInput) {
-            const buffer = await pdfInput.arrayBuffer();
-            state.pdfArrayBuffer = buffer.slice(0);
-            state.pdfBytes = new Uint8Array(buffer);
-            return new Uint8Array(state.pdfBytes);
-        }
-
-        return null;
-    }
-
-    async function resolveCropTotalPages() {
-        const cachedPages = state.pdfPagesState?.length || state.proofPageImages?.length || 0;
-        if (cachedPages > 0) return cachedPages;
-
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (!pdfjs?.getDocument) return 0;
-
-        try {
-            const bytes = await getPdfBytesForCrop();
-            if (!bytes || !bytes.length) return 0;
-            const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
-            return pdfDoc.numPages || 0;
-        } catch (err) {
-            console.warn('Could not resolve PDF page count for crop modal:', err);
-            return 0;
-        }
-    }
-
-    async function attachFullSourcePageImage(questionIndex, pageNum) {
-        if (!state.questions[questionIndex]) return;
-
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (!pdfjs?.getDocument) {
-            showToast('ספריית PDF.js לא נטענה בדפדפן.', 'error');
-            return;
-        }
-
-        try {
-            const bytes = await getPdfBytesForCrop();
-            if (!bytes || !bytes.length) {
-                showToast('לא נמצא PDF זמין. העלה קובץ PDF ונסה שוב.', 'error');
-                return;
-            }
-
-            const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
-            const safePage = Math.min(Math.max(1, Number(pageNum) || 1), pdfDoc.numPages);
-            const page = await pdfDoc.getPage(safePage);
-
-            // Match automatic attachment quality path.
-            const imageData = await renderPageImageData(page, 2.5);
-            state.questions[questionIndex].image = `data:image/png;base64,${imageData}`;
-            state.questions[questionIndex].sourcePage = safePage;
-            state.questions[questionIndex].imageNoCompress = true;
-
-            renderPreview();
-            showToast(`עמוד מקור ${safePage} הוצמד לשאלה באיכות מלאה.`, 'success');
-        } catch (err) {
-            console.error('Failed to attach full source page image:', err);
-            showToast(`שגיאה בהצמדת עמוד מקור: ${err.message || err}`, 'error');
-        }
-    }
-
-    async function openCropModal(questionIndex, initialPageNum = 1) {
-        currentCropTargetIndex = questionIndex;
-        if (!cropElements.modal || !cropElements.canvas) return;
-
-        cropElements.modal.style.display = 'flex';
-        cropElements.modal.classList.remove('hidden');
-
-        // Populate page select dropdown
-        if (cropElements.pageSelect) {
-            cropElements.pageSelect.innerHTML = '';
-            const totalPages = await resolveCropTotalPages();
-            if (!totalPages) {
-                showToast('לא נמצא PDF זמין לחיתוך. העלה קובץ PDF בשדה "קובץ PDF" ונסה שוב.', 'error');
-                closeCropModal();
-                return;
-            }
-            for (let i = 1; i <= totalPages; i++) {
-                const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = `עמוד ${i}`;
-                if (i === Number(initialPageNum)) opt.selected = true;
-                cropElements.pageSelect.appendChild(opt);
-            }
-        }
-
-        await renderCropCanvasPage(initialPageNum);
-    }
-
-    async function renderCropCanvasPage(pageNum) {
-        const canvas = cropElements.canvas;
-        if (!canvas) return;
-        currentCropPageNum = Number(pageNum) || 1;
-
-        cropSelection = { x: 0, y: 0, w: 0, h: 0 };
-        if (cropElements.statusText) cropElements.statusText.textContent = 'סמן אזור לחיתוך בעכבר';
-
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (pdfjs?.getDocument) {
-            try {
-            const bytes = await getPdfBytesForCrop();
-            if (!bytes || !bytes.length) throw new Error('Missing PDF bytes for crop render');
-            const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
-                const page = await pdfDoc.getPage(Number(pageNum));
-                const viewport = page.getViewport({ scale: CROP_RENDER_SCALE });
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
-                }
-                await page.render({ canvasContext: ctx, viewport }).promise;
-
-                baseCropImage = new Image();
-                baseCropImage.src = canvas.toDataURL('image/png');
-                return;
-            } catch (err) {
-                console.warn('PDF.js render error in crop modal:', err);
-            }
-        }
-
-        // Fallback: draw proof image or thumbnail
-        const pageIdx = Number(pageNum) - 1;
-        const imgUrl = state.proofPageImages?.[pageIdx] || state.pdfPagesState?.[pageIdx]?.thumbnailDataUrl;
-        if (imgUrl) {
-            const img = new Image();
-            img.onload = () => {
-                canvas.width = img.naturalWidth || img.width || 800;
-                canvas.height = img.naturalHeight || img.height || 1100;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                baseCropImage = img;
-            };
-            img.src = imgUrl;
-        } else {
-            const ctx = canvas.getContext('2d');
-            canvas.width = 600;
-            canvas.height = 400;
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(0, 0, 600, 400);
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '16px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('לא נמצא עמוד PDF זמין לחיתוך', 300, 200);
-        }
-    }
-
-    async function exportHiResCropFromPdf(pageNum, selection) {
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (!pdfjs?.getDocument) return null;
-
-        const bytes = await getPdfBytesForCrop();
-        if (!bytes || !bytes.length) return null;
-
-        const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise;
-        const safePage = Math.min(Math.max(1, Number(pageNum) || 1), pdfDoc.numPages);
-        const page = await pdfDoc.getPage(safePage);
-
-        const baseRatio = CROP_EXPORT_RENDER_SCALE / CROP_RENDER_SCALE;
-        const minWidthRatio = CROP_EXPORT_MIN_WIDTH / Math.max(1, selection.w);
-        let ratio = Math.max(baseRatio, minWidthRatio);
-        let exportScale = CROP_RENDER_SCALE * ratio;
-        let outW = Math.max(1, Math.round(selection.w * ratio));
-        let outH = Math.max(1, Math.round(selection.h * ratio));
-
-        const maxSide = Math.max(outW, outH);
-        if (maxSide > CROP_EXPORT_MAX_DIMENSION) {
-            const downscale = CROP_EXPORT_MAX_DIMENSION / maxSide;
-            exportScale = Math.max(CROP_RENDER_SCALE, exportScale * downscale);
-            ratio = exportScale / CROP_RENDER_SCALE;
-            outW = Math.max(1, Math.round(selection.w * ratio));
-            outH = Math.max(1, Math.round(selection.h * ratio));
-        }
-
-        const sx = Math.max(0, selection.x * ratio);
-        const sy = Math.max(0, selection.y * ratio);
-
-        // Render full page at target DPI, then crop. This preserves glyph
-        // layout for Hebrew text better than translated render transforms.
-        const viewport = page.getViewport({ scale: exportScale });
-        const fullCanvas = document.createElement('canvas');
-        fullCanvas.width = Math.max(1, Math.round(viewport.width));
-        fullCanvas.height = Math.max(1, Math.round(viewport.height));
-        const fullCtx = fullCanvas.getContext('2d');
-        if (!fullCtx) return null;
-        fullCtx.imageSmoothingEnabled = true;
-        fullCtx.imageSmoothingQuality = 'high';
-
-        await page.render({ canvasContext: fullCtx, viewport }).promise;
-
-        const offscreen = document.createElement('canvas');
-        offscreen.width = outW;
-        offscreen.height = outH;
-        const ctx = offscreen.getContext('2d');
-        if (!ctx) return null;
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-
-        ctx.drawImage(fullCanvas, sx, sy, outW, outH, 0, 0, outW, outH);
-
-        return offscreen.toDataURL(CROP_EXPORT_MIME);
-    }
-
-    function redrawCropCanvas() {
-        const canvas = cropElements.canvas;
-        if (!canvas || !baseCropImage) return;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(baseCropImage, 0, 0, canvas.width, canvas.height);
-
-        if (cropSelection.w > 5 && cropSelection.h > 5) {
-            // Draw dimmed overlay
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Clear cropped selection area
-            ctx.drawImage(
-                baseCropImage,
-                cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h,
-                cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h
-            );
-
-            // Draw red selection border
-            ctx.strokeStyle = '#ef4444';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h);
-        }
-    }
-
-    // Attach Crop Canvas Mouse Drag Handlers
-    cropElements.canvas?.addEventListener('mousedown', (e) => {
-        const rect = cropElements.canvas.getBoundingClientRect();
-        const scaleX = cropElements.canvas.width / rect.width;
-        const scaleY = cropElements.canvas.height / rect.height;
-
-        isCroppingDrag = true;
-        cropStartPos = {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
-        };
-        cropSelection = { x: cropStartPos.x, y: cropStartPos.y, w: 0, h: 0 };
-    });
-
-    cropElements.canvas?.addEventListener('mousemove', (e) => {
-        if (!isCroppingDrag) return;
-        const rect = cropElements.canvas.getBoundingClientRect();
-        const scaleX = cropElements.canvas.width / rect.width;
-        const scaleY = cropElements.canvas.height / rect.height;
-
-        const currentX = (e.clientX - rect.left) * scaleX;
-        const currentY = (e.clientY - rect.top) * scaleY;
-
-        cropSelection.x = Math.min(cropStartPos.x, currentX);
-        cropSelection.y = Math.min(cropStartPos.y, currentY);
-        cropSelection.w = Math.abs(currentX - cropStartPos.x);
-        cropSelection.h = Math.abs(currentY - cropStartPos.y);
-
-        redrawCropCanvas();
-        if (cropElements.statusText) {
-            cropElements.statusText.textContent = `אזור נבחר: ${Math.round(cropSelection.w)}x${Math.round(cropSelection.h)} px`;
-        }
-    });
-
-    window.addEventListener('mouseup', () => {
-        if (isCroppingDrag) {
-            isCroppingDrag = false;
-        }
-    });
-
-    cropElements.pageSelect?.addEventListener('change', (e) => {
-        renderCropCanvasPage(e.target.value);
-    });
-
-    cropElements.resetBtn?.addEventListener('click', () => {
-        cropSelection = { x: 0, y: 0, w: 0, h: 0 };
-        redrawCropCanvas();
-        if (cropElements.statusText) cropElements.statusText.textContent = 'סמן אזור לחיתוך בעכבר';
-    });
-
-    function closeCropModal() {
-        if (cropElements.modal) {
-            cropElements.modal.style.display = 'none';
-            cropElements.modal.classList.add('hidden');
-        }
-    }
-
-    cropElements.closeBtn?.addEventListener('click', closeCropModal);
-    cropElements.cancelBtn?.addEventListener('click', closeCropModal);
-
-    cropElements.saveBtn?.addEventListener('click', async () => {
-        if (currentCropTargetIndex === null || !state.questions[currentCropTargetIndex]) return;
-        const canvas = cropElements.canvas;
-        if (!canvas || cropSelection.w < 10 || cropSelection.h < 10) {
-            showToast('אנא סמן אזור תמונה רחב יותר לחיתוך.', 'error');
-            return;
-        }
-
-        let croppedDataUrl = null;
-        try {
-            croppedDataUrl = await exportHiResCropFromPdf(currentCropPageNum, cropSelection);
-        } catch (err) {
-            console.warn('High-resolution crop export failed, falling back to canvas crop:', err);
-        }
-
-        // Fallback path if high-resolution re-render is unavailable.
-        if (!croppedDataUrl) {
-            const offscreen = document.createElement('canvas');
-            offscreen.width = cropSelection.w;
-            offscreen.height = cropSelection.h;
-            const ctx = offscreen.getContext('2d');
-            if (!ctx) {
-                showToast('לא ניתן היה ליצור תמונת חיתוך.', 'error');
-                return;
-            }
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(
-                canvas,
-                cropSelection.x, cropSelection.y, cropSelection.w, cropSelection.h,
-                0, 0, cropSelection.w, cropSelection.h
-            );
-            croppedDataUrl = offscreen.toDataURL(CROP_EXPORT_MIME);
-        }
-
-        state.questions[currentCropTargetIndex].image = croppedDataUrl;
-        state.questions[currentCropTargetIndex].imageNoCompress = true;
-        if (cropElements.pageSelect) {
-            state.questions[currentCropTargetIndex].sourcePage = parseInt(cropElements.pageSelect.value, 10);
-        }
-
-        closeCropModal();
-        renderPreview();
-        showToast('תמונת השאלה עודכנה ונחתכה בהצלחה!', 'success');
-    });
-
-    function renderPreview() {
-        elements.preview.innerHTML = '';
-
-        state.questions.forEach((question, index) => {
-            const card = document.createElement('article');
-            card.className = 'question-card';
-            card.setAttribute('aria-label', `שאלה ${index + 1}`);
-
-            const questionRow = document.createElement('div');
-            questionRow.className = 'row';
-            questionRow.style.gridTemplateColumns = '80px 1fr 28px';
-
-            const qLabel = document.createElement('label');
-            qLabel.textContent = `שאלה ${index + 1}`;
-            questionRow.appendChild(qLabel);
-
-            // Image thumbnail & per-question crop/upload controls
-            const imageControlsWrap = document.createElement('div');
-            imageControlsWrap.style.cssText = 'grid-column:1/-1;margin-bottom:8px;padding:8px 10px;background:var(--input-bg);border:1px solid var(--border-color);border-radius:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;';
-
-            const leftBox = document.createElement('div');
-            leftBox.style.cssText = 'display:flex;align-items:center;gap:6px;';
-
-            const pageLabel = document.createElement('label');
-            pageLabel.style.cssText = 'font-size:.82rem;font-weight:600;color:var(--text-secondary);';
-            pageLabel.textContent = 'עמוד מקור:';
-
-            const pageInput = document.createElement('input');
-            pageInput.type = 'number';
-            pageInput.min = '1';
-            pageInput.value = question.sourcePage || 1;
-            pageInput.style.cssText = 'width:55px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-color);font:inherit;font-size:.82rem;background:var(--card-bg);color:var(--text-primary);';
-            pageInput.addEventListener('change', () => {
-                const p = parseInt(pageInput.value, 10);
-                if (p && p >= 1) {
-                    state.questions[index].sourcePage = p;
-                    const card = pageInput.closest('.question-card');
-                    if (card) {
-                        const summary = card.querySelector('details summary');
-                        if (summary) summary.textContent = `מצב הגהה: עמוד מקור ${p}`;
-                        const sourceImg = card.querySelector('details img');
-                        const sourcePageIndex = p - 1;
-                        const newSrc = state.proofPageImages[sourcePageIndex] || state.pdfPagesState[sourcePageIndex]?.thumbnailDataUrl;
-                        if (sourceImg && newSrc) {
-                            sourceImg.src = newSrc;
-                            sourceImg.alt = `עמוד מקור ${p}`;
-                        }
-                    }
-                }
-            });
-            leftBox.append(pageLabel, pageInput);
-
-            const rightBox = document.createElement('div');
-            rightBox.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
-
-            const cropBtn = document.createElement('button');
-            cropBtn.type = 'button';
-            cropBtn.className = 'secondary-btn sm-btn';
-            cropBtn.textContent = question.image ? '🖼️ החלף לעמוד מקור מלא' : '🖼️ הוסף עמוד מקור מלא';
-            cropBtn.style.cssText = 'font-size:.8rem;padding:4px 10px;';
-            cropBtn.addEventListener('click', async () => {
-                cropBtn.disabled = true;
-                const prevText = cropBtn.textContent;
-                cropBtn.textContent = 'מוסיף עמוד...';
-                await attachFullSourcePageImage(index, question.sourcePage || 1);
-                cropBtn.disabled = false;
-                cropBtn.textContent = prevText;
-            });
-
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = 'image/*';
-            fileInput.style.display = 'none';
-            fileInput.addEventListener('change', (e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {
-                        state.questions[index].image = ev.target.result;
-                        delete state.questions[index].imageNoCompress;
-                        renderPreview();
-                    };
-                    reader.readAsDataURL(f);
-                }
-            });
-
-            const uploadBtn = document.createElement('button');
-            uploadBtn.type = 'button';
-            uploadBtn.className = 'secondary-btn sm-btn';
-            uploadBtn.textContent = '📁 העלה תמונה מקובץ';
-            uploadBtn.style.cssText = 'font-size:.8rem;padding:4px 10px;';
-            uploadBtn.addEventListener('click', () => fileInput.click());
-
-            rightBox.append(cropBtn, uploadBtn, fileInput);
-
-            if (question.image) {
-                const removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'secondary-btn sm-btn';
-                removeBtn.textContent = '✕ הסר תמונה';
-                removeBtn.style.cssText = 'font-size:.8rem;padding:4px 8px;color:var(--danger);';
-                removeBtn.addEventListener('click', () => {
-                    delete state.questions[index].image;
-                    renderPreview();
-                });
-                rightBox.appendChild(removeBtn);
-            }
-
-            imageControlsWrap.append(leftBox, rightBox);
-
-            if (question.image) {
-                const imgWrap = document.createElement('div');
-                imgWrap.style.cssText = 'grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-bottom:6px;';
-                const thumb = document.createElement('img');
-                thumb.src = question.image;
-                thumb.style.cssText = 'max-height:140px;max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;';
-                thumb.title = 'לחץ להצגה בגודל מלא';
-                thumb.addEventListener('click', () => showImageZoom(question.image));
-                imgWrap.appendChild(thumb);
-                card.appendChild(imgWrap);
-            }
-
-            card.appendChild(imageControlsWrap);
-
-            const questionTextarea = document.createElement('textarea');
-            questionTextarea.value = question.question;
-            questionTextarea.setAttribute('aria-label', `נוסח שאלה ${index + 1}`);
-            questionTextarea.addEventListener('input', () => {
-                state.questions[index].question = questionTextarea.value;
-                updateValidationUI();
-                disableOutputActions(false);
-            });
-            questionRow.appendChild(questionTextarea);
-
-            const deleteQBtn = document.createElement('button');
-            deleteQBtn.type = 'button';
-            deleteQBtn.textContent = '✕';
-            deleteQBtn.title = 'מחק שאלה';
-            deleteQBtn.style.cssText = 'width:28px;height:28px;border-radius:50%;border:1px solid var(--border-color);background:var(--input-bg);color:var(--danger);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;';
-            deleteQBtn.addEventListener('click', () => {
-                state.questions.splice(index, 1);
-                renderPreview();
-            });
-            questionRow.appendChild(deleteQBtn);
-
-            card.appendChild(questionRow);
-
-            if (state.proofMode && question.sourcePage) {
-                const sourcePageIndex = Number(question.sourcePage) - 1;
-                const sourcePageImage = state.proofPageImages[sourcePageIndex] || state.pdfPagesState[sourcePageIndex]?.thumbnailDataUrl;
-                if (sourcePageImage) {
-                    const proofWrap = document.createElement('details');
-                    proofWrap.style.cssText = 'grid-column:1/-1;border:1px solid var(--border-color);border-radius:10px;background:var(--card-bg);padding:8px;';
-                    proofWrap.open = false;
-
-                    const summary = document.createElement('summary');
-                    summary.textContent = `מצב הגהה: עמוד מקור ${question.sourcePage}`;
-                    summary.style.cssText = 'cursor:pointer;font-weight:600;margin-bottom:8px;';
-                    proofWrap.appendChild(summary);
-
-                    const sourceImg = document.createElement('img');
-                    sourceImg.src = sourcePageImage;
-                    sourceImg.alt = `עמוד מקור ${question.sourcePage}`;
-                    sourceImg.style.cssText = 'max-width:100%;border-radius:8px;border:1px solid var(--border-color);cursor:zoom-in;';
-                    sourceImg.addEventListener('click', () => showImageZoom(sourcePageImage, Number(question.sourcePage)));
-                    proofWrap.appendChild(sourceImg);
-
-                    card.appendChild(proofWrap);
-                }
-            }
-
-            const questionErrors = getQuestionValidationErrors().filter((error) => error.startsWith(`שאלה ${index + 1}:`));
-            if (questionErrors.length) {
-                const errorBox = document.createElement('div');
-                errorBox.className = 'question-validation-error';
-                errorBox.setAttribute('role', 'alert');
-                errorBox.textContent = questionErrors.join(' ');
-                card.appendChild(errorBox);
-            }
-
-            question.options.forEach((option, optIndex) => {
-                const optionRow = document.createElement('div');
-                optionRow.className = 'option-row';
-
-                const radio = document.createElement('input');
-                radio.type = 'radio';
-                radio.name = `correct-${index}`;
-                radio.checked = question.correctIndex === optIndex;
-                radio.title = 'סמן תשובה נכונה';
-                radio.addEventListener('change', () => {
-                    state.questions[index].correctIndex = optIndex;
-                });
-
-                const optionInput = document.createElement('input');
-                optionInput.type = 'text';
-                optionInput.value = option;
-                optionInput.setAttribute('aria-label', `שאלה ${index + 1}, תשובה ${optIndex + 1}`);
-                optionInput.addEventListener('input', () => {
-                    state.questions[index].options[optIndex] = optionInput.value;
-                    updateValidationUI();
-                    disableOutputActions(false);
-                });
-
-                const delBtn = document.createElement('button');
-                delBtn.type = 'button';
-                delBtn.textContent = '✕';
-                delBtn.title = 'הסר תשובה';
-                delBtn.style.cssText = 'width:26px;height:26px;border-radius:50%;border:1px solid var(--border-color);background:var(--input-bg);color:var(--danger);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;';
-                delBtn.addEventListener('click', () => {
-                    if (state.questions[index].options.length <= 2) {
-                        alert('שאלה חייבת להכיל לפחות 2 תשובות.');
-                        return;
-                    }
-                    state.questions[index].options.splice(optIndex, 1);
-                    if (state.questions[index].correctIndex >= state.questions[index].options.length) {
-                        state.questions[index].correctIndex = Math.max(0, state.questions[index].options.length - 1);
-                    }
-                    renderPreview();
-                });
-
-                optionRow.append(radio, optionInput, delBtn);
-                card.appendChild(optionRow);
-            });
-
-            const addBtn = document.createElement('button');
-            addBtn.type = 'button';
-            addBtn.textContent = '+ הוסף תשובה';
-            addBtn.style.cssText = 'margin-top:4px;padding:6px 14px;border-radius:8px;border:1px dashed var(--border-color);background:var(--input-bg);color:var(--text-secondary);cursor:pointer;font:inherit;font-size:.85rem;width:100%;';
-            addBtn.addEventListener('click', () => {
-                state.questions[index].options.push('');
-                renderPreview();
-            });
-            card.appendChild(addBtn);
-
-            elements.preview.appendChild(card);
-        });
-
-        const addQBtn = document.createElement('button');
-        addQBtn.type = 'button';
-        addQBtn.textContent = '+ הוסף שאלה';
-        addQBtn.style.cssText = 'margin-top:12px;padding:10px 16px;border-radius:10px;border:2px dashed var(--border-color);background:var(--card-bg);color:var(--text-secondary);cursor:pointer;font:inherit;font-size:.95rem;width:100%;';
-        addQBtn.addEventListener('click', () => {
-            state.questions.push({
-                question: '',
-                options: ['', '', '', ''],
-                correctIndex: 0
-            });
-            renderPreview();
-        });
-        elements.preview.appendChild(addQBtn);
-        updateValidationUI();
-        disableOutputActions(false);
-    }
-
-    async function getTemplateSources() {
-        if (state.templateCache) {
-            return state.templateCache;
-        }
-
-        try {
-            const [indexHtml, styleCss, quizCoreJs, appJs] = await Promise.all([
-                fetch('quiz_player.html').then((response) => {
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return response.text();
-                }),
-                fetch('style.css').then((response) => {
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return response.text();
-                }),
-                fetch('quiz-core.js').then((response) => {
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return response.text();
-                }),
-                fetch('app.js').then((response) => {
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    return response.text();
-                })
-            ]);
-
-            state.templateCache = { indexHtml, styleCss, quizCoreJs, appJs };
-            return state.templateCache;
-        } catch (err) {
-            if (window.location.protocol === 'file:') {
-                throw new Error('לא ניתן ליצור קובץ מבחן בעת הרצה ישירה מקובץ מקומי (file://). דפדפנים חוסמים טעינת תבניות מסיבות אבטחה. הפעל שרת מקומי (כגון Live Server או npx serve) ונסה שוב.');
-            }
-            throw new Error(`טעינת תבניות המבחן נכשלה (${err.message}). ודא שהקבצים quiz_player.html, style.css, quiz-core.js, app.js קיימים בתיקייה.`);
-        }
-    }
-
-    async function compressImageBase64(dataUrl, quality = 0.75) {
-        if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
-            return dataUrl;
-        }
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.naturalWidth || img.width;
-                canvas.height = img.naturalHeight || img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                const compressed = canvas.toDataURL('image/webp', quality);
-                resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
-            };
-            img.onerror = () => resolve(dataUrl);
-            img.src = dataUrl;
-        });
-    }
-
-    async function createStandaloneQuizHtml(task = null) {
-        const validationErrors = validateQuestions(state.questions);
-        if (validationErrors.length) {
-            throw new Error(`לא ניתן לייצא: ${validationErrors.slice(0, 5).join(' ')}`);
-        }
-
-        const shouldCompress = elements.compressExportImages ? elements.compressExportImages.checked : false;
-        const qualityVal = Number(elements.compressQualitySlider?.value) || 75;
-        const quality = Math.min(Math.max(qualityVal, 10), 90) / 100;
-
-        const totalQ = state.questions.length;
-        let processedQ = 0;
-
-        const cleanedQuestions = [];
-        for (const q of state.questions) {
-            if (task && task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
-            processedQ++;
-            let img = q.image;
-            if (shouldCompress && img) {
-                const skipCompression = q.imageNoCompress === true;
-                if (!skipCompression) {
-                    if (task) {
-                        const progressPct = 10 + Math.round((processedQ / totalQ) * 70);
-                        task.update(progressPct, `דוחס תמונה לשאלה ${processedQ} מתוך ${totalQ}...`);
-                    }
-                    img = await compressImageBase64(img, quality);
-                }
-            } else if (task && processedQ % 5 === 0) {
-                const progressPct = 10 + Math.round((processedQ / totalQ) * 70);
-                task.update(progressPct, `מעבד שאלה ${processedQ} מתוך ${totalQ}...`);
-            }
-
-            cleanedQuestions.push({
-                question: normalizeWhitespace(q.question),
-                options: q.options.map((opt) => normalizeWhitespace(opt)),
-                correctIndex: q.correctIndex,
-                ...(q.shuffleOptions ? { shuffleOptions: true } : {}),
-                ...(img ? { image: img } : {}) // embed base64 image directly
-            });
-        }
-
-        if (task) task.update(85, 'טוען קובצי תבנית HTML/CSS/JS...');
-        const { indexHtml, styleCss, quizCoreJs, appJs } = await getTemplateSources();
-        if (task) task.update(92, 'משלב קוד ונתונים למסמך עצמאי...');
-        const styledHtml = window.QuizExport.injectStylesheet(indexHtml, styleCss);
-        const onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
-        const standaloneNavHtml = window.QuizExport.setBuilderLink(styledHtml, onlineBuilderUrl);
-        const dataHtml = window.QuizExport.injectInlineQuestions(standaloneNavHtml, cleanedQuestions);
-        const withCore = window.QuizExport.injectScript(dataHtml, 'quiz-core.js', quizCoreJs);
-        return window.QuizExport.injectScript(withCore, 'app.js', appJs);
-    }
-
-    async function runParse() {
-        disableOutputActions(true);
-        elements.preview.innerHTML = '';
-        state.proofPageImages = [];
-        state.pdfBytes = null; // will be set below after reading the file
-        let apiKey = '';
-
-        const pdf = elements.pdfFile.files?.[0];
-        const csv = elements.csvFile.files?.[0];
-        const formNumber = elements.formNumber.value.trim();
-        const ocrEngine = (elements.ocrEngine?.value || 'gemini_chunked').trim();
-        const llmPolicy = (elements.llmPolicy?.value || 'auto').trim();
-
-        if (!pdf) {
-            throw new Error('יש לבחור קובץ PDF לפענוח.');
-        }
-
-        const task = ProgressController.startTask('מחלץ ומפענח שאלות', {
-            icon: '🔍',
-            cancellable: true,
-            detail: 'קורא קובצי מקור ומנתח מבנה PDF...'
-        });
-
-        try {
-            task.update(5, 'קורא קובצי מקור...');
-            setStatus('קורא קובצי מקור...');
-
-            let pdfFileToParse = pdf;
-            let pdfBufferForParse = (await pdf.arrayBuffer()).slice(0);
-            // Store raw bytes so hi-res lightbox zoom works regardless of whether the
-            // sidebar was previously loaded (state.pdfBytes may still be null).
-            if (!state.pdfBytes || state.pdfBytes.length === 0) {
-                state.pdfBytes = new Uint8Array(pdfBufferForParse.slice(0));
-            }
-
-            const useCleanPdf = elements.useCleanPdfForApi ? elements.useCleanPdfForApi.checked : true;
-            if (useCleanPdf) {
-                try {
-                    const cleanBuffer = await getCleanPdfBuffer();
-                    if (cleanBuffer) {
-                        pdfBufferForParse = cleanBuffer.slice(0);
-                        pdfFileToParse = new File([cleanBuffer], `cleaned_${pdf.name}`, { type: 'application/pdf' });
-                        const keptCount = state.pdfPagesState.filter(p => p.keep).length;
-                        task.update(10, `משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל)...`);
-                        setStatus(`משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל) לעיבוד...`);
-                    }
-                } catch (e) {
-                    console.warn('Could not build clean PDF for parse:', e);
-                }
-            }
-
-            let answerRows = null;
-            if (csv) {
-                const fileName = csv.name.toLowerCase();
-                if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                    const xlsxBuffer = await csv.arrayBuffer();
-                    answerRows = parseXlsxToRows(xlsxBuffer);
-                } else {
-                    const csvText = await csv.text();
-                    answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
-                }
-                if (!formNumber) {
-                    throw new Error('אם הועלה קובץ תשובות, יש להזין מספר שאלון.');
-                }
-            }
-
-            if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
-
-            task.update(15, 'טוען ומנתח את מבנה קובץ ה-PDF...');
-            setStatus('טוען ומנתח את מבנה קובץ ה-PDF...');
-            const extracted = await extractPdfText(pdfBufferForParse);
-
-            let examText = extracted.text;
-            let sourcePages = extracted.rawPages;
-            const useLlmExtraction = llmPolicy === 'force_llm' || (llmPolicy === 'auto' && extracted.isScanned && ocrEngine !== 'offline_local');
-            const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
-
-            if (!extracted.isScanned && llmPolicy !== 'force_llm') {
-                task.update(50, 'זוהה PDF דיגיטלי. מחלץ שאלות ישירות מטקסט המסמך...');
-                setStatus('זוהה PDF דיגיטלי. מחלץ שאלות מקומית מתוך טקסט ה-PDF ללא LLM.');
-            }
-
-            if (useOfflineOcr) {
-                setStatus('מפעיל OCR מקומי בדפדפן (ללא API Key)...');
-                const offlineExtraction = await extractTextViaOfflineOcr(extracted.pdf, task);
-                examText = offlineExtraction.text;
-                sourcePages = offlineExtraction.pages;
-                state.proofPageImages = offlineExtraction.pagePreviews || [];
-            } else if (useLlmExtraction) {
-                apiKey = await resolveGeminiApiKey(true);
-                if (ocrEngine.startsWith('gemini_native')) {
-                    const mode = ocrEngine === 'gemini_native_markdown' ? 'markdown' : 'schema';
-                    setStatus(`שולח את מסמך ה-PDF המלא ל-Gemini API (Native PDF - ${mode === 'schema' ? 'Enforced Schema' : 'Clean Markdown'})...`);
-                    const nativeExtraction = await extractTextViaGeminiNativePdf(pdfFileToParse, extracted.pdf, apiKey, mode, task);
-                    examText = nativeExtraction.text;
-                    sourcePages = nativeExtraction.pages;
-                    const previews = await renderAllPdfPageImages(extracted.pdf, task);
-                    state.proofPageImages = previews.pagePreviews || [];
-                } else {
-                    setStatus('שולח עמודי תמונה ל-Gemini API (מצב Page Chunking)...');
-                    const geminiExtraction = await extractTextViaGemini(extracted.pdf, apiKey, null, task);
-                    examText = geminiExtraction.text;
-                    sourcePages = geminiExtraction.pages;
-                    state.proofPageImages = geminiExtraction.pagePreviews || [];
-                }
-            } else if (extracted.isScanned) {
-                setStatus('זוהה PDF סרוק במצב מקומי בלבד (ללא LLM). התוצאה עלולה להיות חלקית.');
-            }
-
-            if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
-
-            task.update(85, 'מפרק ומבנה שאלות ותשובות מתוך הטקסט...');
-            let parsedQuestions;
-            try {
-                parsedQuestions = parseQuestionsFromText(examText, sourcePages, extracted.pageImages);
-            } catch (error) {
-                if (useLlmExtraction) {
-                    task.update(88, 'מנסה ניתוח מקומי מהטקסט הדיגיטלי...');
-                    setStatus('פורמט תשובת ה-LLM לא תאם מודל צפוי, מנסה ניתוח מקומי מהטקסט הדיגיטלי...');
-                    parsedQuestions = parseQuestionsFromText(extracted.text, extracted.rawPages, extracted.pageImages);
-                } else {
-                    throw error;
-                }
-            }
-
-            if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
-                task.update(60, 'זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...');
-                setStatus('זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...');
-                const fallbackExtraction = await extractTextViaGemini(extracted.pdf, apiKey, 1, task);
-                const fallbackQuestions = parseQuestionsFromText(
-                    fallbackExtraction.text,
-                    fallbackExtraction.pages,
-                    extracted.pageImages
-                );
-
-                if (fallbackQuestions.length > parsedQuestions.length) {
-                    parsedQuestions = fallbackQuestions;
-                    examText = fallbackExtraction.text;
-                    sourcePages = fallbackExtraction.pages;
-                    state.proofPageImages = fallbackExtraction.pagePreviews || [];
-                }
-            }
-
-            for (const q of parsedQuestions) {
-                if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
-                if (q._needsPageRender && !q.image && extracted.pdf && q.sourcePage) {
-                    try {
-                        const page = await extracted.pdf.getPage(q.sourcePage);
-                        // Use same 2.5 scale as renderPageImageData for consistent quality.
-                        const imageData = await renderPageImageData(page, 2.5);
-                        q.image = `data:image/png;base64,${imageData}`;
-                    } catch { /* skip if render fails */ }
-                }
-                delete q._needsPageRender;
-            }
-
-            // Default correct answer to index 0 ('א') and shuffle options until explicit merge
-            state.questions = parsedQuestions.map(q => ({
-                ...q,
-                correctIndex: (typeof q.correctIndex === 'number' && q.correctIndex >= 0) ? q.correctIndex : 0,
-                shuffleOptions: true
-            }));
-
-            // Additional AI Verification step (if explicitly enabled by user toggle)
-            const enableVerification = elements.enableLlmVerification ? elements.enableLlmVerification.checked : false;
-            if (enableVerification) {
-                if (!apiKey) {
-                    apiKey = await resolveGeminiApiKey(true);
-                }
-                if (apiKey) {
-                    setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
-                    state.questions = await verifyTestWithGemini(state.questions, apiKey, task);
-                }
-            }
-
-            const validationErrors = validateQuestions(state.questions);
-            if (validationErrors.length) {
-                throw new Error(`נמצאו שאלות לא תקינות: ${validationErrors.slice(0, 5).join(' ')}`);
-            }
-
-            renderPreview();
-            disableOutputActions(false);
-            task.finish(`הסתיים בהצלחה: נטענו ${state.questions.length} שאלות לעריכה!`);
-        } catch (error) {
-            if (task.isAborted()) {
-                task.abort('פעולת חילוץ השאלות בוטלה.');
-            } else {
-                task.fail(error.message || 'אירעה שגיאה לא צפויה.');
-            }
-            throw error;
-        }
-    }
-
-    elements.runParse.addEventListener('click', async () => {
-        try {
-            await runParse();
-        } catch (error) {
-            console.warn('runParse finished with notice/error:', error);
-        }
-    });
-
-    elements.downloadQuiz.addEventListener('click', () => {
-        if (!state.questions || state.questions.length === 0) {
-            showToast('אין שאלות זמינות ליצירת מבחן.', 'info');
-            return;
-        }
-        if (elements.compressSettingsPopup) {
-            elements.compressSettingsPopup.classList.add('show');
-        }
-    });
-
-    elements.confirmDownloadBtn?.addEventListener('click', async () => {
-        if (elements.compressSettingsPopup) {
-            elements.compressSettingsPopup.classList.remove('show');
-        }
-        const task = ProgressController.startTask('מייצא מבחן עצמאי (HTML)', {
-            icon: '📥',
-            cancellable: true,
-            detail: 'מכין קובץ HTML ודוחס תמונות...'
-        });
-
-        try {
-            task.update(10, 'מכין קובץ HTML להורדה...');
-            setStatus('מכין קובץ HTML להורדה...');
-            const html = await createStandaloneQuizHtml(task);
-            if (task.isAborted()) {
-                task.abort('ייצוא המבחן בוטל.');
-                return;
-            }
-            task.update(95, 'יוצר קובץ HTML עצמאי ומוריד...');
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = 'interactive_quiz.html';
-            anchor.click();
-            URL.revokeObjectURL(url);
-            task.finish('הקובץ נוצר בהצלחה וההורדה התחילה!');
-        } catch (error) {
-            if (task.isAborted()) {
-                task.abort('ייצוא המבחן בוטל.');
-            } else {
-                task.fail(error.message || 'נכשלה יצירת קובץ HTML.');
-            }
-        }
-    });
-
-    elements.takeQuiz.addEventListener('click', async () => {
-        // Open synchronously from the user click so the new tab retains
-        // its opener relationship, enabling the quiz player's back link.
-        const previewWindow = window.open('', '_blank');
-        if (!previewWindow) {
-            setStatus('הדפדפן חסם את פתיחת לשונית המבחן. אפשר חלונות קופצים ונסה שוב.', true);
-            return;
-        }
-
-        const task = ProgressController.startTask('מכין מבחן לפתרון', {
-            icon: '▶️',
-            cancellable: true,
-            detail: 'בונה את נתוני המבחן ומפעיל בלשונית חדשה...'
-        });
-
-        try {
-            // Write a minimal loading page immediately so the tab shows a spinner
-            // instead of blank while createStandaloneQuizHtml() runs (can be slow
-            // for large quizzes with image compression).
-            previewWindow.document.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>מכין מבחן...</title><style>body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:Rubik,system-ui,sans-serif;background:#f8fafc;color:#0f172a;direction:rtl}@keyframes bspin{to{transform:rotate(360deg)}}.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:bspin .7s linear infinite;margin-bottom:16px}.wr{text-align:center}p{font-size:1.1rem;margin:0}</style></head><body><div class="wr"><div class="sp"></div><p>מכין מבחן...</p></div></body></html>');
-            previewWindow.document.title = 'מכין מבחן...';
-            task.update(15, 'פותח תצוגת מבחן ומעבד תמונות...');
-            setStatus('פותח תצוגת מבחן...');
-            const html = await createStandaloneQuizHtml(task);
-            if (task.isAborted()) {
-                previewWindow.close();
-                task.abort('טעינת המבחן בוטלה.');
-                return;
-            }
-            previewWindow.document.open();
-            previewWindow.document.write(html);
-            previewWindow.document.close();
-            task.finish('המבחן נפתח בלשונית חדשה!');
-        } catch (error) {
-            previewWindow?.close();
-            if (task.isAborted()) {
-                task.abort('טעינת המבחן בוטלה.');
-            } else {
-                task.fail(error.message || 'נכשלה פתיחת המבחן.');
-            }
-        }
-    });
-
-    // ── Normalization for questions.json ────────────────────────────────────────
-    function normalizeQuestionsJson(data) {
-        if (!Array.isArray(data) || data.length === 0) {
-            throw new Error('קובץ ה-JSON הינו ריק או אינו במבנה מערך.');
-        }
-
-        return data.map((item, index) => {
-            if (typeof item !== 'object' || item === null) {
-                throw new Error(`שאלה מס' ${index + 1} אינה אובייקט תקין.`);
-            }
-
-            const rawQuestion = item.question || item.title || item.text || '';
-            const cleanQuestion = stripQuestionHeaderPrefix(normalizeWhitespace(rawQuestion));
-            let options = item.options || item.answers || item.choices || [];
-            if (!Array.isArray(options)) options = [];
-
-            options = options.map(opt => (typeof opt === 'object' && opt !== null && opt.text) ? opt.text : String(opt || ''));
-
-            let correctIndex = item.correctIndex !== undefined ? Number(item.correctIndex) : (item.correctAnswerIndex !== undefined ? Number(item.correctAnswerIndex) : undefined);
-            let shuffleOptions = item.shuffleOptions || false;
-
-            if (correctIndex === undefined || isNaN(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
-                if (typeof item.correctAnswer === 'number' && item.correctAnswer >= 1 && item.correctAnswer <= options.length) {
-                    correctIndex = item.correctAnswer - 1;
-                } else {
-                    correctIndex = 0;
-                    shuffleOptions = true;
-                }
-            }
-
-            return {
-                id: item.id || (index + 1),
-                question: cleanQuestion,
-                options: options,
-                correctIndex: correctIndex,
-                image: item.image || item.pageImage || null,
-                sourcePage: item.sourcePage || item.page || (index + 1),
-                shuffleOptions: shuffleOptions
-            };
-        });
-    }
-
-    function normalizeQuestionsFromAnyJson(rawData) {
-        const toQuestionsArray = (input) => {
-            if (!input) return null;
-            if (Array.isArray(input) && input.length > 0) return input;
-            if (typeof input !== 'object') return null;
-
-            const directArray = [input.questions, input.data, input.items, input.quiz, input.test]
-                .find((v) => Array.isArray(v) && v.length > 0);
-            if (directArray) return directArray;
-
-            const objectValues = Object.values(input || {});
-            const nestedArray = objectValues.find((v) => Array.isArray(v) && v.length > 0);
-            if (nestedArray) return nestedArray;
-
-            const numericKeys = Object.keys(input).filter((k) => /^\d+$/.test(k));
-            if (numericKeys.length > 0) {
-                const sortedNumericKeys = numericKeys.sort((a, b) => Number(a) - Number(b));
-                const values = sortedNumericKeys.map((k) => input[k]);
-
-                if (values.every((v) => typeof v === 'number' && Number.isFinite(v))) {
-                    return sortedNumericKeys.map((k) => {
-                        const ansNum = Number(input[k]);
-                        const safeIndex = Math.max(0, Math.min(3, ansNum - 1));
-                        return {
-                            question: `שאלה ${k}`,
-                            options: ['א', 'ב', 'ג', 'ד'],
-                            correctIndex: safeIndex
-                        };
-                    });
-                }
-
-                if (values.every((v) => v && typeof v === 'object')) {
-                    return values;
-                }
-            }
-
-            return null;
-        };
-
-        const asArray = toQuestionsArray(rawData);
-        if (!asArray || !asArray.length) {
-            throw new Error('JSON לא זוהה כמבנה שאלות נתמך.');
-        }
-
-        const normalized = normalizeQuestionsJson(asArray);
-        const validationErrors = validateQuestions(normalized);
-        if (validationErrors.length) {
-            throw new Error(`מבנה השאלות אינו תקין: ${validationErrors.slice(0, 5).join(' ')}`);
-        }
-        return normalized;
-    }
-
-    // ── PDF Page Sidebar & Thumbnail Generator ─────────────────────────────────
-    async function loadPdfSidebar(pdfBytesInput) {
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (pdfBytesInput) {
-            state.pdfBytes = new Uint8Array(pdfBytesInput);
-        }
-        state.pdfPagesState = [];
-        if (elements.pageThumbnailsContainer) elements.pageThumbnailsContainer.innerHTML = '';
-
-        if (!state.pdfBytes || state.pdfBytes.length === 0 || !pdfjs?.getDocument) return;
-
-        const task = ProgressController.startTask('טוען ומעבד עמודי PDF', {
-            icon: '📄',
-            cancellable: true,
-            detail: 'טוען מסמך PDF ומכין תצוגות עמודים...'
-        });
-
-        try {
-            const freshCopy = new Uint8Array(state.pdfBytes);
-            const loadingTask = pdfjs.getDocument({ data: freshCopy });
-            const pdfDoc = await loadingTask.promise;
-            const numPages = pdfDoc.numPages;
-
-            if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.remove('hidden');
-            if (elements.builderLayout) elements.builderLayout.classList.remove('no-sidebar');
-
-            for (let i = 1; i <= numPages; i++) {
-                if (task.isAborted()) {
-                    task.abort('טעינת תצוגות העמודים נעצרה.');
-                    return;
-                }
-
-                const percent = Math.round((i / numPages) * 100);
-                task.update(percent, `יוצר תצוגה מקדימה לעמוד ${i} מתוך ${numPages} (${percent}%)...`);
-
-                const page = await pdfDoc.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ').trim();
-                const isBlank = pageText.length < 30;
-
-                const viewport = page.getViewport({ scale: 0.25 });
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-
-                await page.render({ canvasContext: context, viewport: viewport }).promise;
-                const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-                state.pdfPagesState.push({
-                    pageNum: i,
-                    keep: true,
-                    text: pageText,
-                    isBlank: isBlank,
-                    thumbnailDataUrl: thumbnailDataUrl
-                });
-            }
-
-            renderSidebarThumbnails();
-            if (elements.downloadCleanPdf) elements.downloadCleanPdf.disabled = false;
-            task.finish(`נטענו ${numPages} עמודים בהצלחה!`);
-        } catch (err) {
-            console.error('Error rendering PDF sidebar thumbnails:', err);
-            task.fail(`שגיאה בטעינת עמודי PDF: ${err.message || err}`);
-        }
-    }
-
-    function renderSidebarThumbnails() {
-        if (!elements.pageThumbnailsContainer) return;
-        elements.pageThumbnailsContainer.innerHTML = '';
-        const total = state.pdfPagesState.length;
-        const kept = state.pdfPagesState.filter(p => p.keep).length;
-
-        if (elements.pageCountBadge) {
-            elements.pageCountBadge.textContent = `${kept} מתוך ${total} עמודים נבחרו`;
-        }
-
-        state.pdfPagesState.forEach((pageState) => {
-            const item = document.createElement('div');
-            item.className = `thumbnail-item ${pageState.keep ? '' : 'disabled-page'}`;
-
-            const img = document.createElement('img');
-            img.src = pageState.thumbnailDataUrl;
-            img.alt = `עמוד ${pageState.pageNum}`;
-
-            const label = document.createElement('label');
-            label.className = 'thumbnail-label';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = pageState.keep;
-            checkbox.addEventListener('change', (e) => {
-                pageState.keep = e.target.checked;
-                item.classList.toggle('disabled-page', !pageState.keep);
-                renderSidebarThumbnailsBadgeOnly();
-            });
-
-            label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(`עמוד ${pageState.pageNum}`));
-
-            item.appendChild(img);
-            item.appendChild(label);
-
-            item.addEventListener('click', (e) => {
-                if (e.target !== checkbox) {
-                    checkbox.checked = !checkbox.checked;
-                    pageState.keep = checkbox.checked;
-                    item.classList.toggle('disabled-page', !pageState.keep);
-                    renderSidebarThumbnailsBadgeOnly();
-                }
-            });
-
-            elements.pageThumbnailsContainer.appendChild(item);
-        });
-    }
-
-    function renderSidebarThumbnailsBadgeOnly() {
-        const total = state.pdfPagesState.length;
-        const kept = state.pdfPagesState.filter(p => p.keep).length;
-        if (elements.pageCountBadge) {
-            elements.pageCountBadge.textContent = `${kept} מתוך ${total} עמודים נבחרו`;
-        }
-    }
-
-    function applyStandardFilter() {
-        if (!state.pdfPagesState || !state.pdfPagesState.length) return;
-        state.evenOddMode = null;
-        const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
-        if (btn) btn.textContent = '📄 עמודים זוגיים';
-        state.pdfPagesState.forEach(p => {
-            if (p.pageNum <= 4) p.keep = false;
-            else if (p.pageNum >= 6 && p.pageNum % 2 === 0) p.keep = false;
-            else p.keep = true;
-        });
-        renderSidebarThumbnails();
-    }
-
-    function toggleEvenOddFilter() {
-        if (!state.pdfPagesState || !state.pdfPagesState.length) return;
-
-        if (!state.evenOddMode || state.evenOddMode === 'odd') {
-            // Select EVEN pages (2, 4, 6, ...)
-            state.evenOddMode = 'even';
-            state.pdfPagesState.forEach(p => {
-                p.keep = (p.pageNum % 2 === 0);
-            });
-            const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
-            if (btn) btn.textContent = '📄 עמודים אי-זוגיים';
-            showToast('נבחרו עמודים זוגיים (2, 4, 6...)', 'info', 2000);
-        } else {
-            // Select ODD pages (1, 3, 5, ...)
-            state.evenOddMode = 'odd';
-            state.pdfPagesState.forEach(p => {
-                p.keep = (p.pageNum % 2 !== 0);
-            });
-            const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
-            if (btn) btn.textContent = '📄 עמודים זוגיים';
-            showToast('נבחרו עמודים אי-זוגיים (1, 3, 5...)', 'info', 2000);
-        }
-
-        renderSidebarThumbnails();
-    }
-
-    function selectAllPages(keepState) {
-        if (!state.pdfPagesState || !state.pdfPagesState.length) return;
-        state.evenOddMode = null;
-        const btn = elements.presetEvenOddBtn || elements.presetBlankBtn;
-        if (btn) btn.textContent = '📄 עמודים זוגיים';
-        state.pdfPagesState.forEach(p => {
-            p.keep = keepState;
-        });
-        renderSidebarThumbnails();
-    }
-
-    async function getCleanPdfBuffer() {
-        if (!state.pdfPagesState || !state.pdfPagesState.length) return null;
-        const totalPages = state.pdfPagesState.length;
-        const keptIndices = state.pdfPagesState
-            .filter(p => p.keep)
-            .map(p => p.pageNum - 1);
-
-        if (keptIndices.length === 0 || keptIndices.length === totalPages) {
-            return null;
-        }
-        if (!window.PDFLib) return null;
-
-        let bytes = state.pdfBytes;
-        if (!bytes || bytes.length === 0 || bytes.buffer.byteLength === 0) {
-            const file = elements.pdfFile?.files?.[0];
-            if (!file) return null;
-            const buffer = await file.arrayBuffer();
-            state.pdfBytes = new Uint8Array(buffer);
-            bytes = state.pdfBytes;
-        }
-
-        const freshCopy = new Uint8Array(bytes.buffer.slice(0));
-        const srcDoc = await window.PDFLib.PDFDocument.load(freshCopy);
-        const newDoc = await window.PDFLib.PDFDocument.create();
-        const copiedPages = await newDoc.copyPages(srcDoc, keptIndices);
-        copiedPages.forEach(page => newDoc.addPage(page));
-        const cleanPdfBytes = await newDoc.save();
-        return cleanPdfBytes.buffer;
-    }
-
-    async function downloadCleanPdf() {
-        if (!window.PDFLib) {
-            alert('ספריית PDFLib אינה זמינה בדפדפן. יש לוודא חיבור לאינטרנט או לרענן את העמוד.');
-            return;
-        }
-
-        const task = ProgressController.startTask('יוצר קובץ PDF נקי', {
-            icon: '✂️',
-            cancellable: false,
-            detail: 'מסיר עמודים ומכין קובץ PDF חדש...'
-        });
-
-        try {
-            task.update(15, 'קורא קובץ PDF מקור...');
-            setStatus('מכין קובץ PDF נקי להורדה...');
-
-            let bytes = state.pdfBytes;
-            // Fallback: If state.pdfBytes is missing or detached (0 byteLength), re-read directly from the file input
-            if (!bytes || bytes.length === 0 || bytes.buffer.byteLength === 0) {
-                const file = elements.pdfFile?.files?.[0];
-                if (!file) {
-                    alert('אנא בחר קובץ PDF ראשית.');
-                    task.fail('לא נבחר קובץ PDF.');
-                    return;
-                }
-                const buffer = await file.arrayBuffer();
-                state.pdfBytes = new Uint8Array(buffer);
-                bytes = state.pdfBytes;
-            }
-
-            task.update(40, 'מעבד ומסנן עמודים נבחרים...');
-            const freshCopy = new Uint8Array(bytes.buffer.slice(0));
-            const srcDoc = await window.PDFLib.PDFDocument.load(freshCopy);
-            const newDoc = await window.PDFLib.PDFDocument.create();
-
-            let keptIndices = [];
-            if (state.pdfPagesState && state.pdfPagesState.length > 0) {
-                keptIndices = state.pdfPagesState
-                    .filter(p => p.keep)
-                    .map(p => p.pageNum - 1);
-            }
-
-            // Fallback: If no pages are checked or state.pdfPagesState not yet populated, keep all pages
-            if (keptIndices.length === 0) {
-                const totalPages = srcDoc.getPageCount();
-                for (let i = 0; i < totalPages; i++) {
-                    keptIndices.push(i);
-                }
-            }
-
-            task.update(70, `מעתיק ${keptIndices.length} עמודים ל-PDF החדש...`);
-            const copiedPages = await newDoc.copyPages(srcDoc, keptIndices);
-            copiedPages.forEach(page => newDoc.addPage(page));
-
-            task.update(90, 'שומר ומייצר קובץ להורדה...');
-            const pdfDataUri = await newDoc.saveAsBase64({ dataUri: true });
-
-            const anchor = document.createElement('a');
-            anchor.href = pdfDataUri;
-            anchor.download = 'cleaned_test.pdf';
-            document.body.appendChild(anchor);
-            anchor.click();
-            document.body.removeChild(anchor);
-
-            task.finish(`PDF נקי נוצר בהצלחה עם ${keptIndices.length} עמודים וההורדה התחילה!`);
-        } catch (err) {
-            console.error('Failed to export clean PDF:', err);
-            alert(`שגיאה ביצירת PDF נקי: ${err.message || err}`);
-            task.fail(err.message || 'שגיאה ביצירת PDF נקי.');
-        }
-    }
-
     const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions from this exam PDF document as a clean Markdown file (questions.md) for an interactive Hebrew quiz system.
 
 ===========================================================================
@@ -3788,303 +127,414 @@ STRICT EXTRACTION & FORMATTING RULES:
 7. NO CITATION TAGS OR CONVERSATIONAL CHATTER: Do NOT include web citations like \`[cite: X]\`. Do NOT write intro or outro commentary outside the code box.
 8. DELIVERABLE FORMAT: Provide your entire response strictly inside a single, copyable Markdown code block (wrapped in \`\`\`markdown ... \`\`\`) OR as a downloadable \`questions.md\` file.`;
 
-    if (elements.llmPromptBox) {
-        elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
-    }
-    if (elements.digitalLlmPromptBox) {
-        elements.digitalLlmPromptBox.value = DEFAULT_LLM_PROMPT;
-    }
-
-    function openFreebuffChat() {
-        const opened = window.open('https://freebuff.com/chat', '_blank', 'noopener,noreferrer');
-        if (!opened) {
-            setStatus('הדפדפן חסם פתיחת לשונית חדשה עבור Freebuff.', true);
-        }
-    }
-
-    elements.freebuffButtons.forEach((button) => {
-        button.addEventListener('click', openFreebuffChat);
+    // Initialize Services & UI Components
+    ProgressController.init(elements, (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements));
+    EditorUi.init(state, elements, {
+        renderPageImageData: PdfService.renderPageImageData,
+        attachFullSourcePageImage: CropperModal.attachFullSourcePageImage
+    });
+    CropperModal.init(state, elements, {
+        showToast: EditorUi.showToast,
+        renderPreview: () => EditorUi.renderPreview(state, elements),
+        renderPageImageData: PdfService.renderPageImageData
     });
 
-    elements.freebuffInfoButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            const tooltip = document.getElementById(button.getAttribute('aria-describedby'));
-            if (tooltip) tooltip.classList.toggle('is-open');
+    // Theme Setup
+    let currentTheme = localStorage.getItem('theme') || 'light';
+    EditorUi.setTheme(currentTheme, elements);
+    elements.themeToggle?.addEventListener('click', () => {
+        currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+        EditorUi.setTheme(currentTheme, elements);
+    });
+
+    // Proof Mode Toggle
+    if (elements.proofModeToggle) {
+        state.proofMode = !!elements.proofModeToggle.checked;
+        elements.proofModeToggle.addEventListener('change', () => {
+            state.proofMode = !!elements.proofModeToggle.checked;
+            EditorUi.renderPreview(state, elements);
         });
-    });
+    }
 
-    document.addEventListener('click', (event) => {
-        elements.freebuffInfoButtons.forEach((button) => {
-            const tooltip = document.getElementById(button.getAttribute('aria-describedby'));
-            if (tooltip && !button.parentElement.contains(event.target)) {
-                tooltip.classList.remove('is-open');
-            }
-        });
-    });
+    // LLM Verification UI
+    if (elements.enableLlmVerification) {
+        EditorUi.updateVerificationUI(elements);
+        elements.enableLlmVerification.addEventListener('change', () => EditorUi.updateVerificationUI(elements));
+    }
 
-    // Preset buttons & Clean PDF download listeners
-    elements.presetStdBtn?.addEventListener('click', applyStandardFilter);
-    elements.presetEvenOddBtn?.addEventListener('click', toggleEvenOddFilter);
-    elements.presetBlankBtn?.addEventListener('click', toggleEvenOddFilter);
-    elements.presetSelectAllBtn?.addEventListener('click', () => selectAllPages(true));
-    elements.presetDeselectAllBtn?.addEventListener('click', () => selectAllPages(false));
-    elements.downloadCleanPdf?.addEventListener('click', downloadCleanPdf);
+    // Default Prompt Injections
+    if (elements.llmPromptBox) elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
+    if (elements.digitalLlmPromptBox) elements.digitalLlmPromptBox.value = DEFAULT_LLM_PROMPT;
 
-    elements.toggleSidebarCollapseBtn?.addEventListener('click', () => {
-        if (!elements.pdfSidebarCard) return;
-        const isCollapsed = elements.pdfSidebarCard.classList.toggle('is-collapsed');
-        elements.toggleSidebarCollapseBtn.textContent = isCollapsed ? '▶ פתח סרגל' : '◀ קפל סרגל';
-        showToast(isCollapsed ? 'סרגל עמודים קופל' : 'סרגל עמודים הורחב', 'info', 2000);
-    });
+    // Main Parse Orchestrator
+    async function runParse() {
+        EditorUi.disableOutputActions(true, elements, state.questions);
+        if (elements.preview) elements.preview.innerHTML = '';
+        state.proofPageImages = [];
+        state.pdfBytes = null;
+        let apiKey = '';
 
-    async function tryMergeAnswersFromCsv(explicit = false) {
+        const pdf = elements.pdfFile?.files?.[0];
         const csv = elements.csvFile?.files?.[0];
         const formNumber = elements.formNumber?.value?.trim();
+        const ocrEngine = (elements.ocrEngine?.value || 'gemini_chunked').trim();
+        const llmPolicy = (elements.llmPolicy?.value || 'auto').trim();
 
-        if (explicit) {
-            if (!state.questions || !state.questions.length) {
-                showToast('יש להעלות קודם קובץ שאלות (JSON או Markdown)!', 'error');
-                return;
-            }
-            if (!csv) {
-                showToast('יש לבחור קובץ תשובות (CSV/XLS)!', 'error');
-                return;
-            }
-            if (!formNumber) {
-                showToast('יש להזין מספר שאלון להתאמת התשובות!', 'error');
-                return;
-            }
+        if (!pdf) {
+            throw new Error('יש לבחור קובץ PDF לפענוח.');
         }
 
-        if (!csv || !formNumber || !state.questions || !state.questions.length) return;
-
-        let task = null;
-        if (explicit) {
-            task = ProgressController.startTask('ממזג מפתח תשובות', {
-                icon: '🔗',
-                cancellable: false,
-                detail: `קורא נתונים וממזג תשובות לשאלון ${formNumber}...`
-            });
-        }
-
-        try {
-            if (task) task.update(30, 'מפענח קובץ תשובות...');
-            let answerRows = null;
-            const fileName = csv.name.toLowerCase();
-            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                const xlsxBuffer = await csv.arrayBuffer();
-                answerRows = parseXlsxToRows(xlsxBuffer);
-            } else {
-                const csvText = await csv.text();
-                answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
-            }
-
-            if (task) task.update(70, `מחלץ תשובות עבור שאלון ${formNumber}...`);
-            const answerMap = extractAnswersForForm(answerRows, formNumber);
-            if (!answerMap || !answerMap.size) {
-                if (explicit) {
-                    showToast(`לא נמצאו תשובות לשאלון ${formNumber} בקובץ שנבחר.`, 'error');
-                    if (task) task.fail(`לא נמצאו תשובות לשאלון ${formNumber}.`);
-                }
-                return;
-            }
-
-            state.questions = mergeAnswers(state.questions, answerMap);
-            renderPreview();
-            const msg = `תשובות מ-CSV/XLS מוזגו בהצלחה לשאלון ${formNumber}!`;
-            if (task) {
-                task.finish(msg);
-            } else {
-                setStatus(msg, false, true);
-            }
-        } catch (e) {
-            console.warn('Could not merge CSV answers automatically:', e);
-            if (explicit) {
-                showToast(`שגיאה במיזוג תשובות: ${e.message}`, 'error');
-                if (task) task.fail(`שגיאה במיזוג תשובות: ${e.message}`);
-            }
-        }
-    }
-
-    async function autoAttachDiagramPageImages() {
-        if (!state.questions || !state.questions.length) {
-            showToast('יש להעלות קודם קובץ שאלות (JSON או Markdown)!', 'error');
-            return;
-        }
-
-        let pdfBuffer = state.pdfArrayBuffer || state.pdfBytes;
-        if (!pdfBuffer || pdfBuffer.byteLength === 0) {
-            const pdfInput = elements.pdfFile?.files?.[0];
-            if (!pdfInput) {
-                alert('אנא בחר קודם את קובץ ה-PDF של המבחן בשדה "קובץ PDF".');
-                return;
-            }
-            try {
-                pdfBuffer = await pdfInput.arrayBuffer();
-                state.pdfArrayBuffer = pdfBuffer.slice(0);
-            } catch (e) {
-                alert('קריאת קובץ ה-PDF נכשלה. אנא בחר את הקובץ מחדש.');
-                return;
-            }
-        }
-
-        const pdfjs = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs;
-        if (!pdfjs?.getDocument) {
-            alert('ספריית PDF.js לא נטענה בדפדפן. רענן את העמוד ונסה שוב.');
-            return;
-        }
-
-        const task = ProgressController.startTask('מחבר תמונות עמוד לשאלות', {
-            icon: '🖼️',
+        const task = ProgressController.startTask('מחלץ ומפענח שאלות', {
+            icon: '🔍',
             cancellable: true,
-            detail: 'מנתח עמודי PDF ומחפש תרשימים וטבלאות...'
+            detail: 'קורא קובצי מקור ומנתח מבנה PDF...'
         });
 
         try {
-            task.update(10, 'טוען קובץ PDF לבדיקת תרשימים...');
-            setStatus('מנתח עמודי PDF ומחבר תמונות לשאלות עם תרשימים/טבלאות...');
-            const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBuffer.slice(0)) });
-            const pdfDoc = await loadingTask.promise;
+            task.update(5, 'קורא קובצי מקור...');
+            EditorUi.setStatus('קורא קובצי מקור...', false, false, elements);
 
-            // Build a searchable text cache once so we can map each question to
-            // the most likely physical PDF page even when sourcePage is noisy.
-            const normalizeForSearch = (value) => String(value || '')
-                .replace(/\((?:עמוד|עמ'|page)\s*\d+\)/gi, ' ')
-                .replace(/[^\u0590-\u05FFA-Za-z0-9\s]/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim()
-                .toLowerCase();
+            let pdfFileToParse = pdf;
+            let pdfBufferForParse = (await pdf.arrayBuffer()).slice(0);
+            if (!state.pdfBytes || state.pdfBytes.length === 0) {
+                state.pdfBytes = new Uint8Array(pdfBufferForParse.slice(0));
+            }
 
-            const pdfPageTexts = [];
-            for (let p = 1; p <= pdfDoc.numPages; p++) {
-                if (task.isAborted()) {
-                    task.abort('חיבור התמונות נעצר.');
-                    return;
-                }
-                const scanPct = 10 + Math.round((p / pdfDoc.numPages) * 20);
-                task.update(scanPct, `סורק טקסט עמוד ${p} מתוך ${pdfDoc.numPages}...`);
+            const useCleanPdf = elements.useCleanPdfForApi ? elements.useCleanPdfForApi.checked : true;
+            if (useCleanPdf) {
                 try {
-                    const page = await pdfDoc.getPage(p);
-                    const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map((it) => (it && it.str) ? it.str : '').join(' ');
-                    pdfPageTexts.push(normalizeForSearch(pageText));
-                } catch {
-                    pdfPageTexts.push('');
+                    const cleanBuffer = await PdfService.getCleanPdfBuffer(state, elements);
+                    if (cleanBuffer) {
+                        pdfBufferForParse = cleanBuffer.slice(0);
+                        pdfFileToParse = new File([cleanBuffer], `cleaned_${pdf.name}`, { type: 'application/pdf' });
+                        const keptCount = state.pdfPagesState.filter(p => p.keep).length;
+                        task.update(10, `משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל)...`);
+                        EditorUi.setStatus(`משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל) לעיבוד...`, false, false, elements);
+                    }
+                } catch (e) {
+                    console.warn('Could not build clean PDF for parse:', e);
                 }
             }
 
-            const findBestPageByQuestionText = (questionText, preferredPage) => {
-                if (!questionText || !pdfPageTexts.length) return preferredPage;
-                const normalizedQuestion = normalizeForSearch(questionText);
-                if (!normalizedQuestion) return preferredPage;
-
-                const tokens = normalizedQuestion
-                    .split(' ')
-                    .filter((t) => t.length >= 3)
-                    .slice(0, 24);
-
-                if (!tokens.length) return preferredPage;
-
-                let bestPage = preferredPage;
-                let bestScore = -1;
-
-                for (let idx = 0; idx < pdfPageTexts.length; idx++) {
-                    const pageText = pdfPageTexts[idx];
-                    if (!pageText) continue;
-
-                    let score = 0;
-                    for (const token of tokens) {
-                        if (pageText.includes(token)) score++;
-                    }
-
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestPage = idx + 1;
-                    }
+            if (csv) {
+                const fileName = csv.name.toLowerCase();
+                let answerRows = null;
+                if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                    const xlsxBuffer = await csv.arrayBuffer();
+                    answerRows = QuestionParser.parseXlsxToRows(xlsxBuffer);
+                } else {
+                    const csvText = await csv.text();
+                    answerRows = window.QuizCore ? window.QuizCore.parseCsvRows(csvText.replace(/^\uFEFF/, '')) : [];
                 }
-
-                return bestScore > 0 ? bestPage : preferredPage;
-            };
-
-            const imageKeywords = /(?:^|[\s\(\[\:\,\"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
-            let attachedCount = 0;
-            const totalQ = state.questions.length;
-
-            for (let i = 0; i < totalQ; i++) {
-                if (task.isAborted()) {
-                    task.abort('חיבור התמונות נעצר.');
-                    return;
+                if (!formNumber) {
+                    throw new Error('אם הועלה קובץ תשובות, יש להזין מספר שאלון.');
                 }
-                const renderPct = 30 + Math.round((i / totalQ) * 65);
-                task.update(renderPct, `בודק שאלה ${i + 1} מתוך ${totalQ}...`);
+            }
 
-                const q = state.questions[i];
-                const questionText = q.question || '';
-                const isDiagramQuestion = imageKeywords.test(questionText);
-                const requestedPage = q.sourcePage || 1;
-                const clampedRequestedPage = Math.min(Math.max(1, requestedPage), pdfDoc.numPages);
-                const targetPage = findBestPageByQuestionText(questionText, clampedRequestedPage);
+            if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
 
-                const shouldAttachImage = isDiagramQuestion || q.hasVisualElement || q._needsPageRender;
-                if (shouldAttachImage && pdfDoc.numPages >= 1) {
+            task.update(15, 'טוען ומנתח את מבנה קובץ ה-PDF...');
+            EditorUi.setStatus('טוען ומנתח את מבנה קובץ ה-PDF...', false, false, elements);
+            const extracted = await PdfService.extractPdfText(pdfBufferForParse, QuestionParser.maybeFixHebrewWordOrder);
+
+            let examText = extracted.text;
+            let sourcePages = extracted.rawPages;
+            const useLlmExtraction = llmPolicy === 'force_llm' || (llmPolicy === 'auto' && extracted.isScanned && ocrEngine !== 'offline_local');
+            const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
+
+            if (!extracted.isScanned && llmPolicy !== 'force_llm') {
+                task.update(50, 'זוהה PDF דיגיטלי. מחלץ שאלות ישירות מטקסט המסמך...');
+                EditorUi.setStatus('זוהה PDF דיגיטלי. מחלץ שאלות מקומית מתוך טקסט ה-PDF ללא LLM.', false, false, elements);
+            }
+
+            if (useOfflineOcr) {
+                EditorUi.setStatus('מפעיל OCR מקומי בדפדפן (ללא API Key)...', false, false, elements);
+                const offlineExtraction = await TesseractOcrService.extractTextViaOfflineOcr(extracted.pdf, {
+                    task,
+                    statusCallback: (msg) => EditorUi.setStatus(msg, false, false, elements),
+                    renderAllPdfPageImagesFn: PdfService.renderAllPdfPageImages,
+                    maybeFixHebrewWordOrderFn: QuestionParser.maybeFixHebrewWordOrder
+                });
+                examText = offlineExtraction.text;
+                sourcePages = offlineExtraction.pages;
+                state.proofPageImages = offlineExtraction.pagePreviews || [];
+            } else if (useLlmExtraction) {
+                apiKey = await GeminiService.resolveGeminiApiKey(elements, true);
+                if (ocrEngine.startsWith('gemini_native')) {
+                    const mode = ocrEngine === 'gemini_native_markdown' ? 'markdown' : 'schema';
+                    EditorUi.setStatus(`שולח את מסמך ה-PDF המלא ל-Gemini API (Native PDF - ${mode === 'schema' ? 'Enforced Schema' : 'Clean Markdown'})...`, false, false, elements);
+                    const nativeExtraction = await GeminiService.extractTextViaGeminiNativePdf(pdfFileToParse, extracted.pdf, apiKey, {
+                        mode,
+                        task,
+                        statusCallback: (msg) => EditorUi.setStatus(msg, false, false, elements),
+                        fileToBase64Fn: PdfService.fileToBase64,
+                        renderPageImageDataFn: PdfService.renderPageImageData,
+                        maybeFixHebrewWordOrderFn: QuestionParser.maybeFixHebrewWordOrder
+                    });
+                    examText = nativeExtraction.text;
+                    sourcePages = nativeExtraction.pages;
+                    const previews = await PdfService.renderAllPdfPageImages(extracted.pdf, task);
+                    state.proofPageImages = previews.pagePreviews || [];
+                } else {
+                    EditorUi.setStatus('שולח עמודי תמונה ל-Gemini API (מצב Page Chunking)...', false, false, elements);
+                    const geminiExtraction = await GeminiService.extractTextViaGemini(extracted.pdf, apiKey, {
+                        chunkSizeOverride: null,
+                        task,
+                        statusCallback: (msg) => EditorUi.setStatus(msg, false, false, elements),
+                        renderAllPdfPageImagesFn: PdfService.renderAllPdfPageImages,
+                        maybeFixHebrewWordOrderFn: QuestionParser.maybeFixHebrewWordOrder
+                    });
+                    examText = geminiExtraction.text;
+                    sourcePages = geminiExtraction.pages;
+                    state.proofPageImages = geminiExtraction.pagePreviews || [];
+                }
+            } else if (extracted.isScanned) {
+                EditorUi.setStatus('זוהה PDF סרוק במצב מקומי בלבד (ללא LLM). התוצאה עלולה להיות חלקית.', false, false, elements);
+            }
+
+            if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
+
+            task.update(85, 'מפרק ומבנה שאלות ותשובות מתוך הטקסט...');
+            let parsedQuestions;
+            try {
+                parsedQuestions = QuestionParser.parseQuestionsFromText(examText, sourcePages, extracted.pageImages, {
+                    setStatus: (msg, isErr) => EditorUi.setStatus(msg, isErr, false, elements),
+                    showToast: EditorUi.showToast
+                });
+            } catch (error) {
+                if (useLlmExtraction) {
+                    task.update(88, 'מנסה ניתוח מקומי מהטקסט הדיגיטלי...');
+                    EditorUi.setStatus('פורמט תשובת ה-LLM לא תאם מודל צפוי, מנסה ניתוח מקומי מהטקסט הדיגיטלי...', false, false, elements);
+                    parsedQuestions = QuestionParser.parseQuestionsFromText(extracted.text, extracted.rawPages, extracted.pageImages, {
+                        setStatus: (msg, isErr) => EditorUi.setStatus(msg, isErr, false, elements),
+                        showToast: EditorUi.showToast
+                    });
+                } else {
+                    throw error;
+                }
+            }
+
+            if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
+                task.update(60, 'זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...');
+                EditorUi.setStatus('זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...', false, false, elements);
+                const fallbackExtraction = await GeminiService.extractTextViaGemini(extracted.pdf, apiKey, {
+                    chunkSizeOverride: 1,
+                    task,
+                    statusCallback: (msg) => EditorUi.setStatus(msg, false, false, elements),
+                    renderAllPdfPageImagesFn: PdfService.renderAllPdfPageImages,
+                    maybeFixHebrewWordOrderFn: QuestionParser.maybeFixHebrewWordOrder
+                });
+                const fallbackQuestions = QuestionParser.parseQuestionsFromText(
+                    fallbackExtraction.text,
+                    fallbackExtraction.pages,
+                    extracted.pageImages,
+                    {
+                        setStatus: (msg, isErr) => EditorUi.setStatus(msg, isErr, false, elements),
+                        showToast: EditorUi.showToast
+                    }
+                );
+
+                if (fallbackQuestions.length > parsedQuestions.length) {
+                    parsedQuestions = fallbackQuestions;
+                    examText = fallbackExtraction.text;
+                    sourcePages = fallbackExtraction.pages;
+                    state.proofPageImages = fallbackExtraction.pagePreviews || [];
+                }
+            }
+
+            for (const q of parsedQuestions) {
+                if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
+                if (q._needsPageRender && !q.image && extracted.pdf && q.sourcePage) {
                     try {
-                        task.update(renderPct, `מרנדר עמוד ${targetPage} לשאלה ${i + 1}...`);
-                        const page = await pdfDoc.getPage(targetPage);
-                        // Use same 2.5 scale as renderPageImageData for consistent quality.
-                        const imageData = await renderPageImageData(page, 2.5);
+                        const page = await extracted.pdf.getPage(q.sourcePage);
+                        const imageData = await PdfService.renderPageImageData(page, 2.5);
                         q.image = `data:image/png;base64,${imageData}`;
-                        attachedCount++;
-                    } catch (e) {
-                        console.warn(`Could not render page ${targetPage} for question ${i + 1}:`, e);
-                    }
+                    } catch { /* skip if render fails */ }
+                }
+                delete q._needsPageRender;
+            }
+
+            state.questions = parsedQuestions.map(q => ({
+                ...q,
+                correctIndex: (typeof q.correctIndex === 'number' && q.correctIndex >= 0) ? q.correctIndex : 0,
+                shuffleOptions: true
+            }));
+
+            const enableVerification = elements.enableLlmVerification ? elements.enableLlmVerification.checked : false;
+            if (enableVerification) {
+                if (!apiKey) {
+                    apiKey = await GeminiService.resolveGeminiApiKey(elements, true);
+                }
+                if (apiKey) {
+                    EditorUi.setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...', false, false, elements);
+                    state.questions = await GeminiService.verifyTestWithGemini(state.questions, apiKey, {
+                        task,
+                        statusCallback: (msg) => EditorUi.setStatus(msg, false, false, elements)
+                    });
                 }
             }
 
-            renderPreview();
-            if (attachedCount > 0) {
-                task.finish(`חוברו בהצלחה ${attachedCount} תמונות עמוד לשאלות עם תרשימים/טבלאות!`);
-            } else {
-                task.finish('לא נמצאו שאלות המפנות לתרשימים/טבלאות לחיבור עמוד.');
+            const validationErrors = EditorUi.getQuestionValidationErrors(state.questions);
+            if (validationErrors.length) {
+                throw new Error(`נמצאו שאלות לא תקינות: ${validationErrors.slice(0, 5).join(' ')}`);
             }
-        } catch (err) {
-            console.error('Error auto-attaching diagram images:', err);
-            alert(`שגיאה בחיבור תמונות עמוד: ${err.message || err}`);
-            task.fail(`שגיאה בחיבור תמונות עמוד: ${err.message || err}`);
+
+            EditorUi.renderPreview(state, elements);
+            EditorUi.disableOutputActions(false, elements, state.questions);
+            task.finish(`הסתיים בהצלחה: נטענו ${state.questions.length} שאלות לעריכה!`);
+        } catch (error) {
+            if (task.isAborted()) {
+                task.abort('פעולת חילוץ השאלות בוטלה.');
+            } else {
+                task.fail(error.message || 'אירעה שגיאה לא צפויה.');
+            }
+            throw error;
         }
     }
 
-    function stripAllQuestionHeaderPrefixes() {
+    // Wiring UI Events
+    elements.runParse?.addEventListener('click', async () => {
+        try {
+            await runParse();
+        } catch (error) {
+            console.warn('runParse finished with notice/error:', error);
+        }
+    });
+
+    elements.downloadQuiz?.addEventListener('click', () => {
         if (!state.questions || state.questions.length === 0) {
-            showToast('אין שאלות טעונות במערכת לניקוי.', 'info');
+            EditorUi.showToast('אין שאלות זמינות ליצירת מבחן.', 'info');
             return;
         }
-        let count = 0;
-        state.questions.forEach((q) => {
-            const original = q.question;
-            const cleaned = stripQuestionHeaderPrefix(original);
-            if (cleaned !== original) {
-                q.question = cleaned;
-                count++;
-            }
-        });
-        renderPreview();
-        if (count > 0) {
-            showToast(`נוקו כותרות 'שאלה מספר X' מ-${count} שאלות בהצלחה!`, 'success');
-        } else {
-            showToast('כל השאלות כבר נקיות מכותרות.', 'info');
+        if (elements.compressSettingsPopup) {
+            elements.compressSettingsPopup.classList.add('show');
         }
-    }
+    });
 
-    elements.mergeAnswersBtn?.addEventListener('click', () => tryMergeAnswersFromCsv(true));
-    elements.autoAttachDiagramsBtn?.addEventListener('click', autoAttachDiagramPageImages);
-    elements.stripQuestionHeadersBtnPreview?.addEventListener('click', stripAllQuestionHeaderPrefixes);
+    elements.confirmDownloadBtn?.addEventListener('click', async () => {
+        if (elements.compressSettingsPopup) {
+            elements.compressSettingsPopup.classList.remove('show');
+        }
+        const task = ProgressController.startTask('מייצא מבחן עצמאי (HTML)', {
+            icon: '📥',
+            cancellable: true,
+            detail: 'מכין קובץ HTML ודוחס תמונות...'
+        });
 
-    // jsonFile Upload Listener (Supports questions.json and questions.md)
+        try {
+            task.update(10, 'מכין קובץ HTML להורדה...');
+            EditorUi.setStatus('מכין קובץ HTML להורדה...', false, false, elements);
+            const html = await ExportService.createStandaloneQuizHtml({
+                questions: state.questions,
+                elements,
+                task,
+                normalizeWhitespaceFn: QuestionParser.normalizeWhitespace,
+                validateQuestionsFn: EditorUi.getQuestionValidationErrors
+            });
+            if (task.isAborted()) {
+                task.abort('ייצוא המבחן בוטל.');
+                return;
+            }
+            task.update(95, 'יוצר קובץ HTML עצמאי ומוריד...');
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'interactive_quiz.html';
+            anchor.click();
+            URL.revokeObjectURL(url);
+            task.finish('הקובץ נוצר בהצלחה וההורדה התחילה!');
+        } catch (error) {
+            if (task.isAborted()) {
+                task.abort('ייצוא המבחן בוטל.');
+            } else {
+                task.fail(error.message || 'נכשלה יצירת קובץ HTML.');
+            }
+        }
+    });
+
+    elements.takeQuiz?.addEventListener('click', async () => {
+        const previewWindow = window.open('', '_blank');
+        if (!previewWindow) {
+            EditorUi.setStatus('הדפדפן חסם את פתיחת לשונית המבחן. אפשר חלונות קופצים ונסה שוב.', true, false, elements);
+            return;
+        }
+
+        const task = ProgressController.startTask('מכין מבחן לפתרון', {
+            icon: '▶️',
+            cancellable: true,
+            detail: 'בונה את נתוני המבחן ומפעיל בלשונית חדשה...'
+        });
+
+        try {
+            previewWindow.document.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>מכין מבחן...</title><style>body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:Rubik,system-ui,sans-serif;background:#f8fafc;color:#0f172a;direction:rtl}@keyframes bspin{to{transform:rotate(360deg)}}.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:bspin .7s linear infinite;margin-bottom:16px}.wr{text-align:center}p{font-size:1.1rem;margin:0}</style></head><body><div class="wr"><div class="sp"></div><p>מכין מבחן...</p></div></body></html>');
+            previewWindow.document.title = 'מכין מבחן...';
+            task.update(15, 'פותח תצוגת מבחן ומעבד תמונות...');
+            EditorUi.setStatus('פותח תצוגת מבחן...', false, false, elements);
+            const html = await ExportService.createStandaloneQuizHtml({
+                questions: state.questions,
+                elements,
+                task,
+                normalizeWhitespaceFn: QuestionParser.normalizeWhitespace,
+                validateQuestionsFn: EditorUi.getQuestionValidationErrors
+            });
+            if (task.isAborted()) {
+                previewWindow.close();
+                task.abort('טעינת המבחן בוטלה.');
+                return;
+            }
+            previewWindow.document.open();
+            previewWindow.document.write(html);
+            previewWindow.document.close();
+            task.finish('המבחן נפתח בלשונית חדשה!');
+        } catch (error) {
+            previewWindow?.close();
+            if (task.isAborted()) {
+                task.abort('טעינת המבחן בוטלה.');
+            } else {
+                task.fail(error.message || 'נכשלה פתיחת המבחן.');
+            }
+        }
+    });
+
+    elements.mergeAnswersBtn?.addEventListener('click', () => {
+        QuestionParser.tryMergeAnswersFromCsv({
+            explicit: true,
+            elements,
+            state,
+            progressController: ProgressController,
+            showToastFn: EditorUi.showToast,
+            setStatusFn: (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements),
+            renderPreviewFn: () => EditorUi.renderPreview(state, elements)
+        });
+    });
+
+    elements.autoAttachDiagramsBtn?.addEventListener('click', () => {
+        QuestionParser.autoAttachDiagramPageImages({
+            state,
+            elements,
+            progressController: ProgressController,
+            setStatusFn: (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements),
+            showToastFn: EditorUi.showToast,
+            renderPreviewFn: () => EditorUi.renderPreview(state, elements),
+            renderPageImageDataFn: PdfService.renderPageImageData
+        });
+    });
+
+    elements.stripQuestionHeadersBtnPreview?.addEventListener('click', () => {
+        QuestionParser.stripAllQuestionHeaderPrefixes({
+            state,
+            renderPreviewFn: () => EditorUi.renderPreview(state, elements),
+            showToastFn: EditorUi.showToast
+        });
+    });
+
+    // jsonFile Upload Listener
     elements.jsonFile?.addEventListener('change', async () => {
         const file = elements.jsonFile.files?.[0];
         if (!file) return;
         try {
-            setStatus(`מעבד קובץ ${file.name}...`);
+            EditorUi.setStatus(`מעבד קובץ ${file.name}...`, false, false, elements);
             const text = await file.text();
             let normalizedQuestions = [];
 
@@ -4092,8 +542,6 @@ STRICT EXTRACTION & FORMATTING RULES:
             const isJson = trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```json');
 
             if (isJson) {
-                // Accept any .json input by first trying strict question JSON,
-                // then falling back to the same markdown/text parser flow.
                 let cleanJsonText = trimmed;
                 if (cleanJsonText.startsWith('```json')) {
                     cleanJsonText = cleanJsonText.replace(/^```json\s*/i, '').replace(/\s*```$/, '').trim();
@@ -4102,27 +550,25 @@ STRICT EXTRACTION & FORMATTING RULES:
                 let parsedAsStrictJson = false;
                 try {
                     const rawData = JSON.parse(cleanJsonText);
-                    normalizedQuestions = normalizeQuestionsFromAnyJson(rawData);
+                    normalizedQuestions = QuestionParser.normalizeQuestionsFromAnyJson(rawData);
                     if (Array.isArray(normalizedQuestions) && normalizedQuestions.length > 0) {
-                        parsedAsStrictJson = normalizedQuestions.length > 0;
+                        parsedAsStrictJson = true;
                     }
                 } catch (jsonErr) {
                     console.warn('JSON parse failed for uploaded question file. Trying markdown/text fallback.', jsonErr);
                 }
 
                 if (!parsedAsStrictJson) {
-                    const markdownQuestions = parseQuestionsFromMarkdown(text);
+                    const markdownQuestions = QuestionParser.parseQuestionsFromMarkdown(text);
                     normalizedQuestions = markdownQuestions.length > 0
                         ? markdownQuestions
-                        : parseQuestionsFromText(text, [], []);
+                        : QuestionParser.parseQuestionsFromText(text, [], []);
                 }
             } else {
-                // Prefer strict Markdown parsing for questions.md uploads.
-                // Fall back to the flexible text parser for other plain-text formats.
-                const markdownQuestions = parseQuestionsFromMarkdown(text);
+                const markdownQuestions = QuestionParser.parseQuestionsFromMarkdown(text);
                 normalizedQuestions = markdownQuestions.length > 0
                     ? markdownQuestions
-                    : parseQuestionsFromText(text, [], []);
+                    : QuestionParser.parseQuestionsFromText(text, [], []);
             }
 
             if (!normalizedQuestions || !normalizedQuestions.length) {
@@ -4135,39 +581,62 @@ STRICT EXTRACTION & FORMATTING RULES:
             const hasShuffleFlag = normalizedQuestions.some((q) => q && q.shuffleOptions === true);
             const allAnswersDefaultToAlef = normalizedQuestions.every((q) => q && Number(q.correctIndex) === 0);
 
-            // No answer key file should behave like Form 0: keep correctIndex at א and
-            // randomize option order for solving. This preserves expected behavior when
-            // users upload only questions.json/questions.md from test folders.
             const shouldAutoEnableFormZeroShuffle = !selectedCsv && !hasShuffleFlag && allAnswersDefaultToAlef;
             if (isFormZero || shouldAutoEnableFormZeroShuffle) {
                 normalizedQuestions = normalizedQuestions.map((q) => ({ ...q, shuffleOptions: true }));
 
                 if (shouldAutoEnableFormZeroShuffle && elements.formNumber && !currentFormNumber) {
                     elements.formNumber.value = '0';
-                    showToast('לא זוהה קובץ תשובות. הופעל מצב שאלון 0 עם ערבוב תשובות אוטומטי.', 'info', 5000);
+                    EditorUi.showToast('לא זוהה קובץ תשובות. הופעל מצב שאלון 0 עם ערבוב תשובות אוטומטי.', 'info', 5000);
                 }
             }
 
             state.questions = normalizedQuestions;
-            renderPreview();
-            disableOutputActions(false);
-            tryMergeAnswersFromCsv(false);
-            setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ ${file.name}!`, false, true);
+            EditorUi.renderPreview(state, elements);
+            EditorUi.disableOutputActions(false, elements, state.questions);
+            QuestionParser.tryMergeAnswersFromCsv({
+                explicit: false,
+                elements,
+                state,
+                progressController: ProgressController,
+                showToastFn: EditorUi.showToast,
+                setStatusFn: (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements),
+                renderPreviewFn: () => EditorUi.renderPreview(state, elements)
+            });
+            EditorUi.setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ ${file.name}!`, false, true, elements);
         } catch (error) {
             console.error('Error loading question file:', error);
-            setStatus(error.message || `נכשלה טעינת קובץ ${file.name}.`, true);
+            EditorUi.setStatus(error.message || `נכשלה טעינת קובץ ${file.name}.`, true, false, elements);
         }
     });
 
     elements.csvFile?.addEventListener('change', () => {
         const file = elements.csvFile.files?.[0];
         if (file) {
-            tryMergeAnswersFromCsv(false);
-            showToast(`קובץ תשובות (${file.name}) נבחר. הזן מספר שאלון ולחץ "🔗 מזג תשובות נכונות לשאלות".`, 'info', 4000);
+            QuestionParser.tryMergeAnswersFromCsv({
+                explicit: false,
+                elements,
+                state,
+                progressController: ProgressController,
+                showToastFn: EditorUi.showToast,
+                setStatusFn: (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements),
+                renderPreviewFn: () => EditorUi.renderPreview(state, elements)
+            });
+            EditorUi.showToast(`קובץ תשובות (${file.name}) נבחר. הזן מספר שאלון ולחץ "🔗 מזג תשובות נכונות לשאלות".`, 'info', 4000);
         }
     });
 
-    elements.formNumber?.addEventListener('input', () => tryMergeAnswersFromCsv(false));
+    elements.formNumber?.addEventListener('input', () => {
+        QuestionParser.tryMergeAnswersFromCsv({
+            explicit: false,
+            elements,
+            state,
+            progressController: ProgressController,
+            showToastFn: EditorUi.showToast,
+            setStatusFn: (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements),
+            renderPreviewFn: () => EditorUi.renderPreview(state, elements)
+        });
+    });
 
     function toggleProcessingSettings(showOnly = false) {
         if (!elements.processingSettingsContainer) return;
@@ -4184,7 +653,6 @@ STRICT EXTRACTION & FORMATTING RULES:
 
     elements.toggleProcessingSettingsBtn?.addEventListener('click', () => toggleProcessingSettings(false));
 
-    // Copy prompt helper listener
     elements.copyPromptBtn?.addEventListener('click', async () => {
         const textToCopy = elements.llmPromptBox ? elements.llmPromptBox.value : DEFAULT_LLM_PROMPT;
         try {
@@ -4195,7 +663,7 @@ STRICT EXTRACTION & FORMATTING RULES:
                 elements.copyPromptBtn.textContent = originalText;
             }, 3000);
         } catch (e) {
-            setStatus('נכשלה העתקת הפרומפט ללוח.', true);
+            EditorUi.setStatus('נכשלה העתקת הפרומפט ללוח.', true, false, elements);
         }
     });
 
@@ -4205,7 +673,6 @@ STRICT EXTRACTION & FORMATTING RULES:
         elements.showDigitalPromptBtn.textContent = isHidden ? '📋 הצג פרומפט ל-AI חיצוני' : '📋 הסתר פרומפט';
     });
 
-    // Compression Modal Listeners
     elements.compressSettingsCancel?.addEventListener('click', () => {
         if (elements.compressSettingsPopup) elements.compressSettingsPopup.classList.remove('show');
     });
@@ -4236,15 +703,15 @@ STRICT EXTRACTION & FORMATTING RULES:
                 elements.copyDigitalPromptBtn.textContent = originalText;
             }, 3000);
         } catch (e) {
-            setStatus('נכשלה העתקת הפרומפט ללוח.', true);
+            EditorUi.setStatus('נכשלה העתקת הפרומפט ללוח.', true, false, elements);
         }
     });
 
-    elements.htmlFile.addEventListener('change', async () => {
+    elements.htmlFile?.addEventListener('change', async () => {
         const file = elements.htmlFile.files?.[0];
         if (!file) return;
         try {
-            setStatus('טוען מבחן קיים...');
+            EditorUi.setStatus('טוען מבחן קיים...', false, false, elements);
             const html = await file.text();
             const marker = 'window.__INLINE_QUESTIONS__=';
             const startIdx = html.indexOf(marker);
@@ -4260,11 +727,11 @@ STRICT EXTRACTION & FORMATTING RULES:
             }
             state.questions = questions;
             state.proofPageImages = [];
-            renderPreview();
-            disableOutputActions(false);
-            setStatus(`נטענו ${questions.length} שאלות מקובץ HTML קיים.`);
+            EditorUi.renderPreview(state, elements);
+            EditorUi.disableOutputActions(false, elements, state.questions);
+            EditorUi.setStatus(`נטענו ${questions.length} שאלות מקובץ HTML קיים.`, false, false, elements);
         } catch (error) {
-            setStatus(error.message || 'נכשלה טעינת קובץ HTML.', true);
+            EditorUi.setStatus(error.message || 'נכשלה טעינת קובץ HTML.', true, false, elements);
         }
     });
 
@@ -4275,14 +742,14 @@ STRICT EXTRACTION & FORMATTING RULES:
         try {
             await runParse();
         } catch (error) {
-            setStatus(error.message || 'אירעה שגיאה בעיבוד המקומי.', true);
+            EditorUi.setStatus(error.message || 'אירעה שגיאה בעיבוד המקומי.', true, false, elements);
         }
     });
 
-    elements.pdfFile.addEventListener('change', async () => {
+    elements.pdfFile?.addEventListener('change', async () => {
         const file = elements.pdfFile.files?.[0];
         if (!file) {
-            setPdfTypeNote('');
+            EditorUi.setPdfTypeNote('', 'neutral', elements);
             if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
             if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
             if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
@@ -4291,7 +758,7 @@ STRICT EXTRACTION & FORMATTING RULES:
         }
 
         if ((file.name || '').toLowerCase().endsWith('.docx')) {
-            setPdfTypeNote('קובץ DOCX זוהה. יש להמיר אותו ל-PDF ואז להעלות מחדש.', 'error');
+            EditorUi.setPdfTypeNote('קובץ DOCX זוהה. יש להמיר אותו ל-PDF ואז להעלות מחדש.', 'error', elements);
             if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
             if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
             if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
@@ -4301,14 +768,15 @@ STRICT EXTRACTION & FORMATTING RULES:
         }
 
         try {
-            setPdfTypeNote('מזהה את סוג ה-PDF...', 'loading');
+            EditorUi.setPdfTypeNote('מזהה את סוג ה-PDF...', 'loading', elements);
             const pdfBuffer = await file.arrayBuffer();
             state.pdfArrayBuffer = pdfBuffer.slice(0);
 
-            const detection = await detectPdfType(state.pdfArrayBuffer.slice(0));
-            setPdfTypeNote(
+            const detection = await PdfService.detectPdfType(state.pdfArrayBuffer.slice(0));
+            EditorUi.setPdfTypeNote(
                 `${detection.pdfTypeLabel}: ${detection.recommendation}`,
-                detection.isScanned ? 'scanned' : 'digital'
+                detection.isScanned ? 'scanned' : 'digital',
+                elements
             );
 
             if (elements.scannedActionsBox) {
@@ -4318,18 +786,60 @@ STRICT EXTRACTION & FORMATTING RULES:
                 elements.digitalActionsBox.classList.toggle('hidden', detection.isScanned);
             }
 
-            // Load sidebar thumbnails & page selection state
-            await loadPdfSidebar(state.pdfArrayBuffer.slice(0));
+            await PdfService.loadPdfSidebar(state.pdfArrayBuffer.slice(0), state, elements, ProgressController);
         } catch (error) {
-            setPdfTypeNote(error.message || 'לא ניתן היה לזהות את סוג ה-PDF.', 'error');
+            EditorUi.setPdfTypeNote(error.message || 'לא ניתן היה לזהות את סוג ה-PDF.', 'error', elements);
         }
     });
 
     document.querySelector('[data-target="pdf-file"]')?.addEventListener('click', () => {
-        setPdfTypeNote('');
+        EditorUi.setPdfTypeNote('', 'neutral', elements);
         if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
         if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
         if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
         if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
+    });
+
+    // Preset & Clean PDF listeners
+    elements.presetStdBtn?.addEventListener('click', () => PdfService.applyStandardFilter(state, elements));
+    elements.presetEvenOddBtn?.addEventListener('click', () => PdfService.toggleEvenOddFilter(state, elements, EditorUi.showToast));
+    elements.presetBlankBtn?.addEventListener('click', () => PdfService.toggleEvenOddFilter(state, elements, EditorUi.showToast));
+    elements.presetSelectAllBtn?.addEventListener('click', () => PdfService.selectAllPages(state, elements, true));
+    elements.presetDeselectAllBtn?.addEventListener('click', () => PdfService.selectAllPages(state, elements, false));
+    elements.downloadCleanPdf?.addEventListener('click', () => PdfService.downloadCleanPdf(state, elements, ProgressController, (msg) => EditorUi.setStatus(msg, false, false, elements)));
+
+    elements.toggleSidebarCollapseBtn?.addEventListener('click', () => {
+        if (!elements.pdfSidebarCard) return;
+        const isCollapsed = elements.pdfSidebarCard.classList.toggle('is-collapsed');
+        elements.toggleSidebarCollapseBtn.textContent = isCollapsed ? '▶ פתח סרגל' : '◀ קפל סרגל';
+        EditorUi.showToast(isCollapsed ? 'סרגל עמודים קופל' : 'סרגל עמודים הורחב', 'info', 2000);
+    });
+
+    // Freebuff handlers
+    function openFreebuffChat() {
+        const opened = window.open('https://freebuff.com/chat', '_blank', 'noopener,noreferrer');
+        if (!opened) {
+            EditorUi.setStatus('הדפדפן חסם פתיחת לשונית חדשה עבור Freebuff.', true, false, elements);
+        }
+    }
+
+    elements.freebuffButtons.forEach((button) => {
+        button.addEventListener('click', openFreebuffChat);
+    });
+
+    elements.freebuffInfoButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const tooltip = document.getElementById(button.getAttribute('aria-describedby'));
+            if (tooltip) tooltip.classList.toggle('is-open');
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        elements.freebuffInfoButtons.forEach((button) => {
+            const tooltip = document.getElementById(button.getAttribute('aria-describedby'));
+            if (tooltip && !button.parentElement.contains(event.target)) {
+                tooltip.classList.remove('is-open');
+            }
+        });
     });
 });

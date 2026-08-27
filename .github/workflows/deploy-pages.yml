@@ -64,6 +64,9 @@ jobs:
         run: |
           mkdir -p site
           cp index.html app.js style.css quiz_player.html generator.js quiz-core.js quiz-export.js site/
+          if [ -d js ]; then
+            cp -R js site/js
+          fi
           if [ -d vendor ]; then
             cp -R vendor site/vendor
           fi

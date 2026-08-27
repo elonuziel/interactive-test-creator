@@ -174,8 +174,157 @@ runTest('Auto-Advance Countdown', 'Verifies countdown markup generation and styl
     assert.ok(styleCss.includes('@keyframes autoAdvanceShrink'), 'autoAdvanceShrink animation missing in style.css');
 });
 
+runTest('Progress Controller Module', 'Verifies ProgressController starts tasks, dispatches updates, and handles abort signals', () => {
+    const ProgressController = require('../js/progress-controller.js');
+    const task = ProgressController.startTask('Test task', { cancellable: true, detail: 'Processing...' });
+    assert.ok(task);
+    assert.strictEqual(task.isAborted(), false);
+    assert.strictEqual(ProgressController.activeTask.id, task.id);
+
+    task.update(45, 'Working on 45%');
+    assert.strictEqual(task.isAborted(), false);
+
+    task.abort('User cancelled');
+    assert.strictEqual(task.isAborted(), true);
+});
+
+runTest('Question Parser - Markdown', 'Parses Hebrew exam questions formatted in Markdown', () => {
+    const QuestionParser = require('../js/question-parser.js');
+    const md = [
+        '### שאלה 1: מהו התפקיד העיקרי של ההמוגלובין? (עמוד 2)',
+        '- א. נשיאת חמצן בדם',
+        '- ב. פירוק סוכרים',
+        '- ג. הגנה מפני נגיפים',
+        '- ד. ייצור הורמונים',
+        '',
+        '### שאלה 2: איזה מהבאים אינו אב-מזון?',
+        '- א. ויטמין C',
+        '- ב. חלבון',
+        '- ג. פחמימה',
+        '- ד. שומן'
+    ].join('\n');
+
+    const parsed = QuestionParser.parseQuestionsFromMarkdown(md);
+    assert.strictEqual(parsed.length, 2);
+    assert.strictEqual(parsed[0].question, 'מהו התפקיד העיקרי של ההמוגלובין?');
+    assert.strictEqual(parsed[0].sourcePage, 2);
+    assert.strictEqual(parsed[0].options.length, 4);
+    assert.strictEqual(parsed[0].options[0], 'נשיאת חמצן בדם');
+    assert.strictEqual(parsed[1].question, 'איזה מהבאים אינו אב-מזון?');
+    assert.strictEqual(parsed[1].sourcePage, 1);
+});
+
+runTest('Question Parser - Hebrew Word Order & Heuristics', 'Detects reversed Hebrew and cleans header prefixes', () => {
+    const QuestionParser = require('../js/question-parser.js');
+    const normalHebrew = 'שאלה מספר 1: מהי הביולוגיה?\nשאלה מספר 2: מהי הכימיה?';
+    assert.strictEqual(QuestionParser.maybeFixHebrewWordOrder(normalHebrew), normalHebrew);
+
+    const reversedHebrew = [
+        '1 שאלה מספר :מהי',
+        '2 שאלה מספר :מהי',
+        '3 שאלה מספר :מהי',
+        '4 שאלה מספר :מהי'
+    ].join('\n');
+    const fixed = QuestionParser.maybeFixHebrewWordOrder(reversedHebrew);
+    assert.ok(fixed.includes('שאלה מספר'));
+
+    assert.strictEqual(QuestionParser.stripQuestionHeaderPrefix('### שאלה מספר 12: מהו מבנה התא?'), 'מהו מבנה התא?');
+    assert.strictEqual(QuestionParser.stripQuestionHeaderPrefix('14) מהו לחץ הדם?'), 'מהו לחץ הדם?');
+    assert.strictEqual(QuestionParser.stripQuestionHeaderPrefix('שאלה 5: הסבר את תהליך הפוטוסינתזה'), 'הסבר את תהליך הפוטוסינתזה');
+});
+
+runTest('Question Parser - Text Extraction & Inline Options', 'Parses text with inline answer options', () => {
+    const QuestionParser = require('../js/question-parser.js');
+    const rawText = [
+        'שאלה 1',
+        'איזה מהאיברים הבאים שייך למערכת הנשימה?',
+        'א. ריאות ב. כליות ג. קיבה ד. טחול',
+        '',
+        'שאלה 2',
+        'מהי יחידת המבנה הבסיסית של כל היצורים החיים?',
+        'א. התא',
+        'ב. הרקמה',
+        'ג. האיבר',
+        'ד. המערכת'
+    ].join('\n');
+
+    const parsed = QuestionParser.parseQuestionsFromText(rawText);
+    assert.strictEqual(parsed.length, 2);
+    assert.strictEqual(parsed[0].options.length, 4);
+    assert.strictEqual(parsed[0].options[0], 'ריאות');
+    assert.strictEqual(parsed[0].options[1], 'כליות');
+    assert.strictEqual(parsed[1].options.length, 4);
+    assert.strictEqual(parsed[1].options[0], 'התא');
+});
+
+runTest('PDF Service - Heuristics & Geometry', 'Evaluates direction detection and Hebrew breakage scores', () => {
+    const PdfService = require('../js/pdf-service.js');
+    assert.strictEqual(PdfService.hasHebrew('שלום עולם'), true);
+    assert.strictEqual(PdfService.hasHebrew('Hello World 123'), false);
+
+    const dirHeb = PdfService.detectLineDirection([{ text: 'שלום', dir: 'rtl' }]);
+    assert.strictEqual(dirHeb, 'rtl');
+
+    const dirEng = PdfService.detectLineDirection([{ text: 'Hello', dir: 'ltr' }]);
+    assert.strictEqual(dirEng, 'ltr');
+
+    const breakageClean = PdfService.computeHebrewBreakageScore('משפט שלם בעברית תקינה לחלוטין');
+    const breakageBroken = PdfService.computeHebrewBreakageScore('מ ש פ ט מ פ ו ז ר ב ע ב ר י ת');
+    assert.ok(breakageClean < breakageBroken);
+});
+
+runTest('Gemini Service - Models & Error Classification', 'Classifies Gemini errors and sorts candidate models', () => {
+    const GeminiService = require('../js/gemini-service.js');
+    const err401 = GeminiService.getGeminiErrorInfo(401, 'Unauthorized');
+    assert.strictEqual(err401.code, 'auth');
+    assert.strictEqual(err401.retryNextModel, false);
+
+    const err429 = GeminiService.getGeminiErrorInfo(429, 'Quota exceeded');
+    assert.strictEqual(err429.code, 'quota');
+    assert.strictEqual(err429.retryNextModel, true);
+
+    const candidates = [
+        { version: 'v1beta', model: 'gemini-1.5-flash' },
+        { version: 'v1', model: 'gemini-2.5-flash' },
+        { version: 'v1beta', model: 'gemini-2.0-flash' }
+    ];
+    const sorted = GeminiService.sortGeminiModelCandidates(candidates);
+    assert.strictEqual(sorted[0].model, 'gemini-2.5-flash');
+    assert.strictEqual(sorted[1].model, 'gemini-2.0-flash');
+    assert.strictEqual(sorted[2].model, 'gemini-1.5-flash');
+});
+
+runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts are referenced in correct dependency order', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const indexHtml = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+
+    const expectedScripts = [
+        'quiz-core.js',
+        'quiz-export.js',
+        'js/progress-controller.js',
+        'js/gemini-service.js',
+        'js/pdf-service.js',
+        'js/ocr-tesseract.js',
+        'js/question-parser.js',
+        'js/cropper-modal.js',
+        'js/editor-ui.js',
+        'js/export-service.js',
+        'generator.js'
+    ];
+
+    let lastIndex = -1;
+    for (const script of expectedScripts) {
+        const idx = indexHtml.indexOf(`src="${script}"`);
+        assert.ok(idx !== -1, `Script ${script} is missing from index.html`);
+        assert.ok(idx > lastIndex, `Script ${script} is loaded out of order in index.html`);
+        lastIndex = idx;
+    }
+});
+
 console.log('\n──────────────────────────────────────────────────────────────');
 console.log(`📊 Final Execution Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
 console.log('──────────────────────────────────────────────────────────────\n');
 
 if (testsFailed > 0) process.exit(1);
+
