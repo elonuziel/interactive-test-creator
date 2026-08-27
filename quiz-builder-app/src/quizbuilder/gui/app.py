@@ -393,6 +393,7 @@ class MainWindow(QWidget):
         self.question_list.currentRowChanged.connect(self.show_question)
         self.help_button.clicked.connect(self.show_markdown_help)
         self.question_editor.changed.connect(self.mark_dirty)
+        self.question_editor.crop_requested.connect(self.open_image_cropper)
         self.add_question_button.clicked.connect(self.add_question)
         self.delete_question_button.clicked.connect(self.delete_question)
         self.save_button.clicked.connect(self.save_test)
@@ -1494,8 +1495,20 @@ class MainWindow(QWidget):
             run, html, opened = result
             self.play_button.setEnabled(True)
             self.export_button.setEnabled(True)
-            note = "" if opened or custom_path else " The browser could not be opened automatically."
-            QMessageBox.information(self, "Quiz ready", f"Created {len(run.questions)} question(s).\nSaved to:\n{html}.{note}")
+            
+            box = QMessageBox(self)
+            box.setWindowTitle("Quiz Ready")
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setText(f"Successfully generated quiz with {len(run.questions)} question(s)!\n\nSaved to:\n{html}")
+            open_btn = box.addButton("🌐 Open in Browser", QMessageBox.ButtonRole.ActionRole)
+            folder_btn = box.addButton("📁 Open Folder", QMessageBox.ButtonRole.ActionRole)
+            ok_btn = box.addButton(QMessageBox.StandardButton.Ok)
+            box.exec()
+
+            if box.clickedButton() == open_btn:
+                webbrowser.open(html.as_uri())
+            elif box.clickedButton() == folder_btn:
+                webbrowser.open(html.parent.as_uri())
 
         def failed(error):
             self.play_button.setEnabled(True)
@@ -1505,6 +1518,21 @@ class MainWindow(QWidget):
         worker.signals.finished.connect(done)
         worker.signals.failed.connect(failed)
         self.start_worker(worker)
+
+    def open_image_cropper(self) -> None:
+        workspace = self.state["workspace"]
+        # Look for local web player or standalone html to crop from
+        web_index = self.config.scripts_root.parent / "web" / "index.html"
+        if not web_index.is_file():
+            web_index = Path(__file__).resolve().parents[3] / "web" / "index.html"
+        if web_index.is_file():
+            webbrowser.open(web_index.as_uri())
+        else:
+            QMessageBox.information(
+                self,
+                "Image Cropper",
+                "To crop an image from a PDF page, open your exported HTML quiz or web player in the browser and use the 'Crop Image' tool below any diagram.",
+            )
 
     def open_runs_folder(self) -> None:
         if not self.state["root"]:
