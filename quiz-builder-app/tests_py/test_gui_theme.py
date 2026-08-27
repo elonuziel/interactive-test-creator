@@ -11,7 +11,12 @@ from quizbuilder.config import Config
 from quizbuilder.gui.app import MainWindow
 
 
-def test_main_window_exposes_theme_toggle_and_markdown_help(qtbot, tmp_path):
+@pytest.fixture(scope="module")
+def application():
+    return QApplication.instance() or QApplication([])
+
+
+def test_main_window_exposes_theme_toggle_and_markdown_help(application, tmp_path):
     window = MainWindow(Config.defaults(root=tmp_path))
     assert window.theme_button.text() in {"Switch to dark theme", "Switch to light theme"}
     assert window.help_button.text() == "Markdown format help"
