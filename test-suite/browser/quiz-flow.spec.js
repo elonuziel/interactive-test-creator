@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const QuizExport = require('../../quiz-export.js');
 
 const questions = [
     {
@@ -46,11 +47,14 @@ test('builder exports a standalone quiz with embedded questions', async ({ page 
 });
 
 test('standalone player loads embedded questions and persists answers', async ({ page }) => {
+    await page.route('**/quiz_player.html', async (route) => {
+        const response = await route.fetch();
+        const body = await response.text();
+        const injected = QuizExport.injectInlineQuestions(body, questions);
+        await route.fulfill({ response, body: injected });
+    });
+
     await page.goto('/quiz_player.html');
-    await page.evaluate((data) => {
-        document.getElementById('quiz-data').textContent = JSON.stringify(data);
-    }, questions);
-    await page.reload();
 
     await page.locator('#start-btn').click();
     await expect(page.locator('#quiz-screen')).toHaveClass(/active/);
@@ -59,3 +63,4 @@ test('standalone player loads embedded questions and persists answers', async ({
 
     await expect(page.locator('#resume-notice')).not.toHaveClass(/hidden/);
 });
+
