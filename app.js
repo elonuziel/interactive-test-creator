@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
     let userFlags = []; // boolean per question
     let isImmediateFeedback = false;
-    let isImmediateFeedback = true;
     let autoAdvanceTimer = null;
     let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered' | 'flagged'
     let isReviewMode = false; // true when reviewing from results screen
@@ -128,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (feedbackToggle) feedbackToggle.checked = enabled;
         if (welcomeFeedbackToggle) welcomeFeedbackToggle.checked = enabled;
     }
-    setImmediateFeedback(true);
 
     feedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
     welcomeFeedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
