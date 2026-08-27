@@ -57,7 +57,7 @@ def test_assemble_run_reports_missing_questions(tmp_path):
     workspace = Workspace("empty", tmp_path / "empty")
     workspace.path.mkdir()
 
-    with pytest.raises(RunError, match="no questions.json"):
+    with pytest.raises(RunError, match="no questions.md"):
         assemble_run([workspace])
 
 
@@ -97,7 +97,7 @@ def test_discover_batch_reports_incomplete_and_ambiguous_projects(tmp_path):
         "ambiguous - first", "ambiguous - second", "ready"
     ]
     assert candidates[0].ready_to_run is False
-    assert "questions.json is missing" in candidates[0].issues[0]
+    assert "questions.md is missing" in candidates[0].issues[0]
     assert candidates[2].ready_to_run is True
 
 

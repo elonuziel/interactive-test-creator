@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import argparse
 
@@ -52,6 +52,8 @@ Required Markdown Example:
 - ב. סינתזת חלבונים
 - ג. אחסון החומר התורשתי
 - ד. פירוק רעלים בתא
+
+Answer: A
 """
 
     # 2. Web AI Prompts (Extraction vs Proofread)
@@ -82,6 +84,7 @@ OUTPUT & DELIVERABLE REQUIREMENTS:
 2. Use this exact format per question:
     - `### שאלה N: [נוסח השאלה] (עמוד X)`
     - `- א. ...`, `- ב. ...`, `- ג. ...`, `- ד. ...`
+    - `Answer: A` (or B / C / D / א / ב / ג / ד if answer is known)
 3. Do not return JSON and do not include commentary or code fences.
 """
     else:
@@ -98,11 +101,15 @@ REQUIRED MARKDOWN FORMAT (questions.md):
 - ג. [אפשרות 3]
 - ד. [אפשרות 4]
 
+Answer: A
+
 ### שאלה 2: [נוסח השאלה השנייה בעברית] (עמוד 2)
 - א. [אפשרות 1]
 - ב. [אפשרות 2]
 - ג. [אפשרות 3]
 - ד. [אפשרות 4]
+
+Answer: A
 
 ===========================================================================
 STRICT EXTRACTION & PROOFREADING RULES:

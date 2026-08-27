@@ -55,7 +55,7 @@ def assemble_run(
     for workspace in selected:
         path = workspace.questions_path
         if not path.is_file():
-            raise RunError(f"Test '{workspace.name}' has no questions.json file (questions.md is also accepted).")
+            raise RunError(f"Test '{workspace.name}' has no questions.md file.")
         try:
             questions = load_questions(path)
         except ValidationError as exc:
@@ -76,5 +76,9 @@ def write_run_questions(run: QuizRun, output: Path) -> Path:
     """Write a derived questions file without changing any source project."""
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    write_json_atomic(output, run.payload)
+    if output.suffix.lower() == ".md":
+        from .markdown import write_questions
+        write_questions(output, run.payload)
+    else:
+        write_json_atomic(output, run.payload)
     return output

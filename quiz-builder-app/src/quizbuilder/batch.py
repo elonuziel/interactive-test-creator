@@ -111,7 +111,7 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
             elif source_pdf and exam_variant(source_pdf.stem) and not matched_answers and answers:
                 issues.append("no answer key matches this Moed variant")
             if not workspace.questions_path.is_file():
-                issues.append("questions.json is missing (questions.md is also accepted)")
+                issues.append("questions.md is missing")
             candidates.append(BatchCandidate(workspace, sources, tuple(issues)))
     return candidates
 

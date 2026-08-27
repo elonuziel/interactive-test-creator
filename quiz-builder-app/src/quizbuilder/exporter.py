@@ -44,8 +44,8 @@ def build_run_standalone_quiz(
                 image = question.get(field)
                 if image and not Path(image).is_absolute():
                     question[field] = str((item.source_path / image).resolve())
-        (workspace / "questions.json").write_text(
-            json.dumps(questions, ensure_ascii=False), encoding="utf-8"
+        (workspace / "questions.md").write_text(
+            dump_questions(questions), encoding="utf-8"
         )
         build_standalone_quiz(workspace, scripts_dir, output)
     return output
