@@ -139,6 +139,7 @@ def test_question_reordering_and_duplication(application, tmp_path):
     window.move_question_down()
     assert window.state["questions"][1]["question"] == "Q1"
 
+    window.state["dirty"] = False
     window.close()
 
 
@@ -165,5 +166,29 @@ def test_question_filtering_and_status(application, tmp_path):
     assert window.question_list.count() == 1
     assert "Empty question" in window.question_list.item(0).text()
 
+    window.state["dirty"] = False
+    window.close()
+
+
+def test_main_window_has_matrix_button_and_explanation(application, tmp_path):
+    window = MainWindow(Config.defaults(root=tmp_path))
+    assert hasattr(window, "matrix_button")
+    assert hasattr(window.question_editor, "explanation_edit")
+
+    # Set question with explanation
+    q = {
+        "question": "Q with explanation",
+        "options": ["A", "B"],
+        "correctIndex": 0,
+        "explanation": "Because of reason X",
+    }
+    window.question_editor.set_question(q)
+    assert window.question_editor.explanation_edit.toPlainText() == "Because of reason X"
+
+    collected = {}
+    window.question_editor.collect(collected)
+    assert collected["explanation"] == "Because of reason X"
+
+    window.state["dirty"] = False
     window.close()
 
