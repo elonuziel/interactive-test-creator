@@ -22,13 +22,16 @@ The web application (`web/index.html`, `web/app.js`, `style.css` in `web/`) offe
 
 ---
 
-### 🧙 Interactive CLI Wizard (`start.bat`)
-A step-by-step Windows wizard (`start.bat`) that automates:
+### 🧙 Interactive CLI Wizard (`start.bat` / `start.sh`)
+A step-by-step wizard that automates:
 1. Environment & package prerequisite verification (`pymupdf`, `pandas`, `openpyxl`).
 2. Test folder creation and exam source drop-folder setup (`.pdf` or `.docx`) plus answer-key sheets.
 3. PDF type detection & page image rendering for Vision LLM extraction.
 4. Automatic answer key merging, schema QA validation (`7_check_json.py`), and test manifest updates (`8_generate_manifest.py`).
 5. Building portable single-file HTML apps or starting local web servers.
+6. Detecting an installed `freebuff` or `freebuff-cli` command and offering it as a prompt-helper destination.
+
+On Linux/macOS, run `bash start.sh` (or `./start.sh` after making it executable). The launcher resolves its own directory and uses `python3`, falling back to `python`.
 
 If `.docx` files are detected, the wizard asks once whether to convert all DOCX files to PDF. If matching PDFs already exist, it also asks once whether to overwrite them. If a local converter backend is available, conversion is attempted automatically. If not, the wizard provides manual export-to-PDF steps and resumes after you place PDFs in the same folder.
 
@@ -55,6 +58,7 @@ Designed for AI agents (such as Antigravity, Gemini, ChatGPT, Claude) to extract
 ```
 cli-legacy/
 ├── start.bat                  # Interactive Windows wizard CLI
+├── start.sh                   # Linux/macOS wizard launcher
 ├── LLM_RUNBOOK.md             # AI Agent instructions for PDF extraction
 ├── README.md                  # Legacy CLI project documentation
 ├── web/                       # Legacy Web Quiz App
@@ -90,9 +94,19 @@ Double-click `start.bat` or run from terminal:
 ```cmd
 start.bat
 ```
+
+### 2. Using the Interactive Wizard (Linux/macOS)
+```bash
+bash start.sh
+# Or, once executable:
+./start.sh
+```
+
+If `freebuff` or `freebuff-cli` is installed on `PATH`, the prompt-helper menu includes a Freebuff option. Selecting it pipes the generated local prompt to the command through standard input and waits for you to return after it completes.
+
 Follow the interactive prompts to set up test folders, render pages for LLM processing, validate JSON outputs, build standalone HTML files, or launch the web player.
 
-### 2. Manual Workflow & Test Creation
+### 3. Manual Workflow & Test Creation
 1. **Create a Test Folder**: Place raw source files under `tests/` (e.g. `tests/botany_2024_a/`):
    - Exam source: `tests/botany_2024_a/exam.pdf` or `tests/botany_2024_a/exam.docx`
    - Answer key spreadsheet: `tests/botany_2024_a/answers.csv` or `answers.xlsx`

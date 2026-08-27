@@ -69,6 +69,18 @@ else:
 
 TESTS_DIR = os.path.join(CLI_ROOT, 'tests')
 
+FREEBUFF_COMMAND_NAMES = ['freebuff', 'freebuff-cli']
+
+
+def detect_freebuff_command():
+    """Return a detected Freebuff CLI executable, or None."""
+    for command_name in FREEBUFF_COMMAND_NAMES:
+        command_path = shutil.which(command_name)
+        if command_path:
+            return command_path
+    return None
+
+
 def copy_to_clipboard(text):
     if sys.platform == 'win32':
         try:
@@ -691,6 +703,10 @@ def process_workspace(test_name, test_dir):
     web_prompt_path = os.path.join(test_dir, 'prompt_web_ai.txt')
 
     # Check CLI Agents
+    freebuff_command = detect_freebuff_command()
+    if freebuff_command:
+        print(f"  {C_GREEN}[✔] Detected Freebuff CLI: {freebuff_command}{C_RESET}")
+
     agent_found = None
     for ag in ['agy', 'gemini', 'claude']:
         if shutil.which(ag):
@@ -728,9 +744,13 @@ def process_workspace(test_name, test_dir):
     print("    [2] WEB AI (ChatGPT, Claude.ai, Gemini Web, Google AI Studio)")
     print("        Generates prompt_web_ai.txt on demand & opens AI website.")
     print("    [3] Print both prompts to console")
+    if freebuff_command:
+        print("    [4] FREEBUFF CLI (detected)")
+        print("        Sends the generated prompt to Freebuff through standard input.")
     print("    [S] Skip prompt helper\n")
 
-    p_choice = input("   [?] Your choice (1/2/3/S) [Default: 1]: ").strip().lower()
+    valid_choices = '1/2/3/4/S' if freebuff_command else '1/2/3/S'
+    p_choice = input(f"   [?] Your choice ({valid_choices}) [Default: 1]: ").strip().lower()
     if p_choice == '2':
         run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'web'])
         print(f"\n  {C_GREEN}[✔] Created {web_prompt_path}{C_RESET}")
@@ -745,6 +765,18 @@ def process_workspace(test_name, test_dir):
         elif web_choice == '2': webbrowser.open('https://gemini.google.com')
         elif web_choice == '3': webbrowser.open('https://claude.ai')
         elif web_choice == '4': webbrowser.open('https://aistudio.google.com')
+    elif freebuff_command and p_choice == '4':
+        run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
+        if os.path.isfile(local_prompt_path):
+            print(f"\n  {C_CYAN}[i] Sending {local_prompt_path} to Freebuff CLI...{C_RESET}")
+            try:
+                with open(local_prompt_path, 'r', encoding='utf-8') as prompt_file:
+                    result = subprocess.Popen([freebuff_command], stdin=prompt_file)
+                input("   Press Enter after Freebuff completes...")
+                if result.poll() is None:
+                    print(f"  {C_YELLOW}[!] Freebuff is still running in the background.{C_RESET}")
+            except OSError as exc:
+                print(f"  {C_RED}[✘] Could not launch Freebuff CLI: {exc}{C_RESET}")
     elif p_choice == '3':
         run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'all'])
         if os.path.isfile(local_prompt_path):
@@ -756,6 +788,10 @@ def process_workspace(test_name, test_dir):
     elif p_choice != 's':
         run_script('generate_prompts.py', [test_dir, test_name, form_number, has_answers_flag, 'local'])
         print(f"\n  {C_GREEN}[✔] Created {local_prompt_path}{C_RESET}")
+
+    if p_choice == '4' and not freebuff_command:
+        print(f"  {C_YELLOW}[!] Freebuff CLI was not detected. Choose another prompt helper.{C_RESET}")
+        p_choice = 's'
 
     if p_choice != 's':
         print(f"\n{C_CYAN}┌──────────────────────────────────────────────────────────────────────────┐{C_RESET}")
