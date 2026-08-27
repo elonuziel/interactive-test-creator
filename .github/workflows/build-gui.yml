@@ -1,0 +1,36 @@
+name: Build Desktop GUI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: linux-gui
+            path: cli-legacy/dist/quiz_builder_gui
+          - os: windows-latest
+            artifact: windows-gui
+            path: cli-legacy/dist/quiz_builder_gui
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install GUI and packaging dependencies
+        working-directory: cli-legacy
+        run: python -m pip install -e ".[gui,package]"
+      - name: Build GUI bundle
+        working-directory: cli-legacy
+        run: python build_gui.py
+      - name: Upload GUI bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}

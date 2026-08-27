@@ -18,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("wizard", help="Run the guided workflow")
+    subparsers.add_parser("gui", help="Open the desktop GUI")
     process = subparsers.add_parser("process", help="Process a workspace")
     process.add_argument("workspace", type=Path)
     prompt = subparsers.add_parser("prompt", help="Generate a prompt for a workspace")
@@ -27,6 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
     build = subparsers.add_parser("build", help="Build a standalone HTML quiz")
     build.add_argument("workspace", type=Path)
     build.add_argument("-o", "--output", type=Path)
+    run = subparsers.add_parser("run", help="Prepare one test or a mixed quiz run")
+    run.add_argument("workspaces", type=Path, nargs="+")
+    run.add_argument("--mix", action="store_true", help="Mix questions from all selected tests")
+    run.add_argument("--name", help="Name for the derived run")
+    run.add_argument("-o", "--output", type=Path, help="Write the derived questions JSON")
+    run.add_argument("--html", type=Path, help="Write a standalone HTML quiz for the run")
     init = subparsers.add_parser("init", help="Create a workspace")
     init.add_argument("name")
     detect = subparsers.add_parser("detect", help="Check dependencies and available AI providers")
@@ -51,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
             from . import __version__
             print(__version__)
             return 0
+        if args.command == "gui":
+            from .gui import main as gui_main
+            return gui_main()
         if args.command == "process":
             from .commands import process_workspace
             artifacts = process_workspace(config, args.workspace)
@@ -63,6 +73,20 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "build":
             from .commands import build_workspace
             print(build_workspace(config, args.workspace, args.output))
+            return 0
+        if args.command == "run":
+            from .models import Workspace
+            from .exporter import build_run_standalone_quiz
+            from .runs import assemble_run, write_run_questions
+
+            workspaces = [Workspace(path.resolve().name, path.resolve()) for path in args.workspaces]
+            quiz_run = assemble_run(workspaces, name=args.name, mix=args.mix)
+            if args.output:
+                print(write_run_questions(quiz_run, args.output.resolve()))
+            if args.html:
+                print(build_run_standalone_quiz(quiz_run, args.html.resolve(), config.scripts_root))
+            if not args.output and not args.html:
+                print(f"{quiz_run.name}: {len(quiz_run.questions)} question(s) from {len(quiz_run.sources)} test(s)")
             return 0
         if args.command == "init":
             from .workspace import create_workspace
@@ -95,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
             from .wizard import run
             return run(config)
         parser.error(f"Unknown command: {args.command}")
-    except (DependencyError, ValueError) as exc:
+    except (DependencyError, RuntimeError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:

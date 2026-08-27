@@ -104,6 +104,8 @@ bash start.sh
 
 Useful commands include:
 ```bash
+python -m pip install -e ".[gui]"
+python -m quizbuilder gui
 python -m quizbuilder --help
 python -m quizbuilder detect
 python -m quizbuilder serve --port 8000
@@ -116,6 +118,17 @@ python -m quizbuilder clean tests/biology_101
 python -m quizbuilder wizard
 python -m quizbuilder --config quizbuilder.toml detect
 ```
+
+The desktop GUI lets you choose a projects folder, edit a test's `questions.json`
+with RTL-aware fields, save changes, and export a standalone HTML quiz. Select one
+test for a normal run, or check multiple tests and enable mixed mode to create a
+derived quiz without changing the source projects. Generated runs are placed in
+the folder's `runs/` directory.
+
+To build a portable desktop bundle, install the GUI and packaging extras and run
+`python build_gui.py` from this directory. PyInstaller builds for the operating
+system it is run on; create the Windows bundle on Windows and the Linux bundle on
+Linux.
 
 If `freebuff` or `freebuff-cli` is installed on `PATH`, the prompt-helper menu includes a Freebuff option. Selecting it pipes the generated local prompt to the command through standard input and waits for you to return after it completes.
 

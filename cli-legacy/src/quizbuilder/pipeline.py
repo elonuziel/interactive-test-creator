@@ -69,6 +69,11 @@ class PipelineRunner:
             "--image-dir", str(image_dir), "--page-map", str(page_map),
         )
 
+    def extract_answers(self, source: Path, form: str, output: Path) -> StageResult:
+        return self.require_success(
+            "4_extract_csv_answers.py", str(source), str(form), "-o", str(output)
+        )
+
     def merge_answers(self, workspace: Path) -> StageResult:
         return self.require_success("6_merge_json_answers.py", str(workspace))
 
