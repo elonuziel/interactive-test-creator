@@ -750,6 +750,83 @@
         .nav-toggle-pill input[type="checkbox"]:disabled {
             cursor: not-allowed !important;
         }
+
+        .freebuff-action-group {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .freebuff-btn {
+            background: linear-gradient(135deg, #7c3aed, #2563eb);
+            color: #fff;
+            border: 0;
+            font-weight: 700;
+        }
+
+        .freebuff-btn:hover:not(:disabled) {
+            filter: brightness(1.08);
+            transform: translateY(-1px);
+        }
+
+        .freebuff-info-btn {
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            background: var(--input-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font: inherit;
+            font-size: .75rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .freebuff-info-btn:hover,
+        .freebuff-info-btn:focus-visible {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #fff;
+        }
+
+        .freebuff-tooltip {
+            position: absolute;
+            z-index: 20;
+            right: 0;
+            bottom: calc(100% + 8px);
+            width: min(300px, 80vw);
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-md);
+            font-size: .78rem;
+            line-height: 1.45;
+            text-align: right;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(4px);
+            transition: opacity .15s ease, transform .15s ease;
+        }
+
+        .freebuff-info-btn:hover + .freebuff-tooltip,
+        .freebuff-info-btn:focus-visible + .freebuff-tooltip,
+        .freebuff-tooltip.is-open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 640px) {
+            .freebuff-tooltip {
+                right: auto;
+                left: 0;
+            }
+        }
     </style>
 </head>
 
@@ -846,6 +923,11 @@
                                 </div>
                                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                                     <button id="run-digital-local-btn" type="button" class="success-btn sm-btn" style="white-space: nowrap; font-weight: 700; padding: 8px 14px; font-size: .83rem;">⚡ חלץ שאלות מקומית כעת</button>
+                                    <div class="freebuff-action-group">
+                                        <button id="freebuff-digital-btn" type="button" class="freebuff-btn sm-btn" title="פתח את Freebuff Chat בלשונית חדשה">✨ Freebuff</button>
+                                        <button id="freebuff-digital-info" type="button" class="freebuff-info-btn" aria-label="מידע על Freebuff" aria-describedby="freebuff-digital-tooltip">i</button>
+                                        <span id="freebuff-digital-tooltip" class="freebuff-tooltip" role="tooltip">Freebuff עוזר להמשיך ולשפר את זרימת העבודה עם AI. הלחיצה תפתח את Freebuff Chat בלשונית חדשה.</span>
+                                    </div>
                                     <button id="copy-digital-prompt-btn" type="button" class="secondary-btn sm-btn" style="white-space: nowrap; font-weight: 700; padding: 8px 12px; font-size: .83rem;">📋 העתק פרומפט ל-AI</button>
                                 </div>
                             </div>
@@ -860,7 +942,14 @@
                                     <strong style="color: #b45309; font-size: .88rem;">📷 זוהה PDF סרוק (תמונה)!</strong>
                                     <span style="display: block; font-size: .82rem; color: var(--text-secondary); margin-top: 2px;">העתק את הפרומפט והעלה אותו עם ה-PDF (או ה-PDF הנקי מהסרגל) ל-ChatGPT / Claude / Gemini:</span>
                                 </div>
-                                <button id="copy-prompt-btn" type="button" class="primary-btn sm-btn" style="white-space: nowrap; font-weight: 700; padding: 8px 14px; font-size: .83rem; background: #d97706; border: none;">📋 העתק פרומפט ל-AI</button>
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                                    <div class="freebuff-action-group">
+                                        <button id="freebuff-scanned-btn" type="button" class="freebuff-btn sm-btn" title="פתח את Freebuff Chat בלשונית חדשה">✨ Freebuff</button>
+                                        <button id="freebuff-scanned-info" type="button" class="freebuff-info-btn" aria-label="מידע על Freebuff" aria-describedby="freebuff-scanned-tooltip">i</button>
+                                        <span id="freebuff-scanned-tooltip" class="freebuff-tooltip" role="tooltip">Freebuff עוזר להמשיך ולשפר את זרימת העבודה עם AI. הלחיצה תפתח את Freebuff Chat בלשונית חדשה.</span>
+                                    </div>
+                                    <button id="copy-prompt-btn" type="button" class="primary-btn sm-btn" style="white-space: nowrap; font-weight: 700; padding: 8px 14px; font-size: .83rem; background: #d97706; border: none;">📋 העתק פרומפט ל-AI</button>
+                                </div>
                             </div>
                             <textarea id="llm-prompt-box" readonly rows="6" style="font-family: monospace; font-size: .8rem; width: 100%; resize: vertical; direction: rtl; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; margin-top: 6px;"></textarea>
                         </div>

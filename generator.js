@@ -58,6 +58,14 @@ document.addEventListener('DOMContentLoaded', () => {
         processingSettingsContainer: document.getElementById('processing-settings-container'),
         copyPromptBtn: document.getElementById('copy-prompt-btn'),
         llmPromptBox: document.getElementById('llm-prompt-box'),
+        freebuffButtons: [
+            document.getElementById('freebuff-digital-btn'),
+            document.getElementById('freebuff-scanned-btn')
+        ].filter(Boolean),
+        freebuffInfoButtons: [
+            document.getElementById('freebuff-digital-info'),
+            document.getElementById('freebuff-scanned-info')
+        ].filter(Boolean),
         pdfSidebarCard: document.getElementById('pdf-sidebar-card'),
         toggleSidebarCollapseBtn: document.getElementById('toggle-sidebar-collapse-btn'),
         builderLayout: document.getElementById('builder-layout'),
@@ -3442,6 +3450,33 @@ STRICT EXTRACTION & FORMATTING RULES:
     if (elements.digitalLlmPromptBox) {
         elements.digitalLlmPromptBox.value = DEFAULT_LLM_PROMPT;
     }
+
+    function openFreebuffChat() {
+        const opened = window.open('https://freebuff.com/chat', '_blank', 'noopener,noreferrer');
+        if (!opened) {
+            setStatus('הדפדפן חסם פתיחת לשונית חדשה עבור Freebuff.', true);
+        }
+    }
+
+    elements.freebuffButtons.forEach((button) => {
+        button.addEventListener('click', openFreebuffChat);
+    });
+
+    elements.freebuffInfoButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const tooltip = document.getElementById(button.getAttribute('aria-describedby'));
+            if (tooltip) tooltip.classList.toggle('is-open');
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        elements.freebuffInfoButtons.forEach((button) => {
+            const tooltip = document.getElementById(button.getAttribute('aria-describedby'));
+            if (tooltip && !button.parentElement.contains(event.target)) {
+                tooltip.classList.remove('is-open');
+            }
+        });
+    });
 
     // Preset buttons & Clean PDF download listeners
     elements.presetStdBtn?.addEventListener('click', applyStandardFilter);

@@ -74,6 +74,30 @@ test('standalone player loads embedded questions and persists answers', async ({
     await expect(page.locator('#resume-notice')).not.toHaveClass(/hidden/);
 });
 
+test('builder exposes Freebuff actions with accessible explainer controls', async ({ page }) => {
+    await page.goto('/index.html');
+
+    await expect(page.locator('#freebuff-digital-btn')).toBeHidden();
+    await expect(page.locator('#freebuff-scanned-btn')).toBeHidden();
+
+    await page.locator('#json-file').setInputFiles({
+        name: path.basename(fixturePath),
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(questions))
+    });
+    await expect(page.locator('.question-card')).toHaveCount(2);
+
+    await page.locator('#freebuff-digital-info').focus();
+    await expect(page.locator('#freebuff-digital-info')).toHaveAttribute('aria-describedby', 'freebuff-digital-tooltip');
+    await expect(page.locator('#freebuff-digital-tooltip')).toContainText('Freebuff');
+
+    const popupPromise = page.waitForEvent('popup');
+    await page.locator('#freebuff-digital-btn').click();
+    const popup = await popupPromise;
+    await expect(popup).toHaveURL('https://freebuff.com/chat');
+    await popup.close();
+});
+
 test('builder blocks export while a question is invalid', async ({ page }) => {
     await importQuestions(page);
     await page.locator('.question-card textarea').first().fill('');
