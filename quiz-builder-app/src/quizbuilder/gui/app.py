@@ -8,7 +8,7 @@ import webbrowser
 import threading
 
 from PySide6.QtCore import QSettings, QThreadPool, Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QImage, QKeySequence, QPixmap, QShortcut, QAction
+from PySide6.QtGui import QCursor, QGuiApplication, QImage, QKeySequence, QPixmap, QShortcut, QAction
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
+    QMenu,
     QProgressBar,
     QRadioButton,
     QSpinBox,
@@ -84,25 +85,117 @@ class MainWindow(QWidget):
         self._build_ui()
         self._show_welcome_if_needed()
         self._connect_signals()
-        self._add_theme_action()
         self._restore_session()
 
     def start_worker(self, worker: Worker) -> None:
         self._active_workers.add(worker)
-        worker.signals.finished.connect(lambda _: self._active_workers.discard(worker))
-        worker.signals.failed.connect(lambda _: self._active_workers.discard(worker))
-        self.thread_pool.start(worker)
+        self._set_worker_busy(True)
 
-    def _add_theme_action(self) -> None:
-        self.theme_button = QPushButton("Switch to light theme" if self.dark_mode else "Switch to dark theme")
-        self.theme_button.clicked.connect(self.toggle_theme)
-        self.layout().itemAt(0).widget().layout().addWidget(self.theme_button)
+        def _remove(result_or_err=None) -> None:
+            self._active_workers.discard(worker)
+            self._set_worker_busy(bool(self._active_workers))
+
+        worker.signals.finished.connect(_remove)
+        worker.signals.failed.connect(_remove)
+        self.thread_pool.start(worker)
 
     def toggle_theme(self) -> None:
         self.dark_mode = not self.dark_mode
         self.settings.setValue("dark_mode", self.dark_mode)
         self.setStyleSheet(DARK_STYLESHEET if self.dark_mode else LITE_STYLESHEET)
-        self.theme_button.setText("Switch to light theme" if self.dark_mode else "Switch to dark theme")
+        self.theme_button.setText("☀️ Light" if self.dark_mode else "🌙 Dark")
+
+    # ------------------------------------------------------------------ helpers
+
+    def _set_status(self, text: str, kind: str = "info") -> None:
+        """Update the status bar with optional color feedback."""
+        colors: dict[str, str] = {
+            "success": "color: #22c55e; font-weight: 500;",
+            "error":   "color: #ef4444; font-weight: 500;",
+            "busy":    "color: #f59e0b;",
+            "info":    "",
+        }
+        self.status_label.setStyleSheet(colors.get(kind, ""))
+        self.status_label.setText(text)
+
+    def _set_worker_busy(self, busy: bool) -> None:
+        """Show or hide the indeterminate progress bar in the status bar."""
+        if hasattr(self, "status_progress"):
+            self.status_progress.setVisible(busy)
+
+    def _update_tab_labels(self) -> None:
+        """Refresh tab title badges with live counts."""
+        q_total = len(self.state.get("questions", []))
+        ready = sum(
+            1
+            for i in range(self.play_list.count())
+            if self.play_list.item(i).checkState() == Qt.CheckState.Checked
+        )
+        self.tabs.setTabText(1, f"Review questions ({q_total})" if q_total else "Review questions")
+        self.tabs.setTabText(2, f"Play or export ({ready} ready)" if ready else "Play or export")
+
+    def _recent_folders(self) -> list[str]:
+        return self.settings.value("recent_folders", [], type=list) or []
+
+    def _add_recent_folder(self, path: Path) -> None:
+        existing = self._recent_folders()
+        entry = str(path)
+        if entry in existing:
+            existing.remove(entry)
+        existing.insert(0, entry)
+        self.settings.setValue("recent_folders", existing[:5])
+
+    def _show_recent_menu(self) -> None:
+        menu = QMenu(self)
+        recents = self._recent_folders()
+        if not recents:
+            menu.addAction("No recent folders").setEnabled(False)
+        else:
+            for path_str in recents:
+                action = menu.addAction(Path(path_str).name)
+                action.setToolTip(path_str)
+                action.setData(path_str)
+        chosen = menu.exec(QCursor.pos())
+        if chosen and chosen.data():
+            if not self.confirm_discard_changes():
+                return
+            self.state["root"] = Path(chosen.data())
+            self.settings.setValue("last_exam_folder", chosen.data())
+            self.populate_tests()
+
+    def _on_questions_reordered(self) -> None:
+        """Sync state["questions"] after a drag-drop reorder in the question list."""
+        questions = self.state["questions"]
+        if not questions:
+            return
+        new_order: list = []
+        seen: set[int] = set()
+        for i in range(self.question_list.count()):
+            item = self.question_list.item(i)
+            if item is None:
+                continue
+            old_idx = item.data(Qt.ItemDataRole.UserRole)
+            if old_idx is not None and 0 <= old_idx < len(questions) and old_idx not in seen:
+                seen.add(old_idx)
+                new_order.append(questions[old_idx])
+        if len(new_order) == len(questions):
+            self.save_active_question()
+            self.state["questions"] = new_order
+            self.state["dirty"] = True
+            current_row = self.question_list.currentRow()
+            self.refresh_question_list()
+            if 0 <= current_row < self.question_list.count():
+                self.question_list.setCurrentRow(current_row)
+
+    def _update_drag_drop_mode(self) -> None:
+        """Enable drag-drop reorder only when no filter is active."""
+        has_filter = bool(self.question_filter_edit.text()) or self.filter_incomplete_checkbox.isChecked()
+        mode = (
+            QListWidget.DragDropMode.NoDragDrop
+            if has_filter
+            else QListWidget.DragDropMode.InternalMove
+        )
+        self.question_list.setDragDropMode(mode)
 
     def _build_ui(self) -> None:
         root_layout = QVBoxLayout(self)
@@ -114,13 +207,22 @@ class MainWindow(QWidget):
         top_layout = QHBoxLayout(top_bar)
         self.root_label = QLabel("Exam folder: (not selected)")
         self.root_label.setToolTip("Choose the parent folder containing your exam folders.")
-        self.choose_root_btn = QPushButton("Choose exam folder...")
+        self.choose_root_btn = QPushButton("Choose exam folder…")
         self.choose_root_btn.setToolTip("Select the parent folder that contains your exam projects.")
-        self.refresh_root_btn = QPushButton("Reload exams")
+        self.recent_btn = QPushButton("▼ Recent")
+        self.recent_btn.setToolTip("Open a recently used exam folder.")
+        self.recent_btn.setMaximumWidth(82)
+        self.refresh_root_btn = QPushButton("⟳ Reload")
         self.refresh_root_btn.setToolTip("Scan the selected folder again for exam projects.")
+        self.theme_button = QPushButton("☀️ Light" if self.dark_mode else "🌙 Dark")
+        self.theme_button.setToolTip("Toggle between dark and light theme.")
+        self.theme_button.setMaximumWidth(88)
+        self.theme_button.clicked.connect(self.toggle_theme)
         top_layout.addWidget(self.root_label, 1)
         top_layout.addWidget(self.choose_root_btn)
+        top_layout.addWidget(self.recent_btn)
         top_layout.addWidget(self.refresh_root_btn)
+        top_layout.addWidget(self.theme_button)
         root_layout.addWidget(top_bar)
 
         self.tabs = QTabWidget()
@@ -134,7 +236,14 @@ class MainWindow(QWidget):
         status_layout = QHBoxLayout(status_bar)
         self.status_label = QLabel("Welcome! Choose an exam folder to begin. Each exam folder should contain a PDF and questions.md.")
         self.status_label.setWordWrap(True)
+        self.status_progress = QProgressBar()
+        self.status_progress.setRange(0, 0)  # indeterminate
+        self.status_progress.setMaximumWidth(130)
+        self.status_progress.setMaximumHeight(14)
+        self.status_progress.setTextVisible(False)
+        self.status_progress.setVisible(False)
         status_layout.addWidget(self.status_label, 1)
+        status_layout.addWidget(self.status_progress)
         root_layout.addWidget(status_bar)
 
     def _build_extract_tab(self) -> None:
@@ -183,6 +292,7 @@ class MainWindow(QWidget):
         self.detection_description = QLabel("Choose an exam to check whether its text can be extracted automatically.")
         self.detection_description.setWordWrap(True)
         self.extract_button = QPushButton("Extract questions from PDF")
+        self.extract_button.setObjectName("primary")
         self.ai_hint = QLabel("Digital PDFs can be extracted automatically. Scanned PDFs need an AI prompt. Results are saved as questions.md.")
         self.ai_hint.setWordWrap(True)
         self.ai_provider_combo = QComboBox()
@@ -303,14 +413,16 @@ class MainWindow(QWidget):
         filter_row.addWidget(self.filter_incomplete_checkbox)
 
         self.question_list = QListWidget()
+        self.question_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.question_list.setDefaultDropAction(Qt.DropAction.MoveAction)
 
         reorder_row = QHBoxLayout()
         self.move_up_button = QPushButton("⬆️ Up")
-        self.move_up_button.setToolTip("Move selected question up")
+        self.move_up_button.setToolTip("Move selected question up (Alt+↑) — or drag to reorder")
         self.move_down_button = QPushButton("⬇️ Down")
-        self.move_down_button.setToolTip("Move selected question down")
+        self.move_down_button.setToolTip("Move selected question down (Alt+↓) — or drag to reorder")
         self.duplicate_button = QPushButton("📋 Duplicate")
-        self.duplicate_button.setToolTip("Duplicate selected question")
+        self.duplicate_button.setToolTip("Duplicate selected question (Ctrl+D)")
         reorder_row.addWidget(self.move_up_button)
         reorder_row.addWidget(self.move_down_button)
         reorder_row.addWidget(self.duplicate_button)
@@ -339,6 +451,7 @@ class MainWindow(QWidget):
         edit_layout = QVBoxLayout(edit_group)
         self.question_editor = QuestionEditorWidget()
         self.save_button = QPushButton("Save questions.md")
+        self.save_button.setObjectName("primary")
         self.save_as_button = QPushButton("Save as...")
         self.save_as_button.setToolTip("Save questions to a custom .md or .json file")
         self.help_button = QPushButton("Markdown format help")
@@ -386,6 +499,7 @@ class MainWindow(QWidget):
         self.summary = QLabel("No exams selected. Check one or more exams to continue.")
         self.summary.setWordWrap(True)
         self.play_button = QPushButton("Play quiz in browser")
+        self.play_button.setObjectName("primary")
         self.export_button = QPushButton("Export quiz as HTML...")
         self.open_runs_button = QPushButton("Open saved quizzes folder")
         action_layout.addWidget(self.summary)
@@ -403,6 +517,7 @@ class MainWindow(QWidget):
     def _connect_signals(self) -> None:
         self.choose_root_btn.clicked.connect(self.choose_folder)
         self.refresh_root_btn.clicked.connect(self.reload_folder)
+        self.recent_btn.clicked.connect(self._show_recent_menu)
         self.exam_search.textChanged.connect(self.filter_exams)
         self.exam_list.currentItemChanged.connect(self.select_exam)
         self.pdf_combo.currentIndexChanged.connect(self._on_pdf_selection_changed)
@@ -426,6 +541,7 @@ class MainWindow(QWidget):
         self.question_filter_edit.textChanged.connect(self.refresh_question_list)
         self.filter_incomplete_checkbox.toggled.connect(self.refresh_question_list)
         self.question_list.currentRowChanged.connect(self.show_question)
+        self.question_list.model().rowsMoved.connect(lambda *_: self._on_questions_reordered())
         self.help_button.clicked.connect(self.show_markdown_help)
         self.question_editor.changed.connect(self.mark_dirty)
         self.question_editor.crop_requested.connect(self.open_image_cropper)
@@ -449,6 +565,7 @@ class MainWindow(QWidget):
         QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.duplicate_question)
         QShortcut(QKeySequence("Alt+Up"), self).activated.connect(self.move_question_up)
         QShortcut(QKeySequence("Alt+Down"), self).activated.connect(self.move_question_down)
+        QShortcut(QKeySequence("Delete"), self.question_list).activated.connect(self.delete_question)
 
     def show_markdown_help(self) -> None:
         QMessageBox.information(self, "questions.md format", "Each question uses this format:\n\n## Question 1\n\nQuestion text\n\n- First choice\n- Second choice\n- Third choice\n- Fourth choice\n\nAnswer: A\n\nUse pageImage: path/to/page.png on its own line when a question references a diagram or table.")
@@ -459,28 +576,53 @@ class MainWindow(QWidget):
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen" or QGuiApplication.platformName() == "offscreen":
             return
         dialog = QDialog(self)
-        dialog.setWindowTitle("Welcome to Quiz Builder")
+        dialog.setWindowTitle("Welcome to Interactive Quiz Builder")
+        dialog.setMinimumWidth(520)
         layout = QVBoxLayout(dialog)
-        title = QLabel("Create an interactive quiz in a few steps")
-        title.setStyleSheet("font-size: 18px; font-weight: 700;")
+        layout.setSpacing(14)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        title = QLabel("🎓 Interactive Quiz Builder")
+        title.setStyleSheet("font-size: 20px; font-weight: 700;")
+        subtitle = QLabel("Create interactive quizzes from exam PDFs in three simple steps.")
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("font-size: 13px; color: #64748b;")
         layout.addWidget(title)
-        instructions = QLabel(
-            "1. Choose the folder containing your exam folders.\n"
-            "2. Select an exam and extract questions or create an AI prompt.\n"
-            "3. Review questions and save them as questions.md.\n"
-            "4. Select an exam to play or export it as HTML.\n\n"
-            "Each exam folder normally contains a PDF, questions.md, and optionally an answer key."
-        )
-        instructions.setWordWrap(True)
-        layout.addWidget(instructions)
-        example = QPlainTextEdit("## Question 1\n\nWhat is the answer?\n\n- Choice A\n- Choice B\n\nAnswer: A")
-        example.setReadOnly(True)
-        example.setMaximumHeight(150)
-        layout.addWidget(QLabel("Markdown example:"))
-        layout.addWidget(example)
+        layout.addWidget(subtitle)
+
+        steps = [
+            ("📁", "Step 1 — Choose Folder",
+             "Click <b>Choose exam folder…</b> to select the parent folder that contains your exam sub-folders. Each sub-folder should have a PDF and optionally an answer key."),
+            ("⚙️", "Step 2 — Extract &amp; Review",
+             "Extract questions automatically from digital PDFs, or use the <b>AI prompt</b> for scanned exams. Review and fix questions on the <b>Review questions</b> tab."),
+            ("▶️", "Step 3 — Play or Export",
+             "Go to <b>Play or export</b>, tick the exams you want, then click <b>Play quiz in browser</b> or export a standalone HTML file to share with students."),
+        ]
+        for icon, heading, body in steps:
+            step_row = QHBoxLayout()
+            step_row.setSpacing(12)
+            icon_lbl = QLabel(icon)
+            icon_lbl.setStyleSheet("font-size: 28px;")
+            icon_lbl.setFixedWidth(44)
+            icon_lbl.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+            text_col = QVBoxLayout()
+            text_col.setSpacing(2)
+            h_lbl = QLabel(heading)
+            h_lbl.setStyleSheet("font-weight: 700; font-size: 13px;")
+            b_lbl = QLabel(body)
+            b_lbl.setWordWrap(True)
+            b_lbl.setStyleSheet("color: #64748b;")
+            text_col.addWidget(h_lbl)
+            text_col.addWidget(b_lbl)
+            step_row.addWidget(icon_lbl)
+            step_row.addLayout(text_col, 1)
+            layout.addLayout(step_row)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Get Started →")
         buttons.accepted.connect(dialog.accept)
         layout.addWidget(buttons)
+
         dialog.exec()
         self.settings.setValue("welcome_shown", True)
 
@@ -522,7 +664,8 @@ class MainWindow(QWidget):
     def mark_dirty(self) -> None:
         if self.state["workspace"] is not None:
             self.state["dirty"] = True
-            self.setWindowTitle("Interactive Quiz Builder *")
+            ws_name = self.state["workspace"].name
+            self.setWindowTitle(f"Interactive Quiz Builder — {ws_name} *")
 
     def save_active_question(self) -> None:
         if self.state["index"] >= 0:
@@ -533,21 +676,23 @@ class MainWindow(QWidget):
             if show_message:
                 QMessageBox.warning(self, "No exam selected", "Choose an exam first.")
             return False
+        was_dirty = self.state["dirty"]
         self.save_active_question()
         try:
             write_questions(self.state["workspace"].path / "questions.md", self.state["questions"])
         except OSError as exc:
             LOGGER.exception("Could not save questions.md")
-            self.status_label.setText(f"Could not save questions.md: {exc}")
+            self._set_status(f"Could not save questions.md: {exc}", "error")
             if show_message:
                 QMessageBox.critical(self, "Could not save", f"{exc}\n\nCheck that the exam folder is writable and try again.")
             return False
         self.state["dirty"] = False
-        self.setWindowTitle("Interactive Quiz Builder")
+        ws_name = self.state["workspace"].name if self.state["workspace"] else ""
+        self.setWindowTitle(f"Interactive Quiz Builder — {ws_name}" if ws_name else "Interactive Quiz Builder")
         self.refresh_question_list()
         self.update_summary()
-        self.status_label.setText("Changes saved.")
-        if show_message:
+        self._set_status("Changes saved.", "success")
+        if show_message and was_dirty:
             QMessageBox.information(self, "Saved", "Your question changes were saved.")
         return True
 
@@ -601,6 +746,7 @@ class MainWindow(QWidget):
         if chosen:
             self.state["root"] = Path(chosen)
             self.settings.setValue("last_exam_folder", str(self.state["root"]))
+            self._add_recent_folder(self.state["root"])
             self.populate_tests()
 
     def filter_exams(self, query: str) -> None:
@@ -648,7 +794,7 @@ class MainWindow(QWidget):
             self.detection_title.setText("No exam file found")
             self.detection_description.setText("Add a PDF to this folder, or click Choose file... to select an exam.")
         self.state["dirty"] = False
-        self.setWindowTitle("Interactive Quiz Builder")
+        self.setWindowTitle(f"Interactive Quiz Builder — {workspace.name}")
         self.update_summary()
 
     def choose_custom_exam_file(self) -> None:
@@ -871,6 +1017,9 @@ class MainWindow(QWidget):
             self.question_status.setText(f"📊 {total} Questions (✅ {valid} Complete | ⚠️ {total - valid} Incomplete)")
             self.question_status.setStyleSheet("color: #facc15; font-weight: bold;")
 
+        self._update_tab_labels()
+        self._update_drag_drop_mode()
+
     def show_question(self, row: int) -> None:
         self.save_active_question()
         item = self.question_list.item(row) if row >= 0 else None
@@ -982,26 +1131,10 @@ class MainWindow(QWidget):
 
             curr_ans = q.get("correctIndex", 0)
 
-            btn_widget = QWidget()
-            btn_layout = QHBoxLayout(btn_widget)
-            btn_layout.setContentsMargins(2, 2, 2, 2)
-            btn_layout.setSpacing(4)
-            btn_group = QButtonGroup(btn_widget)
+            def make_toggle(r, o):
+                return lambda checked: (questions[r].__setitem__("correctIndex", o), self.mark_dirty()) if checked else None
 
-            for opt_idx, letter in enumerate(letters):
-                radio = QRadioButton(letter)
-                btn_group.addButton(radio, opt_idx)
-                if opt_idx == curr_ans:
-                    radio.setChecked(True)
-
-                def make_toggle(r, o):
-                    return lambda checked: (questions[r].__setitem__("correctIndex", o), self.mark_dirty()) if checked else None
-
-                radio.toggled.connect(make_toggle(row_idx, opt_idx))
-                btn_layout.addWidget(radio)
-
-            table.setCellWidget(row_idx, 2 + curr_ans, None) # reset
-            # Put the 4 radios into columns 2, 3, 4, 5
+            # Put one radio per answer column (A/B/C/D)
             for opt_idx, letter in enumerate(letters):
                 radio = QRadioButton(letter)
                 if opt_idx == curr_ans:
@@ -1064,9 +1197,33 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "No exam selected", "Choose an exam first.")
             return
         self.extract_button.setEnabled(False)
-        worker = Worker(lambda: process_workspace(self.config_for_root(self.state["root"]), workspace.path, self.answer_combo.currentData(), self.form_edit.text().strip() or "0", self.pdf_combo.currentData()))
-        worker.signals.finished.connect(lambda _result: (self.extract_button.setEnabled(True), self.load_workspace(workspace)))
-        worker.signals.failed.connect(lambda error: (self.extract_button.setEnabled(True), QMessageBox.critical(self, "Extraction failed", f"{error}\n\nCheck that the PDF is readable and that the selected exam folder is writable.")))
+        self.status_label.setText(f"Extracting questions from {workspace.name}…")
+
+        def execute():
+            return process_workspace(
+                self.config_for_root(self.state["root"]),
+                workspace.path,
+                self.answer_combo.currentData(),
+                self.form_edit.text().strip() or "0",
+                self.pdf_combo.currentData(),
+            )
+
+        def done(_result) -> None:
+            self.extract_button.setEnabled(True)
+            self.load_workspace(workspace)
+            if self.state.get("questions"):
+                self._set_status(f"Extracted {len(self.state['questions'])} question(s). Opening Review tab…", "success")
+                QTimer.singleShot(400, lambda: self.tabs.setCurrentIndex(1))
+            else:
+                self._set_status("Extraction complete — no questions found. Try an AI prompt.", "info")
+
+        def failed(error) -> None:
+            self.extract_button.setEnabled(True)
+            QMessageBox.critical(self, "Extraction failed", f"{error}\n\nCheck that the PDF is readable and that the selected exam folder is writable.")
+
+        worker = Worker(execute)
+        worker.signals.finished.connect(done)
+        worker.signals.failed.connect(failed)
         self.start_worker(worker)
 
     def process_batch_checked(self) -> None:
@@ -1277,8 +1434,8 @@ class MainWindow(QWidget):
                         k_combo.setCurrentIndex(1)
                         dec_combo.setCurrentIndex(0)
 
-            btn_select_all.clicked.connect(lambda: select_all(True))
-            btn_deselect_all.clicked.connect(lambda: select_all(False))
+            btn_select_all.clicked.connect(lambda _=None: select_all(True))
+            btn_deselect_all.clicked.connect(lambda _=None: select_all(False))
             btn_set_zero_test.clicked.connect(set_all_zero_test)
             btn_auto_match.clicked.connect(auto_match_all)
 
@@ -1665,6 +1822,7 @@ class MainWindow(QWidget):
             except (OSError, ValidationError):
                 pass
         self.summary.setText(f"{len(selected)} exam(s), {total} question(s) ready\n{'Mixed mode' if self.mix_checkbox.isChecked() else 'Standard mode'}")
+        self._update_tab_labels()
 
     def select_all_exams(self) -> None:
         for index in range(self.play_list.count()):
