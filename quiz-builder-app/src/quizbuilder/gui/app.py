@@ -33,9 +33,9 @@ from PySide6.QtWidgets import (
 from ..batch import discover_batch
 from ..commands import generate_workspace_prompt, process_workspace, process_workspaces
 from ..config import Config
-from ..documents import classify_pdf, DocumentError
+from ..documents import classify_pdf, convert_docx_with_soffice, DocumentError
 from ..exporter import build_run_standalone_quiz
-from ..markdown import write_questions
+from ..markdown import dump_questions, write_questions
 from ..preview import render_pdf_page
 from ..providers import WEB_PROVIDERS, detect_providers, open_web_provider
 from ..prompts import send_to_provider
@@ -143,9 +143,12 @@ class MainWindow(QWidget):
         self.current_exam_title = QLabel("Choose an exam from the list")
         self.pdf_combo = QComboBox()
         self.pdf_combo.addItem("No exam file selected", None)
+        self.browse_pdf_button = QPushButton("Choose file...")
+        self.browse_pdf_button.setToolTip("Select a custom PDF or Word (DOCX) exam file")
         pdf_row = QHBoxLayout()
         pdf_row.addWidget(QLabel("Exam file:"))
         pdf_row.addWidget(self.pdf_combo, 1)
+        pdf_row.addWidget(self.browse_pdf_button)
         self.detection_title = QLabel("PDF type: waiting for an exam")
         self.detection_description = QLabel("Choose an exam to check whether its text can be extracted automatically.")
         self.detection_description.setWordWrap(True)
@@ -161,6 +164,8 @@ class MainWindow(QWidget):
         self.launch_ai_button.setToolTip("Create a prompt for extracting questions into questions.md.")
         self.answer_combo = QComboBox()
         self.answer_combo.addItem("No answer key", None)
+        self.browse_answer_button = QPushButton("Choose file...")
+        self.browse_answer_button.setToolTip("Select a custom CSV or Excel (XLS/XLSX) answer key")
         self.form_edit = QLineEdit(self.config.default_form)
         self.form_edit.setMaximumWidth(70)
         self.preview = QLabel("No exam preview available")
@@ -181,6 +186,7 @@ class MainWindow(QWidget):
         answer_row = QHBoxLayout()
         answer_row.addWidget(QLabel("Answer key (optional):"))
         answer_row.addWidget(self.answer_combo, 1)
+        answer_row.addWidget(self.browse_answer_button)
         answer_row.addWidget(QLabel("Form number:"))
         answer_row.addWidget(self.form_edit)
         right.addLayout(answer_row)
@@ -202,15 +208,20 @@ class MainWindow(QWidget):
         self.question_list = QListWidget()
         self.add_question_button = QPushButton("Add question")
         self.delete_question_button = QPushButton("Delete")
+        self.open_questions_button = QPushButton("Open questions file...")
+        self.open_questions_button.setToolTip("Load questions from any questions.md or questions.json file")
         list_layout.addWidget(self.question_status)
         list_layout.addWidget(self.question_list, 1)
         list_layout.addWidget(self.add_question_button)
         list_layout.addWidget(self.delete_question_button)
+        list_layout.addWidget(self.open_questions_button)
         layout.addWidget(list_group, 4)
         edit_group = QGroupBox("Review and edit questions")
         edit_layout = QVBoxLayout(edit_group)
         self.question_editor = QuestionEditorWidget()
         self.save_button = QPushButton("Save questions.md")
+        self.save_as_button = QPushButton("Save as...")
+        self.save_as_button.setToolTip("Save questions to a custom .md or .json file")
         self.help_button = QPushButton("Markdown format help")
         self.help_button.setToolTip("Show the questions.md format used by this project.")
         self.save_button.setToolTip("Save the current questions to questions.md. Shortcut: Ctrl+S")
@@ -218,6 +229,7 @@ class MainWindow(QWidget):
         edit_layout.addWidget(self.question_editor, 1)
         edit_actions = QHBoxLayout()
         edit_actions.addWidget(self.save_button)
+        edit_actions.addWidget(self.save_as_button)
         edit_actions.addWidget(self.help_button)
         edit_actions.addStretch()
         edit_actions.addWidget(self.next_export_button)
@@ -260,7 +272,11 @@ class MainWindow(QWidget):
         self.refresh_root_btn.clicked.connect(self.reload_folder)
         self.exam_search.textChanged.connect(self.filter_exams)
         self.exam_list.currentItemChanged.connect(self.select_exam)
-        self.pdf_combo.currentIndexChanged.connect(lambda: self.preview_first_page() if not self.state["loading"] else None)
+        self.pdf_combo.currentIndexChanged.connect(self._on_pdf_selection_changed)
+        self.browse_pdf_button.clicked.connect(self.choose_custom_exam_file)
+        self.browse_answer_button.clicked.connect(self.choose_custom_answer_key)
+        self.open_questions_button.clicked.connect(self.import_custom_questions_file)
+        self.save_as_button.clicked.connect(self.save_questions_as)
         self.extract_button.clicked.connect(self.process_selected_exam)
         self.batch_button.clicked.connect(self.process_batch_checked)
         self.launch_ai_button.clicked.connect(self.launch_ai)
@@ -443,15 +459,18 @@ class MainWindow(QWidget):
             self.pdf_combo.addItem(workspace.source_pdf.name, workspace.source_pdf)
         elif sources.pdf:
             self.pdf_combo.addItem(sources.pdf.name, sources.pdf)
-        for pdf in sorted(workspace.path.glob("*.pdf"), key=lambda item: item.name.casefold()):
-            if self.pdf_combo.findData(pdf) < 0:
-                self.pdf_combo.addItem(pdf.name, pdf)
+        for doc in sorted(list(workspace.path.glob("*.pdf")) + list(workspace.path.glob("*.docx")), key=lambda item: item.name.casefold()):
+            if self.pdf_combo.findData(doc) < 0:
+                self.pdf_combo.addItem(doc.name, doc)
         if not self.pdf_combo.count():
             self.pdf_combo.addItem("No exam file selected", None)
         self.answer_combo.clear()
         self.answer_combo.addItem("No answer key", None)
         for answer in sources.answer_keys:
             self.answer_combo.addItem(answer.name, answer)
+        for ans in sorted(list(workspace.path.glob("*.csv")) + list(workspace.path.glob("*.xlsx")) + list(workspace.path.glob("*.xls")), key=lambda item: item.name.casefold()):
+            if self.answer_combo.findData(ans) < 0:
+                self.answer_combo.addItem(ans.name, ans)
         self.state["loading"] = False
         self._load_questions(workspace)
         pdf = self.pdf_combo.currentData()
@@ -460,10 +479,113 @@ class MainWindow(QWidget):
             self.preview_first_page(Path(pdf))
         else:
             self.detection_title.setText("No exam file found")
-            self.detection_description.setText("Add a PDF to this folder, then reload the exam list.")
+            self.detection_description.setText("Add a PDF to this folder, or click Choose file... to select an exam.")
         self.state["dirty"] = False
         self.setWindowTitle("Interactive Quiz Builder")
         self.update_summary()
+
+    def choose_custom_exam_file(self) -> None:
+        workspace = self.state["workspace"]
+        start_dir = str(workspace.path) if workspace else (str(self.state["root"]) if self.state["root"] else "")
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose Exam File (PDF or Word DOCX)",
+            start_dir,
+            "Exam Files (*.pdf *.docx);;PDF Files (*.pdf);;Word Documents (*.docx);;All Files (*)",
+        )
+        if filename:
+            path = Path(filename)
+            if path.suffix.lower() == ".docx":
+                try:
+                    pdf_path = convert_docx_with_soffice(path, path.parent)
+                    path = pdf_path
+                except Exception as exc:
+                    QMessageBox.warning(self, "DOCX Conversion", f"Could not convert DOCX to PDF automatically: {exc}\n\nPlease convert to PDF manually.")
+            label = f"{path.name} ({path.parent.name})" if workspace and path.parent != workspace.path else path.name
+            idx = self.pdf_combo.findData(path)
+            if idx < 0:
+                self.pdf_combo.addItem(label, path)
+                idx = self.pdf_combo.count() - 1
+            self.pdf_combo.setCurrentIndex(idx)
+            self._on_pdf_selection_changed()
+
+    def choose_custom_answer_key(self) -> None:
+        workspace = self.state["workspace"]
+        start_dir = str(workspace.path) if workspace else (str(self.state["root"]) if self.state["root"] else "")
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose Answer Key (CSV or Excel)",
+            start_dir,
+            "Answer Key Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls);;All Files (*)",
+        )
+        if filename:
+            path = Path(filename)
+            label = f"{path.name} ({path.parent.name})" if workspace and path.parent != workspace.path else path.name
+            idx = self.answer_combo.findData(path)
+            if idx < 0:
+                self.answer_combo.addItem(label, path)
+                idx = self.answer_combo.count() - 1
+            self.answer_combo.setCurrentIndex(idx)
+
+    def import_custom_questions_file(self) -> None:
+        if not self.confirm_discard_changes():
+            return
+        workspace = self.state["workspace"]
+        start_dir = str(workspace.path) if workspace else (str(self.state["root"]) if self.state["root"] else "")
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Questions File (Markdown or JSON)",
+            start_dir,
+            "Question Files (*.md *.json);;Markdown Files (*.md);;JSON Files (*.json);;All Files (*)",
+        )
+        if filename:
+            path = Path(filename)
+            try:
+                self.state["questions"] = load_questions(path)
+                self.state["dirty"] = True
+                self.refresh_question_list()
+                if self.state["questions"]:
+                    self.question_list.setCurrentRow(0)
+                else:
+                    self.question_editor.clear()
+                self.status_label.setText(f"Loaded {len(self.state['questions'])} question(s) from {path.name}.")
+                self.update_summary()
+            except Exception as exc:
+                QMessageBox.critical(self, "Could not load questions", f"Error reading {path.name}:\n{exc}")
+
+    def save_questions_as(self) -> None:
+        self.save_active_question()
+        workspace = self.state["workspace"]
+        default_name = "questions.md" if not workspace else f"{workspace.name}_questions.md"
+        start_dir = str(workspace.path / default_name) if workspace else default_name
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Questions As",
+            start_dir,
+            "Markdown Files (*.md);;JSON Files (*.json);;All Files (*)",
+        )
+        if filename:
+            path = Path(filename)
+            try:
+                if path.suffix.lower() == ".json":
+                    path.write_text(json.dumps(self.state["questions"], ensure_ascii=False, indent=2), encoding="utf-8")
+                else:
+                    dump_questions(self.state["questions"], path)
+                self.status_label.setText(f"Saved {len(self.state['questions'])} question(s) to {path.name}.")
+            except Exception as exc:
+                QMessageBox.critical(self, "Could not save questions", f"Error saving {path.name}:\n{exc}")
+
+    def _on_pdf_selection_changed(self) -> None:
+        if self.state["loading"]:
+            return
+        pdf = self.pdf_combo.currentData()
+        if pdf and Path(pdf).is_file():
+            self.check_pdf_classification(Path(pdf))
+            self.preview_first_page(Path(pdf))
+        else:
+            self.detection_title.setText("No exam file selected")
+            self.detection_description.setText("Select a PDF or DOCX exam file to analyze.")
+            self.preview.setText("No exam preview available")
 
     def _load_questions(self, workspace) -> None:
         try:

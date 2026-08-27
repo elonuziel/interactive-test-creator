@@ -68,3 +68,33 @@ def test_main_window_tracks_editor_changes(application, tmp_path):
     assert window.state["dirty"] is True
     window.state["dirty"] = False
     window.close()
+
+
+def test_main_window_custom_file_choosers(application, tmp_path):
+    exam_dir = tmp_path / "exam_nested"
+    exam_dir.mkdir()
+    (exam_dir / "exam.pdf").write_bytes(b"%PDF-1.4\n")
+    (exam_dir / "exam.docx").touch()
+    (exam_dir / "keys.csv").write_text("1,A\n2,B\n", encoding="utf-8")
+    (exam_dir / "questions.md").write_text("## Question 1\nQ?\n- A\n- B\n\nAnswer: A\n", encoding="utf-8")
+
+    window = MainWindow(Config.defaults(root=tmp_path))
+    assert hasattr(window, "browse_pdf_button")
+    assert hasattr(window, "browse_answer_button")
+    assert hasattr(window, "open_questions_button")
+    assert hasattr(window, "save_as_button")
+
+    workspace = Workspace("exam_nested", exam_dir)
+    window.load_workspace(workspace)
+
+    # Both PDF and DOCX should be listed in the exam file combo
+    items = [window.pdf_combo.itemText(i) for i in range(window.pdf_combo.count())]
+    assert any("exam.pdf" in item for item in items)
+    assert any("exam.docx" in item for item in items)
+
+    # CSV answer key should be listed in the answer key combo
+    answers = [window.answer_combo.itemText(i) for i in range(window.answer_combo.count())]
+    assert any("keys.csv" in ans for ans in answers)
+
+    window.close()
+
