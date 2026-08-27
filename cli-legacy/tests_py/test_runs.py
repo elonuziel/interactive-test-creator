@@ -118,7 +118,7 @@ def test_discover_batch_separates_multiple_exam_pdfs(tmp_path):
 
 
 def test_render_pdf_page_returns_png_bytes(tmp_path):
-    import fitz
+    fitz = pytest.importorskip("fitz")
 
     pdf = tmp_path / "source.pdf"
     document = fitz.open()
@@ -133,7 +133,7 @@ def test_render_pdf_page_returns_png_bytes(tmp_path):
 
 
 def test_render_pdf_page_rejects_invalid_page(tmp_path):
-    import fitz
+    fitz = pytest.importorskip("fitz")
 
     pdf = tmp_path / "source.pdf"
     document = fitz.open()
@@ -143,3 +143,4 @@ def test_render_pdf_page_rejects_invalid_page(tmp_path):
 
     with pytest.raises(PreviewError, match="outside the document"):
         render_pdf_page(pdf, page_number=1)
+

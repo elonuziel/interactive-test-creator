@@ -6,6 +6,9 @@ import sys
 
 def application_root() -> Path:
     if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return Path(meipass)
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parents[2]
 
