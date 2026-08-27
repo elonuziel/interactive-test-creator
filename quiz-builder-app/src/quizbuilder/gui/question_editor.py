@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
@@ -42,6 +44,19 @@ class QuestionEditorWidget(QWidget):
         self.text_edit.setMaximumHeight(110)
         layout.addWidget(self.text_edit)
 
+        # Image / Graph display
+        self.image_info_label = QLabel("")
+        self.image_info_label.setObjectName("image_info")
+        self.image_info_label.setStyleSheet("color: #38bdf8; font-weight: bold; margin-top: 4px;")
+        self.image_info_label.setVisible(False)
+        self.image_preview = QLabel("")
+        self.image_preview.setMaximumHeight(160)
+        self.image_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_preview.setStyleSheet("border: 1px dashed #334155; border-radius: 6px; padding: 4px; background: rgba(0,0,0,0.1);")
+        self.image_preview.setVisible(False)
+        layout.addWidget(self.image_info_label)
+        layout.addWidget(self.image_preview)
+
         layout.addWidget(QLabel("Answer choices — select the correct answer (בחר את התשובה הנכונה):"))
 
         self.option_edits: list[QLineEdit] = []
@@ -77,7 +92,7 @@ class QuestionEditorWidget(QWidget):
         for radio in self.option_radios:
             radio.toggled.connect(lambda checked: self.changed.emit() if checked else None)
 
-    def set_question(self, question: dict | None) -> None:
+    def set_question(self, question: dict | None, workspace_path: Path | None = None) -> None:
         """Populate the fields from a question dict, or clear when None."""
         if question is None:
             self.clear()
@@ -92,6 +107,25 @@ class QuestionEditorWidget(QWidget):
             self.option_radios[answer_index].setChecked(True)
         elif self.option_radios:
             self.option_radios[0].setChecked(True)
+
+        # Show image preview if attached
+        img_rel = question.get("image") or question.get("pageImage")
+        if img_rel and workspace_path:
+            img_file = Path(img_rel)
+            if not img_file.is_absolute():
+                img_file = workspace_path / img_rel
+            if img_file.is_file():
+                pix = QPixmap(str(img_file))
+                if not pix.isNull():
+                    scaled = pix.scaled(320, 160, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    self.image_preview.setPixmap(scaled)
+                    self.image_preview.setVisible(True)
+                    self.image_info_label.setText(f"📊 Attached Graph/Diagram: {img_rel}")
+                    self.image_info_label.setVisible(True)
+                    return
+        self.image_preview.clear()
+        self.image_preview.setVisible(False)
+        self.image_info_label.setVisible(False)
 
     def collect(self, question: dict) -> None:
         """Write the current field values back into a question dict."""
@@ -114,3 +148,6 @@ class QuestionEditorWidget(QWidget):
             field.clear()
         if self.option_radios:
             self.option_radios[0].setChecked(True)
+        self.image_preview.clear()
+        self.image_preview.setVisible(False)
+        self.image_info_label.setVisible(False)

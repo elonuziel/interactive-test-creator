@@ -722,7 +722,10 @@ class MainWindow(QWidget):
     def show_question(self, index: int) -> None:
         self.save_active_question()
         self.state["index"] = index
-        self.question_editor.set_question(self.state["questions"][index] if 0 <= index < len(self.state["questions"]) else None)
+        workspace = self.state["workspace"]
+        workspace_path = workspace.path if workspace else None
+        q = self.state["questions"][index] if 0 <= index < len(self.state["questions"]) else None
+        self.question_editor.set_question(q, workspace_path=workspace_path)
 
     def add_question(self) -> None:
         self.save_active_question()
