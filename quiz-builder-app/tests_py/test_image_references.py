@@ -13,7 +13,6 @@ def test_image_reference_validation_accepts_existing_and_data_urls(tmp_path):
     assert validate_image_references(questions, tmp_path) == []
 
 
-def test_question_loading_rejects_missing_local_image(tmp_path):
 def test_question_loading_allows_missing_image_by_default(tmp_path):
     path = tmp_path / "questions.md"
     path.write_text("## Question 1\n\nQ\n\npageImage: pages_output/missing.png\n\n- A\n- B\n\nAnswer: A\n", encoding="utf-8")
@@ -27,10 +26,8 @@ def test_question_loading_rejects_missing_local_image_when_opted_in(tmp_path):
     path = tmp_path / "questions.md"
     path.write_text("## Question 1\n\nQ\n\npageImage: pages_output/missing.png\n\n- A\n- B\n\nAnswer: A\n", encoding="utf-8")
     try:
-        load_questions(path)
         load_questions(path, check_images=True)
     except ValidationError as exc:
         assert "Missing image references" in str(exc)
     else:
-        raise AssertionError("Expected missing image validation failure")
         raise AssertionError("Expected missing image validation failure when check_images=True")

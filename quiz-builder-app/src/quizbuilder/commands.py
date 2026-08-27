@@ -71,9 +71,6 @@ def process_workspace(
             runner.merge_answers(workspace.path)
         runner.validate(workspace.questions_path)
         questions = load_questions(workspace.questions_path)
-        missing_images = validate_image_references(questions, workspace.path)
-        if missing_images:
-            raise ValueError("Missing question image references: " + "; ".join(missing_images))
         artifacts.append(workspace.questions_path)
     return artifacts
 

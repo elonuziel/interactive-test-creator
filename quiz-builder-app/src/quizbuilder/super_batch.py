@@ -361,7 +361,6 @@ def process_item(
         strict_questions(output, allow_unanswered=(item.decision == "generate_only"))
         missing_images = validate_image_references(load_questions(output), output.parent)
         if missing_images:
-            raise ValueError("Missing question image references: " + "; ".join(missing_images))
             item.overview = replace(item.overview, warnings=item.overview.warnings + tuple(missing_images))
         item.status = "saved"
         if progress:

@@ -15,7 +15,6 @@ def questions_path(directory: Path) -> Path:
     return markdown if markdown.is_file() else directory / "questions.json"
 
 
-def load_questions(path: Path) -> list[dict]:
 def load_questions(path: Path, check_images: bool = False) -> list[dict]:
     try:
         if path.suffix.lower() == ".md":
@@ -32,9 +31,6 @@ def load_questions(path: Path, check_images: bool = False) -> list[dict]:
             invalid.append(index)
     if invalid:
         raise ValidationError(f"Invalid question entries: {', '.join(map(str, invalid))}")
-    missing_images = validate_image_references(payload, path.parent)
-    if missing_images:
-        raise ValidationError("Missing image references: " + "; ".join(missing_images))
     if check_images:
         missing_images = validate_image_references(payload, path.parent)
         if missing_images:
