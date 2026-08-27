@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-build_exe.py — Build quiz_builder.exe using PyInstaller with automatic version bumping and Authenticode Code Signing
-"""
+build_exe.py — Build quiz_builder_gui.exe using PyInstaller with automatic version bumping and Authenticode Code Signing
 
 import subprocess
 import sys
@@ -35,12 +34,10 @@ VSVersionInfo(
             StringStruct('CompanyName', 'Elon Uziel'),
             StringStruct('FileDescription', 'Interactive Hebrew Quiz Builder Executable'),
             StringStruct('FileVersion', '{ver_str}'),
-            StringStruct('InternalName', 'quiz_builder'),
+            StringStruct('InternalName', 'quiz_builder_gui'),
             StringStruct('LegalCopyright', 'Copyright © 2026 Elon Uziel. MIT License.'),
-            StringStruct('OriginalFilename', 'quiz_builder.exe'),
             StringStruct('ProductName', 'Interactive Hebrew Quiz Builder'),
             StringStruct('ProductVersion', '{ver_str}')
-          ]
         )
       ]
     ),
@@ -107,7 +104,7 @@ def main():
     args = parser.parse_args()
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    spec_file = os.path.join(base_dir, 'quiz_builder.spec')
+    spec_file = os.path.join(base_dir, 'quiz_builder_gui.spec')
     info_file = os.path.join(base_dir, 'version_info.txt')
     dist_dir = os.path.join(base_dir, 'dist')
     work_dir = os.path.join(base_dir, 'build')
@@ -133,7 +130,7 @@ def main():
 
     res = subprocess.run(cmd)
     if res.returncode == 0:
-        dist_exe = os.path.join(dist_dir, 'quiz_builder.exe')
+        dist_exe = os.path.join(dist_dir, 'quiz_builder_gui.exe')
         print(f"\n[OK] Build successful! Executable v{ver_str} generated at:\n  {dist_exe}")
         sign_executable(dist_exe)
     else:
