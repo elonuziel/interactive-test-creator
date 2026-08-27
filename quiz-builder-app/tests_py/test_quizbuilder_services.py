@@ -6,7 +6,7 @@ import sys
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from quizbuilder.providers import detect_providers
+from quizbuilder.providers import WEB_PROVIDERS, detect_providers
 from quizbuilder.workspace import create_workspace, discover_sources
 from quizbuilder.models import Workspace
 
@@ -14,6 +14,14 @@ from quizbuilder.models import Workspace
 def test_provider_registry_detects_only_available_commands():
     found = detect_providers(lookup=lambda name: f"/bin/{name}" if name == "freebuff-cli" else None)
     assert [(provider.id, command) for provider, command in found] == [("freebuff", "/bin/freebuff-cli")]
+
+
+def test_web_provider_registry_includes_freebuff_chat():
+    provider = next(provider for provider in WEB_PROVIDERS if provider.id == "freebuff-web")
+
+    assert provider.label == "Freebuff Chat"
+    assert provider.kind == "web"
+    assert provider.url == "https://freebuff.com/chat"
 
 
 def test_workspace_creation_and_source_discovery(tmp_path):

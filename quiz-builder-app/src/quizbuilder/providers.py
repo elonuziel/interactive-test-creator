@@ -28,6 +28,7 @@ WEB_PROVIDERS = (
     Provider("gemini-web", "Gemini Web", "web", url="https://gemini.google.com"),
     Provider("claude-web", "Claude Web", "web", url="https://claude.ai"),
     Provider("ai-studio", "Google AI Studio", "web", url="https://aistudio.google.com"),
+    Provider("freebuff-web", "Freebuff Chat", "web", url="https://freebuff.com/chat"),
 )
 
 

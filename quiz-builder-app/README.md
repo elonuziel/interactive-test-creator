@@ -130,7 +130,7 @@ To build a portable desktop bundle, install the GUI and packaging extras and run
 system it is run on; create the Windows bundle on Windows and the Linux bundle on
 Linux.
 
-If `freebuff` or `freebuff-cli` is installed on `PATH`, the prompt-helper menu includes a Freebuff option. Selecting it pipes the generated local prompt to the command through standard input and waits for you to return after it completes.
+The prompt-helper menu includes hosted Freebuff Chat, which opens `https://freebuff.com/chat` in the browser after generating the web prompt. If `freebuff` or `freebuff-cli` is installed on `PATH` (or configured through `freebuff_commands`), it also includes Freebuff CLI and pipes the generated local prompt to the command through standard input.
 
 Follow the interactive prompts to set up test folders, render pages for LLM processing, validate JSON outputs, build standalone HTML files, or launch the web player.
 

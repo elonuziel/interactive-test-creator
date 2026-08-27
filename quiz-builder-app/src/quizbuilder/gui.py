@@ -222,6 +222,17 @@ def main() -> int:
         "batch_candidates": [],
         "loading": False,   # guard: suppresses combo signals while repopulating
     }
+    config = Config.load()
+
+    def config_for_root(root: Path) -> Config:
+        return Config(
+            workspace_root=root,
+            scripts_root=config.scripts_root,
+            default_form=config.default_form,
+            default_discard_pages=config.default_discard_pages,
+            auto_build=config.auto_build,
+            provider=config.provider,
+        )
 
     # =========================================================================
     # TAB 1: 📄 1. Select & Extract Exam
@@ -293,7 +304,7 @@ def main() -> int:
     ai_provider_combo = QComboBox()
     for web_p in WEB_PROVIDERS:
         ai_provider_combo.addItem(f"Web: {web_p.label}", (web_p, None))
-    for local_p, cmd in detect_providers():
+    for local_p, cmd in detect_providers(config.provider.freebuff_commands):
         ai_provider_combo.addItem(f"Local: {local_p.label} ({cmd})", (local_p, cmd))
 
     launch_ai_btn = QPushButton("🤖 Generate AI Prompt & Launch")
@@ -816,7 +827,7 @@ def main() -> int:
 
         worker = Worker(
             lambda: process_workspace(
-                Config.defaults(root=root),
+                config_for_root(root),
                 ws.path,
                 sel_key,
                 f_num,
@@ -863,7 +874,7 @@ def main() -> int:
         status_label.setText(f"Batch processing {len(selected)} exam(s)...")
 
         def run_all():
-            results = process_workspaces(Config.defaults(root=root), selected)
+            results = process_workspaces(config_for_root(root), selected)
             return (
                 [r.workspace.name for r in results if r.success],
                 [f"{r.workspace.name}: {r.error}" for r in results if not r.success],
@@ -901,13 +912,15 @@ def main() -> int:
         prov, cmd = ai_provider_combo.currentData()
         try:
             if prov.kind == "web":
-                prompt_path = generate_workspace_prompt(Config.defaults(root=root), ws.path, "web")
-                open_web_provider(prov)
+                prompt_path = generate_workspace_prompt(config_for_root(root), ws.path, "web")
+                if config.provider.open_browser and not open_web_provider(prov):
+                    raise RuntimeError(f"Could not open {prov.label} in the browser.")
             else:
-                prompt_path = generate_workspace_prompt(Config.defaults(root=root), ws.path, "local")
+                prompt_path = generate_workspace_prompt(config_for_root(root), ws.path, "local")
                 send_to_provider(prov, cmd, prompt_path)
             status_label.setText(f"AI Prompt generated: {prompt_path.name}")
-            QMessageBox.information(window, "Prompt Ready", f"Created prompt at:\n{prompt_path}")
+            browser_note = "" if config.provider.open_browser else "\nBrowser opening is disabled in configuration."
+            QMessageBox.information(window, "Prompt Ready", f"Created prompt at:\n{prompt_path}{browser_note}")
         except Exception as exc:
             QMessageBox.critical(window, "Could not launch AI provider", str(exc))
 
