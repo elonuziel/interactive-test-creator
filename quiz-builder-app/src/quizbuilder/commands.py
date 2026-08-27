@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import Config
-from .documents import classify_pdf
+from .documents import classify_pdf, preferred_pdf
 from .exporter import build_standalone_quiz
 from .pipeline import PipelineRunner
 from .prompts import generate_prompt
@@ -34,7 +34,7 @@ def process_workspace(
         (item for item in workspace.path.iterdir() if item.is_file() and item.suffix.lower() == ".pdf"),
         key=lambda item: item.name.lower(),
     )
-    selected_pdf = pdf.resolve() if pdf else sources.pdf
+    selected_pdf = preferred_pdf(pdf.resolve() if pdf else sources.pdf, workspace.path) if (pdf or sources.pdf) else None
     if len(pdf_candidates) > 1 and pdf is None:
         raise ValueError(f"Multiple PDF sources found in {workspace.path}; choose one explicitly.")
     if not selected_pdf:
@@ -48,7 +48,7 @@ def process_workspace(
         answers = workspace.path / "answers.json"
         runner.extract_answers(selected_answer_key, form or config.default_form, answers)
         artifacts.append(answers)
-    if classify_pdf(selected_pdf):
+    if classify_pdf(selected_pdf, workspace=workspace.path):
         raw = workspace.path / "raw_text.md"
         images = workspace.path / "images"
         page_map = workspace.path / "page_map.json"
@@ -60,6 +60,8 @@ def process_workspace(
         pages = workspace.path / "pages_output"
         merged = workspace.path / f"{workspace.name}_clean.pdf"
         runner.render_pages(selected_pdf, pages, config.default_discard_pages, merged)
+        # Keep the full rendered pages available so questions.md can reference
+        # a complete page for the web cropper.
         artifacts.extend((pages, merged))
 
     if workspace.questions_path.exists():

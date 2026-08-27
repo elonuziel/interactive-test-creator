@@ -3,6 +3,7 @@ import threading
 
 import pytest
 
+from quizbuilder.documents import preferred_pdf
 from quizbuilder.super_batch import (
     AnswerKeyCandidate,
     _context_for_pdf,
@@ -29,11 +30,31 @@ def item(tmp_path, digital=False, decision="generate_only"):
     return SuperBatchItem(overview, decision=decision, overwrite=True)
 
 
+def test_preferred_pdf_uses_clean_variant(tmp_path):
+    original = tmp_path / "exam.pdf"
+    cleaned = tmp_path / "exam_clean.pdf"
+    original.write_bytes(b"original")
+    cleaned.write_bytes(b"cleaned")
+    assert preferred_pdf(original) == cleaned
+
+
+def test_preferred_pdf_uses_workspace_clean_variant(tmp_path):
+    original = tmp_path / "source" / "biology_a.pdf"
+    original.parent.mkdir()
+    original.write_bytes(b"original")
+    workspace = tmp_path / "workspaces" / ".quizbuilder" / "biology_a_sub"
+    workspace.mkdir(parents=True)
+    cleaned = workspace / "biology_a_clean.pdf"
+    cleaned.write_bytes(b"cleaned in workspace")
+    assert preferred_pdf(original, workspace) == cleaned
+
+
 def test_scanned_cli_markdown_is_validated_and_saved(tmp_path, monkeypatch):
     current = item(tmp_path)
     monkeypatch.setattr("quizbuilder.super_batch.send_to_provider", lambda *args, **kwargs: "## Question 1\n\nQ?\n\n- A\n- B\n\nAnswer: A\n")
     result = process_item(current, Provider(), "fake", ai_mode="two_phase")
     assert result.success
+    assert current.status == "saved"
     assert result.output.name == "questions.md"
 
 

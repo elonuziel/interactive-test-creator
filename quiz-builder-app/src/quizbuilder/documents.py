@@ -9,6 +9,28 @@ class DocumentError(RuntimeError):
     pass
 
 
+def preferred_pdf(pdf_path: Path, workspace: Path | None = None) -> Path:
+    """Return an existing cleaned variant when available, otherwise the original PDF."""
+    pdf_path = Path(pdf_path)
+    if pdf_path.stem.casefold().endswith("_clean"):
+        return pdf_path
+    candidates: list[Path] = []
+    if workspace:
+        w_path = Path(workspace)
+        candidates.extend([
+            w_path / f"{pdf_path.stem}_clean.pdf",
+            w_path / f"{w_path.name}_clean.pdf",
+        ])
+    candidates.extend([
+        pdf_path.with_name(f"{pdf_path.stem}_clean.pdf"),
+        pdf_path.parent / f"{pdf_path.parent.name}_clean.pdf",
+    ])
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return pdf_path
+
+
 def find_soffice() -> str | None:
     candidate = shutil.which("soffice")
     if candidate:
@@ -101,8 +123,9 @@ def convert_docx_with_soffice(source: Path, output_dir: Path) -> Path:
     return output
 
 
-def classify_pdf(pdf_path: Path, minimum_chars_per_page: int = 50) -> bool:
-    """Return True when the PDF contains enough extractable text to be digital."""
+def classify_pdf(pdf_path: Path, minimum_chars_per_page: int = 50, workspace: Path | None = None) -> bool:
+    """Return True when the preferred PDF contains enough extractable text to be digital."""
+    pdf_path = preferred_pdf(pdf_path, workspace)
     try:
         import fitz
     except ImportError as exc:

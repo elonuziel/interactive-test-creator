@@ -858,9 +858,10 @@ class MainWindow(QWidget):
             form.addRow("PDF cleanup:", clean)
 
             context_mode = QComboBox()
-            context_mode.addItem("Send PDF path (CLI inspects the file)", "path")
-            context_mode.addItem("Send extracted/OCR text (local preprocessing)", "extracted")
-            context_mode.setToolTip("Choose whether the local AI receives a filesystem path or text extracted locally from the PDF.")
+            context_mode.addItem("AI OCR from PDF path (recommended)", "path")
+            context_mode.addItem("AI OCR with local text hint", "extracted")
+            context_mode.setCurrentIndex(0)
+            context_mode.setToolTip("Scanned PDFs always go through the AI for OCR. Choose whether to provide the PDF path alone or add locally extracted text as a hint.")
             form.addRow("Scanned PDF context:", context_mode)
             layout.addLayout(form)
 

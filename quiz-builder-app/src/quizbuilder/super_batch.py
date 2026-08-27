@@ -10,7 +10,7 @@ import threading
 from typing import Any, Callable
 
 from .batch import _project_slug, exam_variant, match_answer_keys
-from .documents import classify_pdf, clean_pdf
+from .documents import classify_pdf, clean_pdf, preferred_pdf
 from .markdown import load_questions, write_questions
 from .models import Workspace
 from .prompts import extract_markdown_from_response, send_to_provider
@@ -181,7 +181,7 @@ def build_plan(root: Path) -> SuperBatchPlan:
 
 
 def classify_plan_item(item: SuperBatchItem) -> SuperBatchItem:
-    digital = classify_pdf(item.overview.pdf)
+    digital = classify_pdf(item.overview.pdf, workspace=item.overview.workspace)
     warnings = tuple(w for w in item.overview.warnings if w != "PDF classification pending")
     item.overview = replace(item.overview, is_digital=digital, warnings=warnings)
     if len(item.answer_keys) == 1:
@@ -305,9 +305,13 @@ def process_item(
             item.status = "cancelled"
             return SuperBatchResult(item, error="Cancelled")
 
-        pdf = item.overview.pdf
+        pdf = preferred_pdf(item.overview.pdf, item.overview.workspace)
+        if pdf != item.overview.pdf:
+            item.status = "using cleaned PDF"
+            if progress:
+                progress(item)
         if item.overview.is_digital:
-            if clean_digital and discard_pages:
+            if clean_digital and discard_pages and pdf == item.overview.pdf:
                 cleaned = item.overview.workspace / f"{pdf.stem}_clean.pdf"
                 clean_pdf(pdf, cleaned, discard_pages)
                 pdf = cleaned
@@ -323,12 +327,22 @@ def process_item(
             if item.decision == "zero_test":
                 write_questions(output, zero_test_questions(load_questions(output)))
         else:
+            # Every scanned PDF must go through the selected CLI AI for OCR/vision
+            # extraction. The decision only controls answer metadata, not OCR.
             if item.decision == "ask_user":
-                raise ValueError("Scanned PDF requires a decision: generate_only, zero_test, or dedicated_instructions")
+                item.decision = "generate_only"
             item.status = "generating"
             if progress:
                 progress(item)
-            context = _context_for_pdf(pdf, False, context_mode)
+            if context_mode == "extracted":
+                context = _context_for_pdf(pdf, False, context_mode)
+            else:
+                context = _context_for_pdf(pdf, False, "path")
+            context = (
+                "SCANNED PDF OCR REQUIREMENT: Inspect every page visually and perform OCR yourself. "
+                "Do not rely only on the filename or local text excerpt. Preserve diagrams, graphs, tables, "
+                "symbols, and question-to-full-page image references.\n\n" + context
+            )
             response = send_to_provider(
                 provider,
                 command,

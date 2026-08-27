@@ -119,7 +119,7 @@ python -m quizbuilder wizard
 python -m quizbuilder --config quizbuilder.toml detect
 ```
 
-The desktop GUI lets you choose a projects folder, edit a test's `questions.md`, or use **Super Batch** to recursively review and process multiple PDF exams with a detected local CLI AI provider. Super Batch previews test-number/variant and answer-key matches before generation, handles digital and scanned PDFs differently, invokes the selected local CLI for scanned exams, protects existing files from accidental overwrite, reports each item independently, and supports the configured digital-PDF page-cleaning rules.
+The desktop GUI lets you choose a projects folder, edit a test's `questions.md`, or use **Super Batch** to recursively review and process multiple PDF exams with a detected local CLI AI provider. Super Batch previews test-number/variant and answer-key matches before generation, handles digital and scanned PDFs differently, always sends scanned PDFs through the selected local CLI AI for OCR/vision extraction, automatically prefers an existing cleaned PDF when available, protects existing files from accidental overwrite, reports each item independently, and supports the configured digital-PDF page-cleaning rules.
 
 The desktop GUI lets you choose a projects folder, edit a test's `questions.md`
 with RTL-aware fields, save changes, and export a standalone HTML quiz. Markdown is
