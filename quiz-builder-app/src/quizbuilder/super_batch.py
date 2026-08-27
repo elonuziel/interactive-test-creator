@@ -254,9 +254,19 @@ def default_decision(item: SuperBatchItem) -> str:
     return "generate_only"
 
 
-def _context_for_pdf(pdf: Path, is_digital: bool) -> str:
+def _context_for_pdf(pdf: Path, is_digital: bool, mode: str = "path") -> str:
+    if mode == "path":
+        return f"PDF file path: {pdf.resolve()}. If your CLI can access local files, inspect this PDF directly."
     if not is_digital:
-        return f"Scanned/Image PDF located at: {pdf.resolve()}. Inspect the file on disk."
+        try:
+            import fitz
+            document = fitz.open(pdf)
+            pages = []
+            for page in document[:5]:
+                pages.append(page.get_text()[:5000])
+            return "\n\n--- PAGE ---\n\n".join(pages) or "No OCR text was extracted; inspect the supplied PDF path if available."
+        except Exception as exc:
+            return f"Local OCR extraction unavailable ({exc}). PDF file path: {pdf.resolve()}"
     try:
         import fitz
         document = fitz.open(pdf)
@@ -271,6 +281,7 @@ def process_item(
     command: str,
     *,
     ai_mode: str = "two_phase",
+    context_mode: str = "path",
     discard_pages: str = "",
     clean_digital: bool = False,
     cancel_event: threading.Event | None = None,
@@ -317,7 +328,7 @@ def process_item(
             item.status = "generating"
             if progress:
                 progress(item)
-            context = _context_for_pdf(pdf, False)
+            context = _context_for_pdf(pdf, False, context_mode)
             response = send_to_provider(
                 provider,
                 command,
@@ -358,6 +369,7 @@ def process_plan(
     *,
     workers: int = 2,
     ai_mode: str = "two_phase",
+    context_mode: str = "path",
     discard_pages: str = "",
     clean_digital: bool = False,
     cancel_event: threading.Event | None = None,
@@ -370,6 +382,7 @@ def process_plan(
                 provider,
                 command,
                 ai_mode=ai_mode,
+                context_mode=context_mode,
                 discard_pages=discard_pages,
                 clean_digital=clean_digital,
                 cancel_event=cancel_event,
@@ -386,6 +399,7 @@ def process_plan(
                 provider,
                 command,
                 ai_mode=ai_mode,
+                context_mode=context_mode,
                 discard_pages=discard_pages,
                 clean_digital=clean_digital,
                 cancel_event=cancel_event,

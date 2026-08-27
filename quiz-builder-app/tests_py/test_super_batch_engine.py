@@ -5,6 +5,7 @@ import pytest
 
 from quizbuilder.super_batch import (
     AnswerKeyCandidate,
+    _context_for_pdf,
     ExamOverview,
     SuperBatchItem,
     SuperBatchPlan,
@@ -43,6 +44,30 @@ def test_existing_output_requires_overwrite(tmp_path):
     result = process_item(current, Provider(), "fake")
     assert not result.success
     assert "already exists" in result.error
+
+
+def test_context_mode_path_is_explicit(tmp_path):
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF")
+    context = _context_for_pdf(pdf, False, "path")
+    assert str(pdf.resolve()) in context
+    assert "PDF file path" in context
+
+
+def test_context_mode_extracted_uses_local_text(tmp_path, monkeypatch):
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    class Page:
+        def get_text(self):
+            return "OCR text"
+
+    class Document(list):
+        pass
+
+    monkeypatch.setitem(__import__("sys").modules, "fitz", type("Fitz", (), {"open": lambda self, path: Document([Page()])})())
+    context = _context_for_pdf(pdf, False, "extracted")
+    assert "OCR text" in context
 
 
 def test_cancelled_plan_does_not_process(tmp_path, monkeypatch):

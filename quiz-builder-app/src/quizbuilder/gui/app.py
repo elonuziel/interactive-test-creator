@@ -856,6 +856,12 @@ class MainWindow(QWidget):
             clean = QCheckBox("Apply configured digital PDF page cleaning (discard blank/boilerplate pages)")
             clean.setChecked(True)
             form.addRow("PDF cleanup:", clean)
+
+            context_mode = QComboBox()
+            context_mode.addItem("Send PDF path (CLI inspects the file)", "path")
+            context_mode.addItem("Send extracted/OCR text (local preprocessing)", "extracted")
+            context_mode.setToolTip("Choose whether the local AI receives a filesystem path or text extracted locally from the PDF.")
+            form.addRow("Scanned PDF context:", context_mode)
             layout.addLayout(form)
 
             # Bulk Actions Toolbar
@@ -1087,6 +1093,7 @@ class MainWindow(QWidget):
                     command,
                     workers=workers.value(),
                     ai_mode=mode.currentData(),
+                    context_mode=context_mode.currentData(),
                     discard_pages=self.config.default_discard_pages if clean.isChecked() else "",
                     clean_digital=clean.isChecked(),
                     cancel_event=cancel_event,
