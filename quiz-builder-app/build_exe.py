@@ -12,8 +12,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 VERSION_TEMPLATE = """# UTF-8
-# Windows Version Info for quiz_builder.exe
-
+# Windows Version Info for quiz_builder_gui.exe
 VSVersionInfo(
   ffi=FixedFileInfo(
     filevers=({major}, {minor}, {patch}, {build}),
@@ -36,9 +35,9 @@ VSVersionInfo(
             StringStruct('FileVersion', '{ver_str}'),
             StringStruct('InternalName', 'quiz_builder_gui'),
             StringStruct('LegalCopyright', 'Copyright © 2026 Elon Uziel. MIT License.'),
-            StringStruct('ProductName', 'Interactive Hebrew Quiz Builder'),
+            StringStruct('OriginalFilename', 'quiz_builder_gui.exe'),
             StringStruct('ProductVersion', '{ver_str}')
-        )
+          ]
       ]
     ),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
