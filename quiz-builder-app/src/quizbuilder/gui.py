@@ -198,11 +198,11 @@ def main() -> int:
     top_layout = QHBoxLayout(top_bar)
     top_layout.setContentsMargins(4, 4, 4, 4)
 
-    root_label = QLabel("📁 Projects Folder: (no folder chosen)")
+    root_label = QLabel("📁 Exam folder: (not selected)")
     root_label.setStyleSheet("font-weight: 600; color: #1e293b;")
-    choose_root_btn = QPushButton("📁 Choose Folder...")
+    choose_root_btn = QPushButton("📁 Choose exam folder...")
     choose_root_btn.setStyleSheet("background-color: #2563eb; color: #ffffff; font-weight: 600; border-color: #1d4ed8;")
-    refresh_root_btn = QPushButton("🔄 Refresh")
+    refresh_root_btn = QPushButton("🔄 Reload")
 
     top_layout.addWidget(root_label, 1)
     top_layout.addWidget(choose_root_btn)
@@ -243,37 +243,37 @@ def main() -> int:
     tab1_layout.setSpacing(12)
 
     # Left: Exam list & search
-    tab1_left = QGroupBox("Exams in Folder")
+    tab1_left = QGroupBox("1. Choose an exam")
     tab1_left_layout = QVBoxLayout(tab1_left)
     tab1_left_layout.setSpacing(8)
 
     exam_search = QLineEdit()
-    exam_search.setPlaceholderText("🔍 Filter exams...")
+    exam_search.setPlaceholderText("🔍 Search exams...")
     tab1_left_layout.addWidget(exam_search)
 
     tab1_exam_list = QListWidget()
     tab1_left_layout.addWidget(tab1_exam_list, 1)
 
-    batch_proc_btn = QPushButton("⚡ Process Checked Exams")
+    batch_proc_btn = QPushButton("⚡ Process selected exams")
     batch_proc_btn.setStyleSheet("background-color: #f1f5f9; color: #334155; font-weight: 600;")
     tab1_left_layout.addWidget(batch_proc_btn)
     tab1_layout.addWidget(tab1_left, 4)
 
     # Right: Source PDF, Smart Detection, Preview & Actions
-    tab1_right = QGroupBox("Document Inspection & Extraction")
+    tab1_right = QGroupBox("2. Prepare questions")
     tab1_right_layout = QVBoxLayout(tab1_right)
     tab1_right_layout.setSpacing(10)
 
     # Header with active exam name
-    current_exam_title = QLabel("Select an exam from the list")
+    current_exam_title = QLabel("Choose an exam from the list")
     current_exam_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #0f172a;")
     tab1_right_layout.addWidget(current_exam_title)
 
     # PDF source picker
     pdf_source_row = QHBoxLayout()
-    pdf_source_row.addWidget(QLabel("Source PDF:"))
+    pdf_source_row.addWidget(QLabel("Exam file:"))
     pdf_source_combo = QComboBox()
-    pdf_source_combo.addItem("No PDF selected", None)
+    pdf_source_combo.addItem("No exam file selected", None)
     pdf_source_row.addWidget(pdf_source_combo, 1)
     tab1_right_layout.addLayout(pdf_source_row)
 
@@ -282,9 +282,9 @@ def main() -> int:
     detection_card.setStyleSheet("background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px;")
     detection_layout = QVBoxLayout(detection_card)
     detection_layout.setContentsMargins(6, 6, 6, 6)
-    detection_title = QLabel("🔍 Auto-Detection: Select a PDF")
+    detection_title = QLabel("🔍 PDF type: waiting for an exam")
     detection_title.setStyleSheet("font-weight: bold; color: #166534;")
-    detection_desc = QLabel("The builder will analyze whether this is a digital or scanned exam.")
+    detection_desc = QLabel("Choose an exam to check whether its text can be extracted automatically.")
     detection_desc.setStyleSheet("color: #15803d; font-size: 12px;")
     detection_layout.addWidget(detection_title)
     detection_layout.addWidget(detection_desc)
@@ -296,9 +296,14 @@ def main() -> int:
     action_box_layout = QVBoxLayout(action_box)
     action_box_layout.setSpacing(8)
 
-    extract_digital_btn = QPushButton("⚡ Extract Questions Automatically (Digital)")
+    extract_digital_btn = QPushButton("⚡ Extract questions from PDF")
     extract_digital_btn.setStyleSheet("background-color: #16a34a; color: #ffffff; font-weight: bold; padding: 9px; font-size: 13px;")
     action_box_layout.addWidget(extract_digital_btn)
+
+    ai_hint = QLabel("For scanned exams, create an AI prompt and open it in your selected AI tool.")
+    ai_hint.setWordWrap(True)
+    ai_hint.setStyleSheet("color: #64748b; font-size: 12px;")
+    action_box_layout.addWidget(ai_hint)
 
     ai_row = QHBoxLayout()
     ai_provider_combo = QComboBox()
@@ -307,7 +312,7 @@ def main() -> int:
     for local_p, cmd in detect_providers(config.provider.freebuff_commands):
         ai_provider_combo.addItem(f"Local: {local_p.label} ({cmd})", (local_p, cmd))
 
-    launch_ai_btn = QPushButton("🤖 Generate AI Prompt & Launch")
+    launch_ai_btn = QPushButton("🤖 Create AI prompt")
     launch_ai_btn.setStyleSheet("background-color: #6366f1; color: #ffffff; font-weight: 600; padding: 8px;")
     ai_row.addWidget(ai_provider_combo, 2)
     ai_row.addWidget(launch_ai_btn, 3)
@@ -315,11 +320,11 @@ def main() -> int:
 
     # Expandable Answer Key row
     key_row = QHBoxLayout()
-    key_row.addWidget(QLabel("Answer Key:"))
+    key_row.addWidget(QLabel("Answer key (optional):"))
     answer_key_combo = QComboBox()
     answer_key_combo.addItem("No answer key", None)
     key_row.addWidget(answer_key_combo, 2)
-    key_row.addWidget(QLabel("Form:"))
+    key_row.addWidget(QLabel("Form number:"))
     form_num_edit = QLineEdit("0")
     form_num_edit.setMaximumWidth(50)
     key_row.addWidget(form_num_edit)
@@ -329,7 +334,7 @@ def main() -> int:
 
     # PDF Preview viewport
     preview_row = QHBoxLayout()
-    tab1_preview = QLabel("No PDF preview loaded")
+    tab1_preview = QLabel("No exam preview available")
     tab1_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
     tab1_preview.setMinimumSize(280, 240)
     tab1_preview.setFrameShape(QFrame.Shape.StyledPanel)
@@ -338,8 +343,8 @@ def main() -> int:
     tab1_right_layout.addLayout(preview_row, 1)
 
     tab1_bottom_nav = QHBoxLayout()
-    preview_btn = QPushButton("🔍 Preview First Page")
-    proceed_to_step2_btn = QPushButton("Next: Review & Edit Questions ➡️")
+    preview_btn = QPushButton("🔍 Preview first page")
+    proceed_to_step2_btn = QPushButton("Next: review questions ➡️")
     proceed_to_step2_btn.setStyleSheet("background-color: #2563eb; color: #ffffff; font-weight: bold; padding: 8px 16px;")
     tab1_bottom_nav.addWidget(preview_btn)
     tab1_bottom_nav.addStretch()
@@ -347,7 +352,7 @@ def main() -> int:
     tab1_right_layout.addLayout(tab1_bottom_nav)
 
     tab1_layout.addWidget(tab1_right, 6)
-    tabs.addTab(tab1, "📄 1. Select & Extract Exam")
+    tabs.addTab(tab1, "📄 1. Choose & extract")
 
     # =========================================================================
     # TAB 2: ✏️ 2. Review & Edit Questions
@@ -358,11 +363,11 @@ def main() -> int:
     tab2_layout.setSpacing(12)
 
     # Left: Questions List & Validation Status
-    tab2_left = QGroupBox("Exam Questions")
+    tab2_left = QGroupBox("Questions in this exam")
     tab2_left_layout = QVBoxLayout(tab2_left)
     tab2_left_layout.setSpacing(8)
 
-    q_status_badge = QLabel("No exam loaded")
+    q_status_badge = QLabel("No exam selected")
     q_status_badge.setStyleSheet("background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-weight: 600; color: #475569;")
     tab2_left_layout.addWidget(q_status_badge)
 
@@ -379,7 +384,7 @@ def main() -> int:
     tab2_layout.addWidget(tab2_left, 4)
 
     # Right: Question Editor Form (Hebrew RTL)
-    tab2_right = QGroupBox("Hebrew Question Editor (RTL)")
+    tab2_right = QGroupBox("Review and edit questions")
     tab2_right_layout = QVBoxLayout(tab2_right)
     tab2_right_layout.setSpacing(10)
 
@@ -422,9 +427,9 @@ def main() -> int:
 
     # Save & Proceed Bar
     tab2_actions = QHBoxLayout()
-    save_test_btn = QPushButton("💾 Save Test Changes")
+    save_test_btn = QPushButton("💾 Save changes")
     save_test_btn.setStyleSheet("background-color: #16a34a; color: #ffffff; font-weight: bold; padding: 8px 16px;")
-    proceed_to_step3_btn = QPushButton("Next: Play & Export Quiz ➡️")
+    proceed_to_step3_btn = QPushButton("Next: play or export ➡️")
     proceed_to_step3_btn.setStyleSheet("background-color: #2563eb; color: #ffffff; font-weight: bold; padding: 8px 16px;")
     tab2_actions.addWidget(save_test_btn)
     tab2_actions.addStretch()
@@ -432,7 +437,7 @@ def main() -> int:
     tab2_right_layout.addLayout(tab2_actions)
 
     tab2_layout.addWidget(tab2_right, 6)
-    tabs.addTab(tab2, "✏️ 2. Review & Edit Questions")
+    tabs.addTab(tab2, "✏️ 2. Review questions")
 
     # =========================================================================
     # TAB 3: 🎯 3. Play & Export Quiz
@@ -443,7 +448,7 @@ def main() -> int:
     tab3_layout.setSpacing(14)
 
     # Left: Exam Selection Checklist
-    tab3_left = QGroupBox("Select Practice Exams")
+    tab3_left = QGroupBox("Choose exams to include")
     tab3_left_layout = QVBoxLayout(tab3_left)
     tab3_left_layout.setSpacing(8)
 
@@ -463,7 +468,7 @@ def main() -> int:
     tab3_layout.addWidget(tab3_left, 5)
 
     # Right: Summary & Action Card
-    tab3_right = QGroupBox("Launch & Export Standalone Quiz")
+    tab3_right = QGroupBox("Play or export your quiz")
     tab3_right_layout = QVBoxLayout(tab3_right)
     tab3_right_layout.setSpacing(12)
 
@@ -471,7 +476,7 @@ def main() -> int:
     summary_card = QFrame()
     summary_card.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px;")
     summary_layout = QVBoxLayout(summary_card)
-    summary_title = QLabel("📊 Quiz Configuration Summary")
+    summary_title = QLabel("📊 Quiz summary")
     summary_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #0f172a;")
     summary_questions_count = QLabel("• Total questions selected: 0")
     summary_questions_count.setStyleSheet("font-size: 13px; color: #334155;")
@@ -486,7 +491,7 @@ def main() -> int:
     tab3_right_layout.addWidget(summary_card)
 
     # Launch buttons
-    play_browser_btn = QPushButton("🚀 Play Interactive Quiz in Browser Now")
+    play_browser_btn = QPushButton("🚀 Play quiz in browser")
     play_browser_btn.setStyleSheet("""
         QPushButton {
             background-color: #2563eb;
@@ -502,23 +507,23 @@ def main() -> int:
     """)
     tab3_right_layout.addWidget(play_browser_btn)
 
-    export_html_btn = QPushButton("📦 Export Standalone HTML Quiz File...")
+    export_html_btn = QPushButton("📦 Export quiz as HTML...")
     export_html_btn.setStyleSheet("font-size: 13px; font-weight: 600; padding: 10px;")
     tab3_right_layout.addWidget(export_html_btn)
 
-    open_runs_dir_btn = QPushButton("📁 Open Runs Folder")
+    open_runs_dir_btn = QPushButton("📁 Open saved quizzes")
     tab3_right_layout.addWidget(open_runs_dir_btn)
 
     tab3_right_layout.addStretch()
     tab3_layout.addWidget(tab3_right, 5)
-    tabs.addTab(tab3, "🎯 3. Play & Export Quiz")
+    tabs.addTab(tab3, "🎯 3. Play or export")
 
     # ── Bottom Global Status Bar ───────────────────────────────────────────
     status_bar = QFrame()
     status_bar.setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 10px;")
     status_layout = QHBoxLayout(status_bar)
     status_layout.setContentsMargins(4, 2, 4, 2)
-    status_label = QLabel("Ready")
+    status_label = QLabel("Choose an exam folder to begin.")
     status_label.setStyleSheet("color: #64748b; font-size: 12px;")
     status_layout.addWidget(status_label, 1)
     root_layout.addWidget(status_bar)
@@ -655,13 +660,13 @@ def main() -> int:
             state["is_digital"] = result
             if result is True:
                 detection_title.setText("✨ Digital PDF Detected (Extractable Text)")
-                detection_desc.setText("This exam has clean text. Click 'Extract Questions Automatically' for instant conversion.")
+                detection_desc.setText("This PDF contains selectable text. You can extract the questions automatically.")
                 detection_card.setStyleSheet("background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 10px;")
                 extract_digital_btn.setEnabled(True)   # Bug 5 fix: enable only for digital
             else:
                 # Bug 5 fix: explicitly disable for scanned PDFs
                 detection_title.setText("📷 Scanned / Vector PDF Detected (Images Only)")
-                detection_desc.setText("This exam requires AI vision/rendering. Use 'Generate AI Prompt & Launch' below.")
+                detection_desc.setText("This PDF is image-based. Create an AI prompt below to extract its questions.")
                 detection_card.setStyleSheet("background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px;")
                 extract_digital_btn.setEnabled(False)
 
@@ -673,7 +678,7 @@ def main() -> int:
             state["workspace"] = None
             state["questions"] = []
             state["index"] = -1
-            current_exam_title.setText("Select an exam from the list")
+            current_exam_title.setText("Choose an exam from the list")
             update_editor_fields(None)
             refresh_question_list_ui()
             return
@@ -699,7 +704,7 @@ def main() -> int:
             if p:
                 pdf_source_combo.addItem(p.name, p)
         if pdf_source_combo.count() == 0:
-            pdf_source_combo.addItem("No PDF selected", None)
+            pdf_source_combo.addItem("No exam file selected", None)
 
         # Update Answer Keys dropdown
         answer_key_combo.clear()
@@ -716,8 +721,8 @@ def main() -> int:
             # Auto-preview
             preview_first_page(chosen_pdf)
         else:
-            detection_title.setText("📂 No PDF Found")
-            detection_desc.setText("Add a PDF to the exam folder, then Refresh.")
+            detection_title.setText("📂 No exam file found")
+            detection_desc.setText("Add a PDF to this folder, then reload the exam list.")
             detection_card.setStyleSheet("background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 10px;")
             extract_digital_btn.setEnabled(False)
 
@@ -735,14 +740,14 @@ def main() -> int:
             state["questions"] = []
             refresh_question_list_ui()
             update_editor_fields(None)
-            status_label.setText(f"Selected {workspace.name} (not extracted yet)")
+            status_label.setText(f"Selected {workspace.name}; questions have not been extracted yet.")
 
         update_tab3_summary()
 
     def preview_first_page(pdf_path: Path | None = None) -> None:
         target = pdf_path or pdf_source_combo.currentData()
         if not target or not Path(target).is_file():
-            tab1_preview.setText("No PDF selected to preview")
+            tab1_preview.setText("No exam file selected to preview")
             return
 
         tab1_preview.setText("Rendering PDF preview...")
@@ -790,7 +795,7 @@ def main() -> int:
             item3.setData(Qt.ItemDataRole.UserRole, c.workspace)
             item3.setCheckState(Qt.CheckState.Checked if c.ready_to_run else Qt.CheckState.Unchecked)
 
-        root_label.setText(f"📁 Projects Folder: {state['root']}")
+        root_label.setText(f"📁 Exam folder: {state['root']}")
         status_label.setText(f"Found {len(candidates)} test project(s) in {state['root'].name}")
         if candidates:
             tab1_exam_list.setCurrentRow(0)
@@ -798,7 +803,7 @@ def main() -> int:
         update_tab3_summary()
 
     def choose_folder() -> None:
-        chosen = QFileDialog.getExistingDirectory(window, "Choose Projects Folder")
+        chosen = QFileDialog.getExistingDirectory(window, "Choose exam folder")
         if not chosen:
             return
         state["root"] = Path(chosen)
@@ -814,7 +819,7 @@ def main() -> int:
         ws = state["workspace"]
         root = state["root"] or (ws.path.parent if ws else None)
         if not ws or not root:
-            QMessageBox.warning(window, "No exam selected", "Select an exam from the list first.")
+            QMessageBox.warning(window, "No exam selected", "Choose an exam from the list first.")
             return
 
         extract_digital_btn.setEnabled(False)
@@ -910,19 +915,40 @@ def main() -> int:
             return
 
         prov, cmd = ai_provider_combo.currentData()
-        try:
+        launch_ai_btn.setEnabled(False)
+        status_label.setText(f"Creating an AI prompt for {ws.name}...")
+
+        def run_launch():
             if prov.kind == "web":
                 prompt_path = generate_workspace_prompt(config_for_root(root), ws.path, "web")
-                if config.provider.open_browser and not open_web_provider(prov):
-                    raise RuntimeError(f"Could not open {prov.label} in the browser.")
+                browser_opened = not config.provider.open_browser
+                if config.provider.open_browser:
+                    browser_opened = open_web_provider(prov)
+                    if not browser_opened:
+                        raise RuntimeError(f"Could not open {prov.label} in the browser.")
             else:
                 prompt_path = generate_workspace_prompt(config_for_root(root), ws.path, "local")
                 send_to_provider(prov, cmd, prompt_path)
-            status_label.setText(f"AI Prompt generated: {prompt_path.name}")
-            browser_note = "" if config.provider.open_browser else "\nBrowser opening is disabled in configuration."
-            QMessageBox.information(window, "Prompt Ready", f"Created prompt at:\n{prompt_path}{browser_note}")
-        except Exception as exc:
-            QMessageBox.critical(window, "Could not launch AI provider", str(exc))
+                browser_opened = False
+            return prompt_path, browser_opened
+
+        worker = Worker(run_launch)
+
+        def on_launch_done(result):
+            prompt_path, browser_opened = result
+            launch_ai_btn.setEnabled(True)
+            status_label.setText(f"AI prompt ready: {prompt_path.name}")
+            browser_note = "" if browser_opened else "\nBrowser opening is disabled in configuration."
+            QMessageBox.information(window, "Prompt ready", f"Created prompt at:\n{prompt_path}{browser_note}")
+
+        def on_launch_fail(err):
+            launch_ai_btn.setEnabled(True)
+            status_label.setText("Could not create the AI prompt")
+            QMessageBox.critical(window, "Could not launch AI provider", err)
+
+        worker.signals.finished.connect(on_launch_done)
+        worker.signals.failed.connect(on_launch_fail)
+        thread_pool.start(worker)
 
     def save_test() -> None:
         ws = state["workspace"]
@@ -973,28 +999,52 @@ def main() -> int:
             run = assemble_run(selected, mix=mix_checkbox.isChecked())
             root = state["root"] or (selected[0].path.parent if selected else None)
             if root is None:
-                raise RunError("Choose a projects folder first.")
+                raise RunError("Choose an exam folder first.")
 
             output = root / "runs" / f"{run.name}.json"
             write_run_questions(run, output)
 
             html_output = custom_export_path or output.with_suffix(".html")
-            build_run_standalone_quiz(run, html_output)
+            play_browser_btn.setEnabled(False)
+            export_html_btn.setEnabled(False)
+            status_label.setText(f"Building quiz with {len(run.questions)} question(s)...")
 
-            status_label.setText(f"Quiz built: {html_output.name}")
-            if not custom_export_path:
-                webbrowser.open(html_output.as_uri())
-                QMessageBox.information(
-                    window,
-                    "Quiz Ready & Launched!",
-                    f"✓ Generated standalone quiz with {len(run.questions)} question(s) from {len(run.sources)} exam(s).\nOpening in your default browser now:\n{html_output}",
-                )
-            else:
-                QMessageBox.information(
-                    window,
-                    "Export Successful",
-                    f"✓ Saved self-contained quiz HTML to:\n{html_output}",
-                )
+            def run_build():
+                build_run_standalone_quiz(run, html_output)
+                browser_opened = False
+                if not custom_export_path:
+                    browser_opened = webbrowser.open(html_output.as_uri())
+                return browser_opened
+
+            worker = Worker(run_build)
+
+            def on_build_done(browser_opened):
+                play_browser_btn.setEnabled(True)
+                export_html_btn.setEnabled(True)
+                status_label.setText(f"Quiz ready: {html_output.name}")
+                if not custom_export_path:
+                    browser_note = "" if browser_opened else "\nThe browser could not be opened automatically."
+                    QMessageBox.information(
+                        window,
+                        "Quiz ready",
+                        f"✓ Created a quiz with {len(run.questions)} question(s) from {len(run.sources)} exam(s).\nSaved to:\n{html_output}{browser_note}",
+                    )
+                else:
+                    QMessageBox.information(
+                        window,
+                        "Export successful",
+                        f"✓ Saved quiz HTML to:\n{html_output}",
+                    )
+
+            def on_build_fail(err):
+                play_browser_btn.setEnabled(True)
+                export_html_btn.setEnabled(True)
+                status_label.setText("Quiz build failed")
+                QMessageBox.critical(window, "Could not build quiz", err)
+
+            worker.signals.finished.connect(on_build_done)
+            worker.signals.failed.connect(on_build_fail)
+            thread_pool.start(worker)
         except Exception as exc:
             QMessageBox.critical(window, "Could not launch quiz", str(exc))
 
@@ -1004,14 +1054,14 @@ def main() -> int:
             QMessageBox.warning(window, "No exams selected", "Select at least one exam first.")
             return
         default_name = "mixed_quiz.html" if mix_checkbox.isChecked() else f"{selected[0].name}.html"
-        save_path, _ = QFileDialog.getSaveFileName(window, "Export Standalone Quiz HTML", default_name, "HTML Files (*.html)")
+        save_path, _ = QFileDialog.getSaveFileName(window, "Export quiz as HTML", default_name, "HTML Files (*.html)")
         if save_path:
             prepare_and_play_quiz(Path(save_path))
 
     def open_runs_folder() -> None:
         root = state["root"]
         if not root:
-            QMessageBox.warning(window, "No folder", "Choose a projects folder first.")
+            QMessageBox.warning(window, "No exam folder", "Choose an exam folder first.")
             return
         runs_dir = root / "runs"
         runs_dir.mkdir(parents=True, exist_ok=True)
