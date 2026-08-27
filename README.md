@@ -72,7 +72,7 @@ interactive-test-creator/
 ├── vendor/               # Third-party dependencies (PDF.js)
 ├── .github/workflows/    # Automated CI/CD Pages deployment workflow
 ├── cli-legacy/           # Legacy Python scripts & batch wizard
-└── deal-with-later/      # Preserved research guides, scripts & proposals
+└── docs/                 # Guides, future ideas, and archived proposals
 ```
 
 ---
