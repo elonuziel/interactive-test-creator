@@ -57,7 +57,7 @@
 
             <div class="quiz-card">
                 <div class="question-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span id="question-counter" class="badge">שאלה 1 מתוך X</span>
+                    <span id="question-counter" class="badge" aria-live="polite">שאלה 1 מתוך X</span>
                     <button id="flag-btn" class="flag-btn" type="button" title="סמן שאלה זו (Flag/Star)">
                         <span class="flag-star">☆</span>
                         <span class="flag-text">סמן שאלה</span>
@@ -65,15 +65,15 @@
                 </div>
 
                 <div class="question-container">
-                    <h2 id="question-text">טוען שאלה...</h2>
+                    <h2 id="question-text" tabindex="-1">טוען שאלה...</h2>
                     <button id="open-cropper-btn" class="secondary-btn hidden" style="margin-bottom: 10px; width: 100%;">חתוך תמונה לנוחותך</button>
                     <img id="question-image" src="" alt="תמונה לשאלה" class="hidden" title="לחץ להגדלה">
-                    <div id="options-container" class="options-list">
+                    <div id="options-container" class="options-list" role="group" aria-labelledby="question-text">
                         <!-- Options injected here -->
                     </div>
                 </div>
 
-                <div id="feedback-message" class="feedback-message hidden">
+                <div id="feedback-message" class="feedback-message hidden" role="status" aria-live="polite">
                     <!-- Correct/Incorrect message injected here -->
                 </div>
 
@@ -150,10 +150,10 @@
     </div>
 
     <!-- CROPPER MODAL -->
-  <div id="cropper-modal" class="modal-overlay hidden">
+  <div id="cropper-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cropper-title">
     <div class="cropper-container">
       <div class="cropper-header">
-        <h3>חתוך את התמונה</h3>
+        <h3 id="cropper-title">חתוך את התמונה</h3>
         <button id="close-cropper-btn" class="close-btn">&times;</button>
       </div>
       <div class="cropper-body">

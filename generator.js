@@ -80,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         compressQualityVal: document.getElementById('compress-quality-val'),
         compressSliderWrap: document.getElementById('compress-slider-wrap'),
         status: document.getElementById('status'),
+        validationSummary: document.getElementById('validation-summary'),
         preview: document.getElementById('preview'),
         proofModeToggle: document.getElementById('proof-mode-toggle'),
         useCleanPdfForApi: document.getElementById('use-clean-pdf-for-api'),
@@ -273,11 +274,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function getQuestionValidationErrors() {
+        return validateQuestions(state.questions);
+    }
+
+    function updateValidationUI() {
+        const errors = getQuestionValidationErrors();
+        const invalidQuestionNumbers = new Set(
+            errors.map((error) => {
+                const match = String(error).match(/^שאלה\s+(\d+)/);
+                return match ? Number(match[1]) : null;
+            }).filter(Boolean)
+        );
+
+        elements.preview?.querySelectorAll('.question-card').forEach((card, index) => {
+            const invalid = invalidQuestionNumbers.has(index + 1);
+            card.classList.toggle('is-invalid', invalid);
+            card.setAttribute('aria-invalid', String(invalid));
+
+            const cardErrors = errors.filter((err) => err.startsWith(`שאלה ${index + 1}:`));
+            let errorBox = card.querySelector('.question-validation-error');
+            if (cardErrors.length) {
+                if (!errorBox) {
+                    errorBox = document.createElement('div');
+                    errorBox.className = 'question-validation-error';
+                    errorBox.setAttribute('role', 'alert');
+                    card.appendChild(errorBox);
+                }
+                errorBox.textContent = cardErrors.join(' ');
+            } else if (errorBox) {
+                errorBox.remove();
+            }
+        });
+
+        if (elements.validationSummary) {
+            elements.validationSummary.classList.toggle('hidden', errors.length === 0);
+            elements.validationSummary.textContent = errors.length
+                ? `נמצאו ${invalidQuestionNumbers.size} שאלות לא תקינות (${errors.length} בעיות): ${errors.slice(0, 3).join(' ')}`
+                : '';
+        }
+        return errors;
+    }
+
     function disableOutputActions(disabled) {
-        if (elements.downloadQuiz) elements.downloadQuiz.disabled = disabled;
-        if (elements.takeQuiz) elements.takeQuiz.disabled = disabled;
-        if (elements.compressSettingsBtn) elements.compressSettingsBtn.disabled = disabled;
-        if (elements.compressExportImages) elements.compressExportImages.disabled = disabled;
+        const hasValidationErrors = getQuestionValidationErrors().length > 0;
+        const outputDisabled = disabled || hasValidationErrors;
+        if (elements.downloadQuiz) elements.downloadQuiz.disabled = outputDisabled;
+        if (elements.takeQuiz) elements.takeQuiz.disabled = outputDisabled;
+        if (elements.compressSettingsBtn) elements.compressSettingsBtn.disabled = outputDisabled;
+        if (elements.compressExportImages) elements.compressExportImages.disabled = outputDisabled;
     }
 
     function setPdfTypeNote(message = '', tone = 'neutral') {
@@ -2445,6 +2490,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.questions.forEach((question, index) => {
             const card = document.createElement('article');
             card.className = 'question-card';
+            card.setAttribute('aria-label', `שאלה ${index + 1}`);
 
             const questionRow = document.createElement('div');
             questionRow.className = 'row';
@@ -2564,8 +2610,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const questionTextarea = document.createElement('textarea');
             questionTextarea.value = question.question;
+            questionTextarea.setAttribute('aria-label', `נוסח שאלה ${index + 1}`);
             questionTextarea.addEventListener('input', () => {
                 state.questions[index].question = questionTextarea.value;
+                updateValidationUI();
+                disableOutputActions(false);
             });
             questionRow.appendChild(questionTextarea);
 
@@ -2606,6 +2655,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            const questionErrors = getQuestionValidationErrors().filter((error) => error.startsWith(`שאלה ${index + 1}:`));
+            if (questionErrors.length) {
+                const errorBox = document.createElement('div');
+                errorBox.className = 'question-validation-error';
+                errorBox.setAttribute('role', 'alert');
+                errorBox.textContent = questionErrors.join(' ');
+                card.appendChild(errorBox);
+            }
+
             question.options.forEach((option, optIndex) => {
                 const optionRow = document.createElement('div');
                 optionRow.className = 'option-row';
@@ -2622,8 +2680,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const optionInput = document.createElement('input');
                 optionInput.type = 'text';
                 optionInput.value = option;
+                optionInput.setAttribute('aria-label', `שאלה ${index + 1}, תשובה ${optIndex + 1}`);
                 optionInput.addEventListener('input', () => {
                     state.questions[index].options[optIndex] = optionInput.value;
+                    updateValidationUI();
+                    disableOutputActions(false);
                 });
 
                 const delBtn = document.createElement('button');
@@ -2673,6 +2734,8 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPreview();
         });
         elements.preview.appendChild(addQBtn);
+        updateValidationUI();
+        disableOutputActions(false);
     }
 
     async function getTemplateSources() {

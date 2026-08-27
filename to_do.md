@@ -1,100 +1,25 @@
-The next priorities are:
+# Project Priorities & Status
 
-## 1. Run and stabilize Playwright tests
+## ✅ Completed Tasks
 
-The tests are configured but not yet executed locally. Run:
+- [x] **2. Standalone-player test real export generation**: Uses real standalone generated HTML (`writeStandaloneQuiz()`) navigated via `file://` instead of route interception.
+- [x] **3. Committed browser fixture**: Created and standardized `test-suite/fixtures/questions.json` containing Hebrew/English mix, answers, and XSS script tags.
+- [x] **4. Export safety & testing**: Escapes script tag terminators (`</script>`), preserves bilingual Hebrew/English text and options.
+- [x] **5. In-browser `test_runner.html` synchronization**: Loads shared functions directly from `quiz-core.js` and `quiz-export.js`, removing duplicated/commented implementations and adding test coverage for validation, custom practice selection, and export injection.
+- [x] **6. Accurate Python test reporting**: Reports explicit `[SKIP]` for missing optional fixtures and outputs `RESULT: X passed, Y skipped, Z failed`.
+- [x] **7. Question validation UI**: Live validation summary banner showing invalid question and error counts, per-card highlighting (`is-invalid`), live per-question error messages, and disabled export/solve buttons while errors exist.
+- [x] **8. CI deployment pipeline separation**: Split `.github/workflows/deploy-pages.yml` into a two-stage `test` -> `deploy` workflow with `needs: test`.
+- [x] **9. Accessibility & keyboard navigation**:
+  - Options rendered as `<button class="option">` elements with accessible labels and `data-key` hints
+  - `aria-live="polite"` feedback & counter announcements
+  - Question text focused on question change with `tabindex="-1"`
+  - High-visibility keyboard `:focus-visible` styles
+  - Jump bar with `aria-label` and `aria-current="step"`
 
-```bash
-npm install
-npx playwright install chromium
-npm run test:browser
-```
+---
 
-Then fix any real browser issues they expose.
+## 📌 Ongoing / Environment Notes
 
-## 2. Fix a likely standalone-player test issue
-
-The current test writes into `#quiz-data` and then reloads the page. A reload will lose that dynamically inserted data because it was never persisted into the HTML document.
-
-A better test should either:
-
-- Generate a real standalone HTML file and navigate to it, or
-- Use Playwright’s `page.setContent()` with the player HTML and embedded data.
-
-The first option is more valuable because it tests the real export path.
-
-## 3. Add a committed browser fixture
-
-Create a small fixture such as:
-
-```text
-test-suite/fixtures/questions.json
-```
-
-Use it in browser tests instead of constructing test data inline. This makes tests easier to inspect and reuse.
-
-## 4. Improve export testing
-
-Test that exported quizzes:
-
-- Load with no `questions.json`
-- Preserve question text containing `</script>`
-- Preserve Hebrew and mixed English text
-- Preserve embedded images
-- Start and answer correctly
-- Resume after refresh
-
-## 5. Fix `test_runner.html`
-
-It still duplicates production helper implementations. Load `quiz-core.js` and use the shared functions there. This prevents the in-browser test runner from drifting away from the actual application.
-
-## 6. Make Python test results accurate
-
-Report:
-
-```text
-7 passed, 3 skipped, 0 failed
-```
-
-instead of:
-
-```text
-7/10 tests passed
-```
-
-Also make missing optional fixtures explicit.
-
-## 7. Add a real question validation UI
-
-The validation currently blocks operations with an error. Improve it by:
-
-- Showing an invalid-question count
-- Highlighting affected cards
-- Disabling export while invalid questions exist
-- Showing errors next to the relevant question
-
-## 8. Improve CI deployment separation
-
-The deployment workflow currently performs browser testing and deployment in one job. Split it into:
-
-```text
-test → deploy
-```
-
-so deployment only occurs if all tests pass, with clearer failure reporting.
-
-## 9. Address accessibility
-
-High-value fixes:
-
-- Replace clickable `<div class="option">` elements with buttons
-- Add `aria-live` to status/feedback areas
-- Preserve focus after question navigation
-- Add visible keyboard focus styles
-- Add labels/roles for dynamically generated controls
-
-## Best next step
-
-The most valuable immediate task is:
-
-> Fix the Playwright standalone-player test to use a genuinely generated exported HTML file, then run the full browser suite.
+### 1. Browser-level Playwright execution in CI
+- Playwright tests are configured with system dependency provisioning (`npx playwright install --with-deps chromium`) in `.github/workflows/deploy-pages.yml` and run automatically on pull requests and deployments.
+- Generated test fixture files (`test-suite/fixtures/generated-quiz.html`) are ignored in `.gitignore`.

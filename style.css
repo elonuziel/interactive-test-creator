@@ -668,6 +668,19 @@ button[disabled],
     font-weight: 600;
 }
 
+/* ── Keyboard focus ──────────────────────────────────────────────────────── */
+.option:focus-visible,
+.jump-btn:focus-visible,
+.flag-btn:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    outline: 3px solid var(--primary-color);
+    outline-offset: 3px;
+}
+
 /* ── Answer Options ──────────────────────────────────────────────────────── */
 .options-list {
     display: flex;

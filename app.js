@@ -477,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         questionCounter.textContent = `שאלה ${currentQuestionIndex + 1} מתוך ${questions.length}`;
         questionText.textContent = q.question;
+        requestAnimationFrame(() => questionText.focus({ preventScroll: true }));
 
         // Flag button state
         if (flagBtn) {
@@ -528,7 +529,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Options
         optionsContainer.innerHTML = '';
         q.options.forEach((option, posIndex) => {
-            const btn = document.createElement('div');
+            const btn = document.createElement('button');
+            btn.type = 'button';
             btn.className = 'option';
             btn.textContent = option.text;
             btn.setAttribute('data-key', posIndex + 1); // keyboard shortcut hint
@@ -544,6 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            btn.setAttribute('aria-label', `תשובה ${posIndex + 1}: ${option.text}`);
             btn.addEventListener('click', () => handleOptionSelect(option.id, btn, q.correctIndex));
             optionsContainer.appendChild(btn);
         });

@@ -66,9 +66,21 @@ test('standalone player loads embedded questions and persists answers', async ({
 
     await page.locator('#start-btn').click();
     await expect(page.locator('#quiz-screen')).toHaveClass(/active/);
+    await expect(page.locator('.option')).toHaveCount(2);
+    await expect(page.locator('#question-text')).toBeFocused();
     await page.locator('.option').first().click();
     await page.reload();
 
     await expect(page.locator('#resume-notice')).not.toHaveClass(/hidden/);
+});
+
+test('builder blocks export while a question is invalid', async ({ page }) => {
+    await importQuestions(page);
+    await page.locator('.question-card textarea').first().fill('');
+
+    await expect(page.locator('#validation-summary')).toContainText('שאלות לא תקינות');
+    await expect(page.locator('.question-card').first()).toHaveClass(/is-invalid/);
+    await expect(page.locator('#download-quiz')).toBeDisabled();
+    await expect(page.locator('#take-quiz')).toBeDisabled();
 });
 

@@ -20,6 +20,7 @@ cli-legacy/build/
 
 # Generated Standalone Quiz Exports
 interactive_quiz*.html
+test-suite/fixtures/generated-quiz.html
 
 # Playwright output
 test-results/
