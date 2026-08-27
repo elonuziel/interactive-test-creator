@@ -59,8 +59,12 @@ def detect_providers(freebuff_commands=("freebuff", "freebuff-cli"), lookup=shut
 
 
 def send_prompt_to_command(command: str, prompt_path: Path) -> subprocess.Popen:
-    prompt_file = prompt_path.open("r", encoding="utf-8")
-    return subprocess.Popen([command], stdin=prompt_file)
+    with prompt_path.open("r", encoding="utf-8") as prompt_file:
+        process = subprocess.Popen([command], stdin=prompt_file)
+        return_code = process.wait()
+    if return_code:
+        raise RuntimeError(f"Provider command exited with status {return_code}.")
+    return process
 
 
 def open_web_provider(provider: Provider) -> bool:

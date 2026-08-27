@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 import webbrowser
 
@@ -12,6 +13,7 @@ from .exporter import build_run_standalone_quiz
 from .providers import WEB_PROVIDERS, detect_providers, open_web_provider
 from .prompts import send_to_provider
 from .preview import render_pdf_page
+from .persistence import write_json_atomic
 from .runs import RunError, assemble_run, write_run_questions
 from .validation import ValidationError, load_questions
 from .workspace import discover_sources
@@ -155,8 +157,8 @@ def main() -> int:
             QVBoxLayout,
             QWidget,
         )
-        from PySide6.QtCore import QObject, QRunnable, QThreadPool, Qt, Signal
-        from PySide6.QtGui import QImage, QPixmap
+        from PySide6.QtCore import QObject, QRunnable, QSettings, QThreadPool, Qt, Signal
+        from PySide6.QtGui import QImage, QKeySequence, QPixmap, QShortcut
     except ImportError as exc:
         raise RuntimeError(
             "The GUI requires PySide6. Install it with: python -m pip install PySide6"
@@ -179,11 +181,23 @@ def main() -> int:
             try:
                 self.signals.finished.emit(self.function())
             except Exception as exc:
+                logging.getLogger(__name__).exception("Background GUI task failed")
                 self.signals.failed.emit(str(exc))
 
     thread_pool = QThreadPool.globalInstance()
 
-    window = QWidget()
+    class MainWindow(QWidget):
+        def __init__(self):
+            super().__init__()
+            self.close_handler = None
+
+        def closeEvent(self, event):
+            if self.close_handler and not self.close_handler():
+                event.ignore()
+                return
+            event.accept()
+
+    window = MainWindow()
     window.setWindowTitle("Interactive Quiz Builder")
     window.resize(1120, 780)
     window.setStyleSheet("background-color: #f8fafc;")
@@ -221,8 +235,14 @@ def main() -> int:
         "is_digital": None,
         "batch_candidates": [],
         "loading": False,   # guard: suppresses combo signals while repopulating
+        "dirty": False,
     }
     config = Config.load()
+    settings = QSettings("InteractiveQuizBuilder", "QuizBuilder")
+
+    geometry = settings.value("window_geometry")
+    if geometry is not None:
+        window.restoreGeometry(geometry)
 
     def config_for_root(root: Path) -> Config:
         return Config(
@@ -627,6 +647,11 @@ def main() -> int:
             q_status_badge.setText("No questions in this test")
             q_status_badge.setStyleSheet("background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-weight: 600; color: #475569;")
 
+    def mark_dirty() -> None:
+        if state["workspace"] is not None:
+            state["dirty"] = True
+            window.setWindowTitle("Interactive Quiz Builder *")
+
     def check_pdf_classification(pdf_path: Path) -> None:
         from .documents import DocumentError
 
@@ -674,6 +699,9 @@ def main() -> int:
         thread_pool.start(worker)
 
     def load_workspace(workspace) -> None:
+        if workspace is not None and workspace != state["workspace"] and state["dirty"]:
+            if not confirm_discard_changes():
+                return
         if workspace is None:
             state["workspace"] = None
             state["questions"] = []
@@ -681,6 +709,8 @@ def main() -> int:
             current_exam_title.setText("Choose an exam from the list")
             update_editor_fields(None)
             refresh_question_list_ui()
+            state["dirty"] = False
+            window.setWindowTitle("Interactive Quiz Builder")
             return
 
         state["workspace"] = workspace
@@ -742,6 +772,8 @@ def main() -> int:
             update_editor_fields(None)
             status_label.setText(f"Selected {workspace.name}; questions have not been extracted yet.")
 
+        state["dirty"] = False
+        window.setWindowTitle("Interactive Quiz Builder")
         update_tab3_summary()
 
     def preview_first_page(pdf_path: Path | None = None) -> None:
@@ -802,11 +834,37 @@ def main() -> int:
 
         update_tab3_summary()
 
+    def confirm_discard_changes() -> bool:
+        if not state["dirty"]:
+            return True
+        answer = QMessageBox.warning(
+            window,
+            "Unsaved changes",
+            "You have unsaved question changes. Save them before continuing?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+        )
+        if answer == QMessageBox.StandardButton.Save:
+            return save_test(show_message=False)
+        return answer == QMessageBox.StandardButton.Discard
+
+    def handle_close() -> bool:
+        if not confirm_discard_changes():
+            return False
+        settings.setValue("window_geometry", window.saveGeometry())
+        return True
+
+    window.close_handler = handle_close
+
     def choose_folder() -> None:
+        if not confirm_discard_changes():
+            return
         chosen = QFileDialog.getExistingDirectory(window, "Choose exam folder")
         if not chosen:
             return
         state["root"] = Path(chosen)
+        settings.setValue("last_exam_folder", str(state["root"]))
         populate_tests()
 
     def filter_exams(query: str) -> None:
@@ -950,21 +1008,21 @@ def main() -> int:
         worker.signals.failed.connect(on_launch_fail)
         thread_pool.start(worker)
 
-    def save_test() -> None:
+    def save_test(show_message=True) -> bool:
         ws = state["workspace"]
         if not ws:
             QMessageBox.warning(window, "No test selected", "Select a test first.")
-            return
+            return False
         save_active_question()
-        ws.questions_path.parent.mkdir(parents=True, exist_ok=True)
-        ws.questions_path.write_text(
-            json.dumps(state["questions"], ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        write_json_atomic(ws.questions_path, state["questions"])
+        state["dirty"] = False
+        window.setWindowTitle("Interactive Quiz Builder")
         refresh_question_list_ui()
         update_tab3_summary()
         status_label.setText(f"Saved {len(state['questions'])} question(s) to {ws.questions_path.name}")
-        QMessageBox.information(window, "Saved", f"Successfully saved {len(state['questions'])} question(s) to:\n{ws.questions_path}")
+        if show_message:
+            QMessageBox.information(window, "Saved", f"Successfully saved {len(state['questions'])} question(s) to:\n{ws.questions_path}")
+        return True
 
     def add_question() -> None:
         save_active_question()
@@ -980,7 +1038,16 @@ def main() -> int:
     def delete_question() -> None:
         idx = state["index"]
         if 0 <= idx < len(state["questions"]):
+            answer = QMessageBox.question(
+                window,
+                "Delete question",
+                "Delete the selected question?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
             state["questions"].pop(idx)
+            state["dirty"] = True
             state["index"] = -1
             refresh_question_list_ui()
             if state["questions"]:
@@ -996,29 +1063,29 @@ def main() -> int:
 
         try:
             save_active_question()
-            run = assemble_run(selected, mix=mix_checkbox.isChecked())
+            mix = mix_checkbox.isChecked()
             root = state["root"] or (selected[0].path.parent if selected else None)
             if root is None:
                 raise RunError("Choose an exam folder first.")
-
-            output = root / "runs" / f"{run.name}.json"
-            write_run_questions(run, output)
-
-            html_output = custom_export_path or output.with_suffix(".html")
             play_browser_btn.setEnabled(False)
             export_html_btn.setEnabled(False)
-            status_label.setText(f"Building quiz with {len(run.questions)} question(s)...")
+            status_label.setText("Preparing your quiz...")
 
             def run_build():
+                run = assemble_run(selected, mix=mix)
+                output = root / "runs" / f"{run.name}.json"
+                write_run_questions(run, output)
+                html_output = custom_export_path or output.with_suffix(".html")
                 build_run_standalone_quiz(run, html_output)
                 browser_opened = False
                 if not custom_export_path:
                     browser_opened = webbrowser.open(html_output.as_uri())
-                return browser_opened
+                return run, html_output, browser_opened
 
             worker = Worker(run_build)
 
-            def on_build_done(browser_opened):
+            def on_build_done(result):
+                run, html_output, browser_opened = result
                 play_browser_btn.setEnabled(True)
                 export_html_btn.setEnabled(True)
                 status_label.setText(f"Quiz ready: {html_output.name}")
@@ -1069,7 +1136,7 @@ def main() -> int:
 
     # ── Signal Connections ─────────────────────────────────────────────────
     choose_root_btn.clicked.connect(choose_folder)
-    refresh_root_btn.clicked.connect(populate_tests)
+    refresh_root_btn.clicked.connect(lambda: populate_tests() if confirm_discard_changes() else None)
     exam_search.textChanged.connect(filter_exams)
 
     tab1_exam_list.currentItemChanged.connect(
@@ -1115,7 +1182,16 @@ def main() -> int:
     export_html_btn.clicked.connect(export_quiz_as)
     open_runs_dir_btn.clicked.connect(open_runs_folder)
 
-    state["root"] = config.workspace_root
+    for editor in [q_text_edit, *option_edits]:
+        editor.textChanged.connect(mark_dirty)
+    for radio in option_radios:
+        radio.toggled.connect(lambda checked: mark_dirty() if checked else None)
+    QShortcut(QKeySequence("Ctrl+S"), window).activated.connect(lambda: save_test())
+    QShortcut(QKeySequence("Ctrl+F"), window).activated.connect(lambda: (exam_search.setFocus(), exam_search.selectAll()))
+
+    saved_folder = settings.value("last_exam_folder", "")
+    configured_root = config.workspace_root
+    state["root"] = configured_root if configured_root.is_dir() else Path(saved_folder) if saved_folder else configured_root
     populate_tests()
     window.show()
     return application.exec()

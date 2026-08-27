@@ -30,5 +30,9 @@ def generate_prompt(runner, workspace: Path, test_name: str, form_number: str, h
 def send_to_provider(provider: Provider, command: str, prompt: Path) -> subprocess.Popen:
     if provider.kind != "freebuff" and provider.kind != "local":
         raise PromptError(f"Provider {provider.id} cannot receive stdin prompts.")
-    prompt_file = prompt.open("r", encoding="utf-8")
-    return subprocess.Popen([command], stdin=prompt_file)
+    with prompt.open("r", encoding="utf-8") as prompt_file:
+        process = subprocess.Popen([command], stdin=prompt_file)
+        return_code = process.wait()
+    if return_code:
+        raise PromptError(f"{provider.label} exited with status {return_code}.")
+    return process
