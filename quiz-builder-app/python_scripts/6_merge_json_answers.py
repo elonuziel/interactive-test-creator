@@ -37,9 +37,19 @@ def main():
                      else json.loads(q_path.read_text(encoding='utf-8')))
         if a_path.suffix.lower() == '.md':
             answers = {}
+            hebrew_map = {'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5}
             for line in a_path.read_text(encoding='utf-8').splitlines():
-                match = __import__('re').match(r'^[-*]\s*(\d+)\s*:\s*([A-D])', line, __import__('re').I)
-                if match: answers[match.group(1)] = ord(match.group(2).upper()) - ord('A') + 1
+                line = line.strip()
+                match = __import__('re').match(r'^[-*#\s]*(\d+)\s*[:.\-–]\s*([A-Ea-eא-ה1-5])', line)
+                if match:
+                    q_num = match.group(1)
+                    val = match.group(2)
+                    if val.isdigit():
+                        answers[q_num] = int(val)
+                    elif val in hebrew_map:
+                        answers[q_num] = hebrew_map[val]
+                    elif val.upper() in 'ABCDE':
+                        answers[q_num] = ord(val.upper()) - ord('A') + 1
         else:
             answers = json.loads(a_path.read_text(encoding='utf-8'))
     except Exception as exc:

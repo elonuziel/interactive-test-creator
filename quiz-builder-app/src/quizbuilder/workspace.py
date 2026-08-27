@@ -42,7 +42,12 @@ def discover_sources(workspace: Workspace) -> SourceFiles:
     files = list(workspace.path.iterdir()) if workspace.path.is_dir() else []
     pdfs = sorted((item for item in files if item.suffix.lower() == ".pdf"), key=lambda p: p.name.lower())
     docx = tuple(sorted((item for item in files if item.suffix.lower() == ".docx"), key=lambda p: p.name.lower()))
-    answers = tuple(sorted((item for item in files if item.suffix.lower() in {".csv", ".xls", ".xlsx"}), key=lambda p: p.name.lower()))
+    answers = tuple(
+        sorted(
+            (item for item in files if item.suffix.lower() in {".csv", ".xls", ".xlsx", ".json", ".md"} and (item.suffix.lower() in {".csv", ".xls", ".xlsx"} or item.name.lower().startswith("answers")) and item.name.lower() not in {"questions.md", "questions.json"}),
+            key=lambda p: p.name.lower(),
+        )
+    )
     return SourceFiles(
         pdf=workspace.source_pdf or (pdfs[0] if pdfs else None),
         docx=docx,

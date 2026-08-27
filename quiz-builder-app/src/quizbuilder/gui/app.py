@@ -554,9 +554,9 @@ class MainWindow(QWidget):
         start_dir = str(workspace.path) if workspace else (str(self.state["root"]) if self.state["root"] else "")
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "Choose Answer Key (CSV or Excel)",
+            "Choose Answer Key (CSV, Excel, Markdown, or JSON)",
             start_dir,
-            "Answer Key Files (*.csv *.xlsx *.xls);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls);;All Files (*)",
+            "Answer Key Files (*.csv *.xlsx *.xls *.json *.md);;CSV Files (*.csv);;Excel Files (*.xlsx *.xls);;Markdown / JSON Answers (*.md *.json);;All Files (*)",
         )
         if filename:
             path = Path(filename)

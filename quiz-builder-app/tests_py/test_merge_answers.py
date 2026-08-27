@@ -110,3 +110,27 @@ class TestMergeAnswers:
 
         assert len(merged) == 1
         assert merged[0]['correctIndex'] == 1  # 2 → 1
+
+    def test_merge_answers_md_hebrew_and_english(self, tmp_path):
+        """answers.md should parse Hebrew letters (א, ב, ג, ד), English letters (A-D), and digits."""
+        q_text = "## Question 1\nQ1\n- A\n- B\n- C\n- D\n\nAnswer: A\n\n## Question 2\nQ2\n- A\n- B\n- C\n- D\n\nAnswer: A\n\n## Question 3\nQ3\n- A\n- B\n- C\n- D\n\nAnswer: A\n"
+        q_path = tmp_path / "questions.md"
+        q_path.write_text(q_text, encoding="utf-8")
+
+        a_text = "- 1: ג\n- 2: B\n- 3: 4\n"
+        a_path = tmp_path / "answers.md"
+        a_path.write_text(a_text, encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, os.path.join(SCRIPTS_DIR, '6_merge_json_answers.py'),
+             str(q_path), str(a_path)],
+            capture_output=True, text=True, encoding='utf-8'
+        )
+        assert result.returncode == 0
+
+        from quizbuilder.markdown import load_questions
+        merged = load_questions(q_path)
+        assert merged[0]['correctIndex'] == 2  # ג -> 3 -> 2
+        assert merged[1]['correctIndex'] == 1  # B -> 2 -> 1
+        assert merged[2]['correctIndex'] == 3  # 4 -> 4 -> 3
+
