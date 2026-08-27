@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 from ..batch import discover_batch
 from ..commands import generate_workspace_prompt, process_workspace, process_workspaces
 from ..config import Config
-from ..documents import classify_pdf, convert_docx_with_soffice, DocumentError
+from ..documents import classify_pdf, clean_pdf, convert_docx_with_soffice, describe_page_cleaning, DocumentError
 from ..exporter import build_run_standalone_quiz
 from ..markdown import dump_questions, write_questions
 from ..preview import render_pdf_page
@@ -183,6 +183,40 @@ class MainWindow(QWidget):
         ai_row.addWidget(self.ai_provider_combo, 2)
         ai_row.addWidget(self.launch_ai_button, 3)
         right.addLayout(ai_row)
+
+        # Clean PDF section for scanned exams
+        self.clean_group = QGroupBox("Clean PDF (Discard blank & cover pages)")
+        clean_layout = QVBoxLayout(self.clean_group)
+        self.clean_hint = QLabel("Discard blank/cover pages for clean AI prompts & accurate OCR.")
+        self.clean_hint.setWordWrap(True)
+        clean_layout.addWidget(self.clean_hint)
+
+        preset_row = QHBoxLayout()
+        self.preset_std_button = QPushButton("🧹 Standard clean (std)")
+        self.preset_std_button.setToolTip("Discards cover pages 1-4 and even pages (6, 8, 10...)")
+        self.preset_even_button = QPushButton("📄 Even pages")
+        self.preset_odd_button = QPushButton("📄 Odd pages")
+        self.preset_clear_button = QPushButton("☐ Reset")
+        preset_row.addWidget(self.preset_std_button)
+        preset_row.addWidget(self.preset_even_button)
+        preset_row.addWidget(self.preset_odd_button)
+        preset_row.addWidget(self.preset_clear_button)
+        clean_layout.addLayout(preset_row)
+
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Discard pages:"))
+        self.discard_range_edit = QLineEdit("std")
+        self.discard_range_edit.setPlaceholderText("e.g. std, 1-4, 6, 8")
+        range_row.addWidget(self.discard_range_edit, 1)
+        self.clean_pdf_button = QPushButton("🧹 Create clean PDF")
+        self.clean_pdf_button.setToolTip("Creates <name>_clean.pdf without discarded pages")
+        range_row.addWidget(self.clean_pdf_button)
+        clean_layout.addLayout(range_row)
+
+        self.clean_summary_label = QLabel("Select an exam to calculate kept pages.")
+        self.clean_summary_label.setStyleSheet("color: var(--muted-color); font-size: 11px;")
+        clean_layout.addWidget(self.clean_summary_label)
+        right.addWidget(self.clean_group)
         answer_row = QHBoxLayout()
         answer_row.addWidget(QLabel("Answer key (optional):"))
         answer_row.addWidget(self.answer_combo, 1)
@@ -275,6 +309,12 @@ class MainWindow(QWidget):
         self.pdf_combo.currentIndexChanged.connect(self._on_pdf_selection_changed)
         self.browse_pdf_button.clicked.connect(self.choose_custom_exam_file)
         self.browse_answer_button.clicked.connect(self.choose_custom_answer_key)
+        self.preset_std_button.clicked.connect(lambda: self.set_discard_preset("std"))
+        self.preset_even_button.clicked.connect(lambda: self.set_discard_preset("even"))
+        self.preset_odd_button.clicked.connect(lambda: self.set_discard_preset("odd"))
+        self.preset_clear_button.clicked.connect(lambda: self.set_discard_preset(""))
+        self.discard_range_edit.textChanged.connect(lambda: self.update_clean_summary())
+        self.clean_pdf_button.clicked.connect(self.run_clean_pdf)
         self.open_questions_button.clicked.connect(self.import_custom_questions_file)
         self.save_as_button.clicked.connect(self.save_questions_as)
         self.extract_button.clicked.connect(self.process_selected_exam)
@@ -582,10 +622,75 @@ class MainWindow(QWidget):
         if pdf and Path(pdf).is_file():
             self.check_pdf_classification(Path(pdf))
             self.preview_first_page(Path(pdf))
+            self.update_clean_summary()
         else:
             self.detection_title.setText("No exam file selected")
             self.detection_description.setText("Select a PDF or DOCX exam file to analyze.")
             self.preview.setText("No exam preview available")
+            self.clean_summary_label.setText("Select an exam to calculate kept pages.")
+
+    def set_discard_preset(self, preset: str) -> None:
+        self.discard_range_edit.setText(preset)
+        self.update_clean_summary()
+
+    def update_clean_summary(self) -> None:
+        pdf = self.pdf_combo.currentData()
+        if not pdf or not Path(pdf).is_file() or Path(pdf).suffix.lower() != ".pdf":
+            self.clean_summary_label.setText("Select a PDF exam to calculate kept pages.")
+            return
+        info = describe_page_cleaning(Path(pdf), self.discard_range_edit.text().strip())
+        if info["total"] == 0:
+            self.clean_summary_label.setText("Could not inspect PDF page count.")
+        else:
+            self.clean_summary_label.setText(
+                f"Total {info['total']} page(s) → Keeping {info['kept_count']} page(s) ({info['discarded_count']} discarded)"
+            )
+
+    def run_clean_pdf(self) -> None:
+        workspace = self.state["workspace"]
+        if not workspace:
+            QMessageBox.warning(self, "No exam selected", "Choose an exam from the list first.")
+            return
+        pdf = self.pdf_combo.currentData()
+        if not pdf or not Path(pdf).is_file():
+            QMessageBox.warning(self, "No PDF selected", "Choose a valid PDF file to clean.")
+            return
+        source_pdf = Path(pdf)
+        clean_name = f"{source_pdf.stem}_clean.pdf" if not source_pdf.stem.endswith("_clean") else source_pdf.name
+        clean_path = workspace.path / clean_name
+        discard_spec = self.discard_range_edit.text().strip() or "std"
+
+        self.clean_pdf_button.setEnabled(False)
+        self.status_label.setText("Cleaning PDF and generating clean pages...")
+
+        def execute():
+            total, kept = clean_pdf(source_pdf, clean_path, discard_spec)
+            return total, kept, clean_path
+
+        worker = Worker(execute)
+
+        def done(result):
+            total, kept, output_path = result
+            self.clean_pdf_button.setEnabled(True)
+            idx = self.pdf_combo.findData(output_path)
+            if idx < 0:
+                self.pdf_combo.addItem(output_path.name, output_path)
+                idx = self.pdf_combo.count() - 1
+            self.pdf_combo.setCurrentIndex(idx)
+            self.status_label.setText(f"Cleaned PDF saved: kept {kept} of {total} pages in {output_path.name}.")
+            QMessageBox.information(
+                self,
+                "Clean PDF Created",
+                f"Successfully created clean PDF with {kept} of {total} pages kept:\n\n{output_path}\n\nIt is now selected as the active exam file.",
+            )
+
+        def failed(error):
+            self.clean_pdf_button.setEnabled(True)
+            QMessageBox.critical(self, "Could not clean PDF", f"{error}\n\nCheck the discard page range.")
+
+        worker.signals.finished.connect(done)
+        worker.signals.failed.connect(failed)
+        self.start_worker(worker)
 
     def _load_questions(self, workspace) -> None:
         try:
