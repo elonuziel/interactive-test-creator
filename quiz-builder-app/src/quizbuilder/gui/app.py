@@ -204,11 +204,14 @@ class MainWindow(QWidget):
         edit_layout = QVBoxLayout(edit_group)
         self.question_editor = QuestionEditorWidget()
         self.save_button = QPushButton("Save questions.md")
+        self.help_button = QPushButton("Markdown format help")
+        self.help_button.setToolTip("Show the questions.md format used by this project.")
         self.save_button.setToolTip("Save the current questions to questions.md. Shortcut: Ctrl+S")
         self.next_export_button = QPushButton("Next: play or export")
         edit_layout.addWidget(self.question_editor, 1)
         edit_actions = QHBoxLayout()
         edit_actions.addWidget(self.save_button)
+        edit_actions.addWidget(self.help_button)
         edit_actions.addStretch()
         edit_actions.addWidget(self.next_export_button)
         edit_layout.addLayout(edit_actions)
@@ -257,6 +260,7 @@ class MainWindow(QWidget):
         self.preview_button.clicked.connect(self.preview_first_page)
         self.next_review_button.clicked.connect(lambda: self.tabs.setCurrentIndex(1))
         self.question_list.currentRowChanged.connect(self.show_question)
+        self.help_button.clicked.connect(self.show_markdown_help)
         self.question_editor.changed.connect(self.mark_dirty)
         self.add_question_button.clicked.connect(self.add_question)
         self.delete_question_button.clicked.connect(self.delete_question)
@@ -271,6 +275,9 @@ class MainWindow(QWidget):
         self.open_runs_button.clicked.connect(self.open_runs_folder)
         QShortcut(QKeySequence("Ctrl+S"), self).activated.connect(self.save_test)
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(lambda: (self.exam_search.setFocus(), self.exam_search.selectAll()))
+
+    def show_markdown_help(self) -> None:
+        QMessageBox.information(self, "questions.md format", "Each question uses this format:\n\n## Question 1\n\nQuestion text\n\n- First choice\n- Second choice\n- Third choice\n- Fourth choice\n\nAnswer: A\n\nUse pageImage: path/to/page.png on its own line when a question references a diagram or table.")
 
     def _show_welcome_if_needed(self) -> None:
         if self.settings.value("welcome_shown", False, type=bool):
@@ -337,7 +344,14 @@ class MainWindow(QWidget):
                 QMessageBox.warning(self, "No exam selected", "Choose an exam first.")
             return False
         self.save_active_question()
-        write_questions(self.state["workspace"].path / "questions.md", self.state["questions"])
+        try:
+            write_questions(self.state["workspace"].path / "questions.md", self.state["questions"])
+        except OSError as exc:
+            LOGGER.exception("Could not save questions.md")
+            self.status_label.setText(f"Could not save questions.md: {exc}")
+            if show_message:
+                QMessageBox.critical(self, "Could not save", f"{exc}\n\nCheck that the exam folder is writable and try again.")
+            return False
         self.state["dirty"] = False
         self.setWindowTitle("Interactive Quiz Builder")
         self.refresh_question_list()
@@ -664,7 +678,7 @@ class MainWindow(QWidget):
 
 def main() -> int:
     application = QApplication.instance() or QApplication([])
-    application.setStyleSheet(LITE_STYLESHEET)
+    # MainWindow applies and persists the user's selected theme.
     window = MainWindow()
     window.show()
     return application.exec()

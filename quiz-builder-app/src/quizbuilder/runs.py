@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 import json
+
+from .persistence import write_json_atomic
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -74,8 +76,5 @@ def write_run_questions(run: QuizRun, output: Path) -> Path:
     """Write a derived questions file without changing any source project."""
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(run.payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    write_json_atomic(output, run.payload)
     return output
