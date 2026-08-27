@@ -6,6 +6,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -29,8 +32,25 @@ jobs:
       - name: Build GUI bundle
         working-directory: cli-legacy
         run: python build_gui.py
+      - name: Package Linux bundle
+        if: runner.os == 'Linux'
+        run: tar -czf quiz_builder_gui-linux-x86_64.tar.gz -C cli-legacy/dist quiz_builder_gui
+      - name: Package Windows bundle
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path cli-legacy/dist/quiz_builder_gui -DestinationPath quiz_builder_gui-windows-x64.zip -Force
       - name: Upload GUI bundle
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.path }}
+      - name: Attach Linux bundle to GitHub Release
+        if: runner.os == 'Linux' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: quiz_builder_gui-linux-x86_64.tar.gz
+      - name: Attach Windows bundle to GitHub Release
+        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: quiz_builder_gui-windows-x64.zip
