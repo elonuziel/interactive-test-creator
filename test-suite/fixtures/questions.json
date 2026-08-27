@@ -1,0 +1,14 @@
+[
+  {
+    "question": "שאלת בדיקה — Mixed English",
+    "options": ["תשובה ראשונה", "Answer 2"],
+    "correctIndex": 0,
+    "shuffleOptions": false
+  },
+  {
+    "question": "טקסט בטוח: </script><script>alert('xss')</script>",
+    "options": ["אפשרות א", "אפשרות ב"],
+    "correctIndex": 1,
+    "shuffleOptions": false
+  }
+]

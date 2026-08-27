@@ -1,22 +1,35 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
 const QuizExport = require('../../quiz-export.js');
 
-const questions = [
-    {
-        question: 'שאלת בדיקה',
-        options: ['תשובה ראשונה', 'תשובה שנייה'],
-        correctIndex: 0
-    }
-];
+const questions = require('../fixtures/questions.json');
+const fixturePath = path.resolve(__dirname, '../fixtures/questions.json');
+
+async function writeStandaloneQuiz() {
+    const [template, css, core, app] = await Promise.all([
+        fs.promises.readFile(path.resolve(__dirname, '../../quiz_player.html'), 'utf8'),
+        fs.promises.readFile(path.resolve(__dirname, '../../style.css'), 'utf8'),
+        fs.promises.readFile(path.resolve(__dirname, '../../quiz-core.js'), 'utf8'),
+        fs.promises.readFile(path.resolve(__dirname, '../../app.js'), 'utf8')
+    ]);
+    let html = QuizExport.injectStylesheet(template, css);
+    html = QuizExport.injectInlineQuestions(html, questions);
+    html = QuizExport.injectScript(html, 'quiz-core.js', core);
+    html = QuizExport.injectScript(html, 'app.js', app);
+    const outputPath = path.resolve(__dirname, '../fixtures/generated-quiz.html');
+    await fs.promises.writeFile(outputPath, html, 'utf8');
+    return outputPath;
+}
 
 async function importQuestions(page) {
     await page.goto('/index.html');
     await page.locator('#json-file').setInputFiles({
-        name: 'questions.json',
+        name: path.basename(fixturePath),
         mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(questions))
     });
-    await expect(page.locator('.question-card')).toHaveCount(1);
+    await expect(page.locator('.question-card')).toHaveCount(2);
 }
 
 test('builder imports and edits a question', async ({ page }) => {
@@ -42,19 +55,14 @@ test('builder exports a standalone quiz with embedded questions', async ({ page 
 
     expect(exportedHtml).toContain('id="quiz-data"');
     expect(exportedHtml).toContain('שאלת בדיקה');
+    expect(exportedHtml).not.toContain('</script><script>alert');
     expect(exportedHtml).toContain('<script>');
     expect(exportedHtml).not.toContain('<script src="app.js"></script>');
 });
 
 test('standalone player loads embedded questions and persists answers', async ({ page }) => {
-    await page.route('**/quiz_player.html', async (route) => {
-        const response = await route.fetch();
-        const body = await response.text();
-        const injected = QuizExport.injectInlineQuestions(body, questions);
-        await route.fulfill({ response, body: injected });
-    });
-
-    await page.goto('/quiz_player.html');
+    const standalonePath = await writeStandaloneQuiz();
+    await page.goto(`file://${standalonePath}`);
 
     await page.locator('#start-btn').click();
     await expect(page.locator('#quiz-screen')).toHaveClass(/active/);

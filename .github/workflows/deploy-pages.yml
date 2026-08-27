@@ -17,10 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -47,6 +44,21 @@ jobs:
 
       - name: Run browser smoke tests
         run: npm run test:browser
+
+  deploy:
+    needs: test
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Prepare site artifact
         run: |

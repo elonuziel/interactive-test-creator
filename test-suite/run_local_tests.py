@@ -134,6 +134,8 @@ def run_all_tests():
     print(" Running Interactive Test Creator Local CLI Tests")
     print("=" * 65)
     passed = 0
+    skipped = 0
+    failed = 0
     total = 0
 
     # Test 1: Whitespace & Footer Artifact Stripping
@@ -218,6 +220,9 @@ def run_all_tests():
         assert parsed_gemini_md[0]['options'][0].startswith("בחינה של שמורת")
         print(" [PASS] Test 7: Markdown Gemini Output (33 Questions & Bullet Options)")
         passed += 1
+    else:
+        print(" [SKIP] Test 7: Markdown Gemini Output (optional fixture missing)")
+        skipped += 1
 
     # Test 8: Gemini Markdown Output with [cite: N] Web Search Citation Artifacts
     total += 1
@@ -230,6 +235,9 @@ def run_all_tests():
         assert "[cite:" not in parsed_cite_md[0]['options'][0], "[cite:] tags must be stripped"
         print(" [PASS] Test 8: Gemini Citation Tag Cleanup ([cite: N] Stripped)")
         passed += 1
+    else:
+        print(" [SKIP] Test 8: Gemini Citation Tag Cleanup (optional fixture missing)")
+        skipped += 1
 
     # Test 9: XLS Answer Extraction for Form 111 (tests/2022_litoral/מועד א.xls)
     total += 1
@@ -248,6 +256,9 @@ def run_all_tests():
         assert q1_ans_match and q1_ans_match.group(1) == '2', "Form 111 Q1 correct answer must be option 2"
         print(" [PASS] Test 9: XLS Answer Extraction for Form 111")
         passed += 1
+    else:
+        print(" [SKIP] Test 9: XLS Answer Extraction for Form 111 (optional fixture missing)")
+        skipped += 1
 
     # Test 10: Diagram Keyword Precision (Delimiters & Bounds)
     total += 1
@@ -263,7 +274,8 @@ def run_all_tests():
     passed += 1
 
     print("=" * 65)
-    print(f" RESULT: {passed}/{total} Tests Passed Successfully!")
+    failed = total - passed - skipped
+    print(f" RESULT: {passed} passed, {skipped} skipped, {failed} failed")
     print("=" * 65)
     return True
 
