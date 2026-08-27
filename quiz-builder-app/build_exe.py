@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 build_exe.py — Build quiz_builder_gui.exe using PyInstaller with automatic version bumping and Authenticode Code Signing
-"""
 
 import subprocess
 import sys
@@ -14,7 +13,6 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 VERSION_TEMPLATE = """# UTF-8
 # Windows Version Info for quiz_builder.exe
-# Windows Version Info for quiz_builder_gui.exe
 
 VSVersionInfo(
   ffi=FixedFileInfo(
@@ -38,10 +36,8 @@ VSVersionInfo(
             StringStruct('FileVersion', '{ver_str}'),
             StringStruct('InternalName', 'quiz_builder_gui'),
             StringStruct('LegalCopyright', 'Copyright © 2026 Elon Uziel. MIT License.'),
-            StringStruct('OriginalFilename', 'quiz_builder_gui.exe'),
             StringStruct('ProductName', 'Interactive Hebrew Quiz Builder'),
             StringStruct('ProductVersion', '{ver_str}')
-          ]
         )
       ]
     ),
