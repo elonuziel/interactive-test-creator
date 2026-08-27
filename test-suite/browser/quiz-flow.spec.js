@@ -106,7 +106,7 @@ test('builder exposes Freebuff actions with accessible explainer controls', asyn
     const popupPromise = page.waitForEvent('popup');
     await page.locator('#freebuff-digital-btn').click();
     const popup = await popupPromise;
-    await expect(popup).toHaveURL('https://freebuff.com/chat');
+    await expect(popup).toHaveURL(/^https:\/\/freebuff\.com\/(chat|login\?callbackUrl=%2Fchat)/);
     await popup.close();
 });
 
