@@ -1065,6 +1065,8 @@ def main() -> int:
     export_html_btn.clicked.connect(export_quiz_as)
     open_runs_dir_btn.clicked.connect(open_runs_folder)
 
+    state["root"] = config.workspace_root
+    populate_tests()
     window.show()
     return application.exec()
 

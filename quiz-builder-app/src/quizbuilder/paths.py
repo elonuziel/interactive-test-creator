@@ -14,7 +14,13 @@ def application_root() -> Path:
 
 
 def tests_root() -> Path:
-    return application_root() / "tests"
+    bundled_tests = application_root() / "tests"
+    if bundled_tests.is_dir():
+        return bundled_tests
+    repository_tests = application_root().parent / "tests"
+    if repository_tests.is_dir():
+        return repository_tests
+    return bundled_tests
 
 
 def scripts_root() -> Path:

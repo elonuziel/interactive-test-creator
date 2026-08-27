@@ -52,10 +52,27 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
         raise FileNotFoundError(f"Projects folder not found: {root}")
 
     candidates: list[BatchCandidate] = []
-    for path in sorted(
-        (item for item in root.iterdir() if item.is_dir() and item.name != "runs"),
-        key=lambda item: item.name.lower(),
-    ):
+    project_dirs = {
+        path
+        for path in root.rglob("*")
+        if path.is_dir()
+        and path.name != "runs"
+        and ".quizbuilder" not in path.parts
+        and any(
+            item.is_file()
+            and item.suffix.lower() in {".pdf", ".docx"}
+            for item in path.iterdir()
+        )
+    }
+    project_dirs.update(
+        path
+        for path in root.iterdir()
+        if path.is_dir()
+        and path.name != "runs"
+        and (path / "questions.json").is_file()
+    )
+
+    for path in sorted(project_dirs, key=lambda item: str(item).casefold()):
         pdfs = sorted(
             (item for item in path.iterdir() if item.is_file() and item.suffix.lower() == ".pdf"),
             key=lambda item: item.name.lower(),
@@ -63,6 +80,12 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
         answers = tuple(
             sorted(
                 (item for item in path.iterdir() if item.is_file() and item.suffix.lower() in {".csv", ".xls", ".xlsx"}),
+                key=lambda item: item.name.lower(),
+            )
+        )
+        docx = tuple(
+            sorted(
+                (item for item in path.iterdir() if item.is_file() and item.suffix.lower() == ".docx"),
                 key=lambda item: item.name.lower(),
             )
         )
@@ -80,6 +103,8 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
             issues: list[str] = []
             if source_pdf is None and len(pdfs) > 1:
                 issues.append("multiple PDF sources; choose one")
+            if source_pdf is None and not pdfs and docx:
+                issues.append("PDF source is missing; convert DOCX to PDF")
             if len(matched_answers) > 1:
                 issues.append("multiple answer keys; choose one")
             elif source_pdf and exam_variant(source_pdf.stem) and not matched_answers and answers:

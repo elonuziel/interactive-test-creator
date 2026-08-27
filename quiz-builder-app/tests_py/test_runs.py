@@ -117,6 +117,22 @@ def test_discover_batch_separates_multiple_exam_pdfs(tmp_path):
     assert candidates[1].workspace.source_pdf == moed_b
 
 
+def test_discover_batch_finds_nested_pdf_and_docx_projects(tmp_path):
+    nested = tmp_path / "archive" / "2013"
+    nested.mkdir(parents=True)
+    (nested / "exam.pdf").touch()
+    docx_only = tmp_path / "archive" / "2005"
+    docx_only.mkdir()
+    (docx_only / "exam.docx").touch()
+
+    candidates = discover_batch(tmp_path)
+
+    assert [candidate.workspace.name for candidate in candidates] == ["2005", "2013"]
+    assert candidates[0].workspace.source_pdf is None
+    assert any("convert DOCX to PDF" in issue for issue in candidates[0].issues)
+    assert candidates[1].sources.pdf == nested / "exam.pdf"
+
+
 def test_exam_variant_recognizes_hebrew_and_english_names():
     assert exam_variant("מבחן מועד א 2010") == "a"
     assert exam_variant("answers_moed_b_2010") == "b"
