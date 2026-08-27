@@ -28,6 +28,7 @@ def process_workspace(
     pdf: Path | None = None,
 ) -> list[Path]:
     workspace = Workspace(workspace_path.name, workspace_path.resolve())
+    workspace.path.mkdir(parents=True, exist_ok=True)
     sources = discover_sources(workspace)
     pdf_candidates = sorted(
         (item for item in workspace.path.iterdir() if item.is_file() and item.suffix.lower() == ".pdf"),
@@ -67,11 +68,17 @@ def process_workspace(
     return artifacts
 
 
-def process_workspaces(config: Config, workspaces: list[Path]) -> tuple[BatchProcessResult, ...]:
+def process_workspaces(
+    config: Config,
+    workspaces: list[Workspace | Path],
+) -> tuple[BatchProcessResult, ...]:
     results = []
-    for workspace_path in workspaces:
+    for selected in workspaces:
+        workspace_path = selected.path if isinstance(selected, Workspace) else selected
+        answer_key = selected.source_answer_keys[0] if isinstance(selected, Workspace) and selected.source_answer_keys else None
+        pdf = selected.source_pdf if isinstance(selected, Workspace) else None
         try:
-            artifacts = process_workspace(config, workspace_path)
+            artifacts = process_workspace(config, workspace_path, answer_key=answer_key, pdf=pdf)
         except Exception as exc:
             results.append(BatchProcessResult(workspace_path, False, error=str(exc)))
         else:

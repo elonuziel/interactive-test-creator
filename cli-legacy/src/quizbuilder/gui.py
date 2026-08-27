@@ -155,10 +155,13 @@ def main() -> int:
     def load_workspace(workspace) -> None:
         pdf_source.clear()
         pdf_source.addItem("No PDF selected")
-        for path in sorted(
+        pdf_paths = [workspace.source_pdf] if workspace.source_pdf else sorted(
             (item for item in workspace.path.iterdir() if item.is_file() and item.suffix.lower() == ".pdf"),
             key=lambda item: item.name.lower(),
-        ):
+        )
+        for path in pdf_paths:
+            if path is None:
+                continue
             pdf_source.addItem(path.name, path)
         answer_key.clear()
         answer_key.addItem("No answer key")
@@ -291,7 +294,7 @@ def main() -> int:
 
         def process_all():
             results = process_workspaces(
-                Config.defaults(root=root), [workspace.path for workspace in selected]
+                Config.defaults(root=root), selected
             )
             return (
                 [result.workspace.name for result in results if result.success],

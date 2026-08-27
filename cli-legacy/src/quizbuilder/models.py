@@ -9,6 +9,8 @@ from typing import Literal
 class Workspace:
     name: str
     path: Path
+    source_pdf: Path | None = None
+    source_answer_keys: tuple[Path, ...] = ()
 
     @property
     def questions_path(self) -> Path:

@@ -28,7 +28,7 @@ def test_cli_version_command(capsys):
     rc = main(["version"])
     assert rc == 0
     captured = capsys.readouterr()
-    assert "2.0.0" in captured.out
+    assert "2.1.0" in captured.out
 
 
 def test_cli_detect_no_dependencies(capsys):
@@ -78,7 +78,7 @@ def test_process_workspaces_continues_after_one_failure(tmp_path, monkeypatch):
     first = tmp_path / "first"
     second = tmp_path / "second"
 
-    def fake_process(_config, workspace):
+    def fake_process(_config, workspace, **_kwargs):
         if workspace == second:
             raise RuntimeError("broken PDF")
         return [workspace / "questions.json"]

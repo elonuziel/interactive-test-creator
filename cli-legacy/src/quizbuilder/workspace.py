@@ -39,11 +39,15 @@ def create_workspace(root: Path, name: str) -> Workspace:
 
 
 def discover_sources(workspace: Workspace) -> SourceFiles:
-    files = list(workspace.path.iterdir())
+    files = list(workspace.path.iterdir()) if workspace.path.is_dir() else []
     pdfs = sorted((item for item in files if item.suffix.lower() == ".pdf"), key=lambda p: p.name.lower())
     docx = tuple(sorted((item for item in files if item.suffix.lower() == ".docx"), key=lambda p: p.name.lower()))
     answers = tuple(sorted((item for item in files if item.suffix.lower() in {".csv", ".xls", ".xlsx"}), key=lambda p: p.name.lower()))
-    return SourceFiles(pdf=pdfs[0] if pdfs else None, docx=docx, answer_keys=answers)
+    return SourceFiles(
+        pdf=workspace.source_pdf or (pdfs[0] if pdfs else None),
+        docx=docx,
+        answer_keys=workspace.source_answer_keys or answers,
+    )
 
 
 def clean_scratch(workspace: Workspace, include_generated_prompts: bool = True) -> list[Path]:

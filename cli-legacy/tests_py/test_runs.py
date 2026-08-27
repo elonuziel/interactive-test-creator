@@ -93,10 +93,28 @@ def test_discover_batch_reports_incomplete_and_ambiguous_projects(tmp_path):
 
     candidates = discover_batch(tmp_path)
 
-    assert [candidate.workspace.name for candidate in candidates] == ["ambiguous", "ready"]
+    assert [candidate.workspace.name for candidate in candidates] == [
+        "ambiguous - first", "ambiguous - second", "ready"
+    ]
     assert candidates[0].ready_to_run is False
-    assert "multiple PDF sources" in candidates[0].issues[0]
-    assert candidates[1].ready_to_run is True
+    assert "questions.json is missing" in candidates[0].issues[0]
+    assert candidates[2].ready_to_run is True
+
+
+def test_discover_batch_separates_multiple_exam_pdfs(tmp_path):
+    year = tmp_path / "2010"
+    year.mkdir()
+    moed_a = year / "Moed A.pdf"
+    moed_b = year / "Moed B.pdf"
+    moed_a.touch()
+    moed_b.touch()
+
+    candidates = discover_batch(tmp_path)
+
+    assert len(candidates) == 2
+    assert candidates[0].workspace.path != candidates[1].workspace.path
+    assert candidates[0].workspace.source_pdf == moed_a
+    assert candidates[1].workspace.source_pdf == moed_b
 
 
 def test_render_pdf_page_returns_png_bytes(tmp_path):
