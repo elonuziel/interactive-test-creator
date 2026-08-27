@@ -9,6 +9,7 @@ from .exporter import build_standalone_quiz
 from .pipeline import PipelineRunner
 from .prompts import generate_prompt
 from .validation import load_questions
+from .markdown import validate_image_references
 from .workspace import Workspace, clean_scratch, discover_sources
 
 
@@ -69,6 +70,10 @@ def process_workspace(
         if has_answers:
             runner.merge_answers(workspace.path)
         runner.validate(workspace.questions_path)
+        questions = load_questions(workspace.questions_path)
+        missing_images = validate_image_references(questions, workspace.path)
+        if missing_images:
+            raise ValueError("Missing question image references: " + "; ".join(missing_images))
         artifacts.append(workspace.questions_path)
     return artifacts
 

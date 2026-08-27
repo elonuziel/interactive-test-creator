@@ -96,6 +96,21 @@ def dump_questions(questions: list[dict[str, Any]]) -> str:
     return "\n".join(sections)
 
 
+def validate_image_references(questions: list[dict[str, Any]], base_dir: Path) -> list[str]:
+    missing: list[str] = []
+    for index, question in enumerate(questions, 1):
+        for field in ("image", "pageImage"):
+            value = question.get(field)
+            if not value or str(value).startswith(("data:", "http://", "https://")):
+                continue
+            target = Path(str(value))
+            if not target.is_absolute():
+                target = base_dir / target
+            if not target.is_file():
+                missing.append(f"Question {index}: {field}={value}")
+    return missing
+
+
 def write_questions(path: Path, questions: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(dump_questions(questions), encoding="utf-8")

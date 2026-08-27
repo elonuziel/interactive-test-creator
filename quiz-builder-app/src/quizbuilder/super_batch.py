@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 from .batch import _project_slug, exam_variant, match_answer_keys
 from .documents import classify_pdf, clean_pdf, preferred_pdf
-from .markdown import load_questions, write_questions
+from .markdown import load_questions, write_questions, validate_image_references
 from .models import Workspace
 from .prompts import extract_markdown_from_response, send_to_provider
 from .config import Config
@@ -359,6 +359,10 @@ def process_item(
             temporary = None
 
         strict_questions(output, allow_unanswered=(item.decision == "generate_only"))
+        missing_images = validate_image_references(load_questions(output), output.parent)
+        if missing_images:
+            raise ValueError("Missing question image references: " + "; ".join(missing_images))
+            item.overview = replace(item.overview, warnings=item.overview.warnings + tuple(missing_images))
         item.status = "saved"
         if progress:
             progress(item)
