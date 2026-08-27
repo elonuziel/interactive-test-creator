@@ -14,6 +14,7 @@ sys.path.insert(0, SCRIPTS_DIR)
 # noinspection PyUnresolvedReferences
 from importlib import import_module
 parse_mod = import_module('5_parse_questions_md')
+from quizbuilder.markdown import load_questions
 
 clean_question_text = parse_mod.clean_question_text
 clean_option_text = parse_mod.clean_option_text
@@ -144,7 +145,7 @@ class TestMidlineSplit:
 
 class TestFullParse:
     def test_basic_parsing(self, write_md, tmp_path):
-        """Parse a simple markdown with 2 questions and verify JSON output."""
+        """Parse a simple markdown with 2 questions and verify Markdown output."""
         md_content = """\
 שאלה מספר 1:
 מה הצבע של השמיים?
@@ -161,7 +162,7 @@ class TestFullParse:
 ד. 0
 """
         md_path = write_md(md_content)
-        output_path = str(tmp_path / "output.json")
+        output_path = str(tmp_path / "output.md")
 
         result = subprocess.run(
             [sys.executable, os.path.join(SCRIPTS_DIR, '5_parse_questions_md.py'),
@@ -170,8 +171,7 @@ class TestFullParse:
         )
         assert result.returncode == 0, f"stderr: {result.stderr}"
 
-        with open(output_path, 'r', encoding='utf-8') as f:
-            questions = json.load(f)
+        questions = load_questions(tmp_path / "output.md")
 
         assert len(questions) == 2
         assert "השמיים" in questions[0]['question']
@@ -190,7 +190,7 @@ class TestFullParse:
 ד. אפשרות ד
 """
         md_path = write_md(md_content)
-        output_path = str(tmp_path / "output.json")
+        output_path = str(tmp_path / "output.md")
 
         result = subprocess.run(
             [sys.executable, os.path.join(SCRIPTS_DIR, '5_parse_questions_md.py'),
@@ -199,8 +199,7 @@ class TestFullParse:
         )
         assert result.returncode == 0
 
-        with open(output_path, 'r', encoding='utf-8') as f:
-            questions = json.load(f)
+        questions = load_questions(tmp_path / "output.md")
 
         assert len(questions) == 1
         assert len(questions[0]['options']) == 4
@@ -217,7 +216,7 @@ class TestFullParse:
 ד. צהוב
 """
         md_path = write_md(md_content)
-        output_path = str(tmp_path / "output.json")
+        output_path = str(tmp_path / "output.md")
 
         subprocess.run(
             [sys.executable, os.path.join(SCRIPTS_DIR, '5_parse_questions_md.py'),
@@ -225,8 +224,7 @@ class TestFullParse:
             capture_output=True, text=True, encoding='utf-8'
         )
 
-        with open(output_path, 'r', encoding='utf-8') as f:
-            questions = json.load(f)
+        questions = load_questions(tmp_path / "output.md")
 
         assert len(questions) == 1
         # The noise line should NOT appear in the question text
@@ -250,7 +248,7 @@ class TestFullParse:
 ד. ארבע
 """
         md_path = write_md(md_content)
-        output_path = str(tmp_path / "output.json")
+        output_path = str(tmp_path / "output.md")
 
         subprocess.run(
             [sys.executable, os.path.join(SCRIPTS_DIR, '5_parse_questions_md.py'),
@@ -258,8 +256,7 @@ class TestFullParse:
             capture_output=True, text=True, encoding='utf-8'
         )
 
-        with open(output_path, 'r', encoding='utf-8') as f:
-            questions = json.load(f)
+        questions = load_questions(tmp_path / "output.md")
 
         assert len(questions) == 2
         assert "הצבע" in questions[0]['question']

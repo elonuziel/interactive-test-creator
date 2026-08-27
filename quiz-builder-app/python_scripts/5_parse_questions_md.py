@@ -5,6 +5,13 @@ import os
 import argparse
 from glob import glob
 
+try:
+    from quizbuilder.markdown import dump_questions
+except ModuleNotFoundError:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+    sys.modules.pop('quizbuilder', None)
+    from quizbuilder.markdown import dump_questions
+
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
@@ -477,7 +484,7 @@ def main():
 
     # ── Write output ───────────────────────────────────────────────────────
     with open(args.output, 'w', encoding='utf-8') as f:
-        json.dump(formatted, f, ensure_ascii=False, indent=2)
+        f.write(dump_questions(formatted))
 
     img_note = ""
     if args.image_dir:
