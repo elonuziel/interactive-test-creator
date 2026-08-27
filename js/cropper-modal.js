@@ -387,6 +387,7 @@
     }
 
     return {
+        init: initCropperModal,
         initCropperModal,
         openCropModal,
         closeCropModal,
