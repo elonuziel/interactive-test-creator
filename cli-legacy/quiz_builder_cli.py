@@ -69,13 +69,14 @@ else:
 
 TESTS_DIR = os.path.join(CLI_ROOT, 'tests')
 
-FREEBUFF_COMMAND_NAMES = ['freebuff', 'freebuff-cli']
+FREEBUFF_COMMAND_NAMES = ('freebuff', 'freebuff-cli')
 
 
-def detect_freebuff_command():
-    """Return a detected Freebuff CLI executable, or None."""
-    for command_name in FREEBUFF_COMMAND_NAMES:
-        command_path = shutil.which(command_name)
+def detect_freebuff_command(path_lookup=None):
+    """Return the first installed Freebuff CLI executable, or None."""
+    path_lookup = path_lookup or shutil.which
+    for name in FREEBUFF_COMMAND_NAMES:
+        command_path = path_lookup(name)
         if command_path:
             return command_path
     return None
