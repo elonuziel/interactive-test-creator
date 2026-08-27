@@ -122,11 +122,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     themeToggle.addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
 
-    function setImmediateFeedback(enabled) {
-        isImmediateFeedback = enabled;
-        if (feedbackToggle) feedbackToggle.checked = enabled;
-        if (welcomeFeedbackToggle) welcomeFeedbackToggle.checked = enabled;
+    // ── Immediate Feedback / Auto-Review ──────────────────────────────────────
+    const savedFeedback = localStorage.getItem('quiz_immediate_feedback');
+    if (savedFeedback !== null) {
+        isImmediateFeedback = savedFeedback === 'true';
     }
+
+    function setImmediateFeedback(enabled) {
+        isImmediateFeedback = Boolean(enabled);
+        if (feedbackToggle) feedbackToggle.checked = isImmediateFeedback;
+        if (welcomeFeedbackToggle) welcomeFeedbackToggle.checked = isImmediateFeedback;
+        localStorage.setItem('quiz_immediate_feedback', isImmediateFeedback);
+    }
+    setImmediateFeedback(isImmediateFeedback);
 
     feedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
     welcomeFeedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));

@@ -15,6 +15,7 @@ import base64
 import json
 import mimetypes
 import os
+from pathlib import Path
 import re
 import sys
 

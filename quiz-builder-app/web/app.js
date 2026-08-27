@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let croppedImages       = {}; // Store crop data URLs per full image path
     const themeToggle    = document.getElementById('theme-toggle');
     const feedbackToggle = document.getElementById('immediate-feedback-toggle');
+    const welcomeFeedbackToggle = document.getElementById('welcome-immediate-feedback-toggle');
     const themeIcon      = document.getElementById('theme-icon');
     const filterBtns     = document.querySelectorAll('.filter-btn');
 
@@ -76,8 +77,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setTheme(theme);
 
-    themeToggle.addEventListener('click', () => setTheme(toggleTheme(theme)));
-    feedbackToggle.addEventListener('change', e => { isImmediateFeedback = e.target.checked; });
+    themeToggle?.addEventListener('click', () => setTheme(toggleTheme(theme)));
+
+    // ── Immediate Feedback / Auto-Review ──────────────────────────────────────
+    const savedFeedback = localStorage.getItem('quiz_immediate_feedback');
+    if (savedFeedback !== null) {
+        isImmediateFeedback = savedFeedback === 'true';
+    }
+
+    function setImmediateFeedback(enabled) {
+        isImmediateFeedback = Boolean(enabled);
+        if (feedbackToggle) feedbackToggle.checked = isImmediateFeedback;
+        if (welcomeFeedbackToggle) welcomeFeedbackToggle.checked = isImmediateFeedback;
+        localStorage.setItem('quiz_immediate_feedback', isImmediateFeedback);
+    }
+    setImmediateFeedback(isImmediateFeedback);
+
+    feedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
+    welcomeFeedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
 
     // ── localStorage Persistence ──────────────────────────────────────────────
     function saveProgress() {
@@ -900,8 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fullOriginalQuestions = [...questions];
         }
 
-        isImmediateFeedback = immediateFeedback;
-        if (feedbackToggle) feedbackToggle.checked = immediateFeedback;
+        setImmediateFeedback(immediateFeedback);
 
         questions = [...pendingPracticeQuestions];
         currentQuestionIndex = 0;

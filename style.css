@@ -487,15 +487,39 @@ button[disabled],
 
 .welcome-feedback-toggle {
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-    margin-top: 1.25rem;
-    color: var(--text-secondary);
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.75rem;
+    background: var(--option-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
     cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.welcome-feedback-toggle:hover {
+    background: var(--option-hover);
+    border-color: var(--text-secondary);
+}
+
+.welcome-feedback-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .welcome-feedback-toggle .toggle-label {
-    font-size: 0.875rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.welcome-feedback-toggle .toggle-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
 }
 
 .hidden {
