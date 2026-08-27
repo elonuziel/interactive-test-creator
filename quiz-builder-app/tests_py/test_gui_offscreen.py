@@ -38,11 +38,16 @@ def test_question_editor_round_trips_question(application):
     editor.deleteLater()
 
 
-def test_main_window_populates_real_tests_folder(application):
-    root = Path(__file__).resolve().parents[2] / "tests"
-    window = MainWindow(Config.defaults(root=root))
+def test_main_window_populates_real_tests_folder(application, tmp_path):
+    for name in ["exam_2020_a", "exam_2021_b"]:
+        exam_dir = tmp_path / name
+        exam_dir.mkdir()
+        (exam_dir / "questions.md").write_text("## Question 1\nTest?\n- A\n- B\n\nAnswer: A\n", encoding="utf-8")
+        (exam_dir / f"{name}.pdf").write_bytes(b"%PDF-1.4\n")
 
-    assert window.exam_list.count() == 35
+    window = MainWindow(Config.defaults(root=tmp_path))
+
+    assert window.exam_list.count() == 2
     assert window.ai_provider_combo.findText("Web: Freebuff Chat") >= 0
     window.close()
 
