@@ -9,39 +9,76 @@ class MarkdownError(ValueError):
     pass
 
 
+def _parse_answer(val: str) -> int:
+    val = val.strip().upper()
+    mapping = {
+        "A": 0, "B": 1, "C": 2, "D": 3,
+        "א": 0, "ב": 1, "ג": 2, "ד": 3,
+        "1": 0, "2": 1, "3": 2, "4": 3,
+    }
+    return mapping.get(val, 0)
+
+
 def load_questions(path: Path) -> list[dict[str, Any]]:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise MarkdownError(f"Could not read questions file {path}: {exc}") from exc
     questions: list[dict[str, Any]] = []
-    blocks = re.split(r"(?m)^##+\s+Question\s+\d+\s*$", text)
-    for block in blocks[1:]:
-        lines = [line.rstrip() for line in block.strip().splitlines()]
-        if not lines:
-            continue
-        answer_match = re.search(r"(?mi)^Answer:\s*([A-D])\s*$", block)
-        answer = ord(answer_match.group(1).upper()) - ord("A") if answer_match else 0
-        option_indexes = [i for i, line in enumerate(lines) if re.match(r"^[-*+]\s+", line)]
+    header_pattern = re.compile(r"(?m)^##+\s*(?:Question|שאלה)\s+\d+[.: \t-]*(.*)$", re.IGNORECASE)
+    matches = list(header_pattern.finditer(text))
+    if not matches:
+        raise MarkdownError("Questions Markdown must contain at least one question.")
+
+    for i, match in enumerate(matches):
+        inline_header_text = match.group(1).strip()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        block = text[start:end].strip()
+        lines = [line.rstrip() for line in block.splitlines()]
+
+        answer_match = re.search(r"(?mi)^(?:Answer|תשובה):\s*([A-Dא-ד1-4])\s*$", block)
+        answer = _parse_answer(answer_match.group(1)) if answer_match else 0
+
+        option_indexes = [idx for idx, line in enumerate(lines) if re.match(r"^(?:[-*+]|\d+\.|\([1-4]\)|[א-ד]\.)\s+", line)]
         if not option_indexes:
             continue
-        question_lines = lines[:option_indexes[0]]
-        question = " ".join(line.strip() for line in question_lines if line.strip())
+
+        body_question_lines = lines[:option_indexes[0]]
+        body_question = " ".join(line.strip() for line in body_question_lines if line.strip() and not line.strip().startswith("pageImage:"))
+
+        if inline_header_text and body_question:
+            question = f"{inline_header_text} {body_question}"
+        elif inline_header_text:
+            question = inline_header_text
+        elif body_question:
+            question = body_question
+        else:
+            question = f"Question {i + 1}"
+
         options: list[str] = []
-        for index in option_indexes:
-            match = re.match(r"^[-*+]\s+(.*)$", lines[index])
-            if match:
-                options.append(match.group(1).strip())
+        for idx in option_indexes:
+            line_str = lines[idx]
+            if re.match(r"(?mi)^(?:Answer|תשובה):", line_str):
+                continue
+            match_opt = re.match(r"^(?:[-*+]|\d+\.|\([1-4]\)|[א-ד]\.)\s*(?:(?:[א-דA-D1-4][\.\)]|\([א-דA-D1-4]\))\s+)?(.*)$", line_str)
+            if match_opt:
+                opt_str = match_opt.group(1).strip()
+                if opt_str:
+                    options.append(opt_str)
+
         metadata: dict[str, Any] = {}
         image_match = re.search(r"(?mi)^pageImage:\s*(\S+)\s*$", block)
         if image_match:
             metadata["pageImage"] = image_match.group(1)
+
         if question and options:
             item = {"question": question, "options": options, "correctIndex": answer}
             item.update(metadata)
             questions.append(item)
+
     if not questions:
-        raise MarkdownError("Questions Markdown must contain at least one question.")
+        raise MarkdownError("Questions Markdown must contain at least one valid question with options.")
     return questions
 
 

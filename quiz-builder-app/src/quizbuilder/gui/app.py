@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 import webbrowser
 
 from PySide6.QtCore import QSettings, QThreadPool, Qt
-from PySide6.QtGui import QImage, QKeySequence, QPixmap, QShortcut, QAction
+from PySide6.QtGui import QGuiApplication, QImage, QKeySequence, QPixmap, QShortcut, QAction
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -89,7 +90,7 @@ class MainWindow(QWidget):
         root_layout.setSpacing(10)
 
         top_bar = QFrame()
-        top_bar.setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px;")
+        top_bar.setObjectName("topBar")
         top_layout = QHBoxLayout(top_bar)
         self.root_label = QLabel("Exam folder: (not selected)")
         self.root_label.setToolTip("Choose the parent folder containing your exam folders.")
@@ -109,7 +110,7 @@ class MainWindow(QWidget):
         self._build_export_tab()
 
         status_bar = QFrame()
-        status_bar.setStyleSheet("background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 10px;")
+        status_bar.setObjectName("statusBar")
         status_layout = QHBoxLayout(status_bar)
         self.status_label = QLabel("Welcome! Choose an exam folder to begin. Each exam folder should contain a PDF and questions.md.")
         self.status_label.setWordWrap(True)
@@ -274,6 +275,8 @@ class MainWindow(QWidget):
     def _show_welcome_if_needed(self) -> None:
         if self.settings.value("welcome_shown", False, type=bool):
             return
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen" or QGuiApplication.platformName() == "offscreen":
+            return
         dialog = QDialog(self)
         dialog.setWindowTitle("Welcome to Quiz Builder")
         layout = QVBoxLayout(dialog)
@@ -369,9 +372,12 @@ class MainWindow(QWidget):
                 label += f" ({'; '.join(candidate.issues)})"
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
             self.exam_list.addItem(item)
             play_item = QListWidgetItem(label)
             play_item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
+            play_item.setFlags(play_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             play_item.setCheckState(Qt.CheckState.Checked if candidate.ready_to_run else Qt.CheckState.Unchecked)
             self.play_list.addItem(play_item)
         self.root_label.setText(f"Exam folder: {self.state['root']}")
@@ -542,6 +548,8 @@ class MainWindow(QWidget):
 
     def process_batch_checked(self) -> None:
         selected = [self.exam_list.item(index).data(Qt.ItemDataRole.UserRole) for index in range(self.exam_list.count()) if self.exam_list.item(index).checkState() == Qt.CheckState.Checked]
+        if not selected and self.state["workspace"]:
+            selected = [self.state["workspace"]]
         if not selected or not self.state["root"]:
             QMessageBox.warning(self, "No exams selected", "Select at least one exam.")
             return

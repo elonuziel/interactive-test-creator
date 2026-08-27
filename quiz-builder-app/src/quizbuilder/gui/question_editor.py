@@ -57,7 +57,7 @@ class QuestionEditorWidget(QWidget):
             self.option_radios.append(radio)
 
             badge = QLabel(f"  {letter}  ")
-            badge.setStyleSheet("background: #e2e8f0; font-weight: bold; border-radius: 4px; padding: 4px;")
+            badge.setObjectName("badge")
 
             edit = QLineEdit()
             edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
@@ -96,9 +96,17 @@ class QuestionEditorWidget(QWidget):
     def collect(self, question: dict) -> None:
         """Write the current field values back into a question dict."""
         question["question"] = self.text_edit.toPlainText().strip()
-        question["options"] = [field.text().strip() for field in self.option_edits if field.text().strip()]
+        non_empty_options = [field.text().strip() for field in self.option_edits if field.text().strip()]
+        question["options"] = non_empty_options
         checked_id = self.radio_group.checkedId()
-        question["correctIndex"] = checked_id if checked_id >= 0 else 0
+        if 0 <= checked_id < len(self.option_edits):
+            checked_text = self.option_edits[checked_id].text().strip()
+            if checked_text in non_empty_options:
+                question["correctIndex"] = non_empty_options.index(checked_text)
+            else:
+                question["correctIndex"] = min(max(0, checked_id), max(0, len(non_empty_options) - 1))
+        else:
+            question["correctIndex"] = 0
 
     def clear(self) -> None:
         self.text_edit.clear()
