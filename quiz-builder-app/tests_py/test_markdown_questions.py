@@ -34,3 +34,20 @@ Answer: 1
     assert loaded[0]["correctIndex"] == 1
     assert loaded[1]["options"] == ["אופציה 1", "אופציה 2"]
     assert loaded[1]["correctIndex"] == 0
+
+
+def test_markdown_explanation_parsing_and_dumping(tmp_path):
+    questions = [
+        {
+            "question": "מה התוצאה של 2+2?",
+            "options": ["3", "4", "5"],
+            "correctIndex": 1,
+            "explanation": "כי 2 ועוד 2 שווה 4 על פי חשבון בסיסי.",
+        }
+    ]
+    path = tmp_path / "questions_with_exp.md"
+    dumped = dump_questions(questions)
+    assert "Explanation: כי 2 ועוד 2 שווה 4" in dumped
+    path.write_text(dumped, encoding="utf-8")
+    loaded = load_questions(path)
+    assert loaded == questions

@@ -11,6 +11,7 @@ from PySide6.QtCore import QSettings, QThreadPool, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QKeySequence, QPixmap, QShortcut, QAction
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QProgressBar,
+    QRadioButton,
     QSpinBox,
     QLabel,
     QLineEdit,
@@ -41,7 +43,7 @@ from PySide6.QtWidgets import (
 
 from ..batch import discover_batch
 from ..commands import generate_workspace_prompt, process_workspace, process_workspaces
-from ..super_batch import build_plan, classify_plan_item, default_decision, process_plan
+from ..super_batch import SuperBatchPlan, SuperBatchItem, build_plan, classify_plan_item, default_decision, process_plan
 from ..config import Config
 from ..documents import classify_pdf, clean_pdf, convert_docx_with_soffice, describe_page_cleaning, DocumentError
 from ..exporter import build_run_standalone_quiz, build_standalone_quiz
@@ -290,15 +292,46 @@ class MainWindow(QWidget):
         list_group = QGroupBox("Questions in this exam")
         list_layout = QVBoxLayout(list_group)
         self.question_status = QLabel("No exam selected")
+        self.question_status.setStyleSheet("font-weight: bold;")
+
+        filter_row = QHBoxLayout()
+        self.question_filter_edit = QLineEdit()
+        self.question_filter_edit.setPlaceholderText("Filter questions...")
+        self.filter_incomplete_checkbox = QCheckBox("⚠️ Incomplete only")
+        self.filter_incomplete_checkbox.setToolTip("Show only questions missing options, text, or a valid answer.")
+        filter_row.addWidget(self.question_filter_edit, 1)
+        filter_row.addWidget(self.filter_incomplete_checkbox)
+
         self.question_list = QListWidget()
-        self.add_question_button = QPushButton("Add question")
-        self.delete_question_button = QPushButton("Delete")
+
+        reorder_row = QHBoxLayout()
+        self.move_up_button = QPushButton("⬆️ Up")
+        self.move_up_button.setToolTip("Move selected question up")
+        self.move_down_button = QPushButton("⬇️ Down")
+        self.move_down_button.setToolTip("Move selected question down")
+        self.duplicate_button = QPushButton("📋 Duplicate")
+        self.duplicate_button.setToolTip("Duplicate selected question")
+        reorder_row.addWidget(self.move_up_button)
+        reorder_row.addWidget(self.move_down_button)
+        reorder_row.addWidget(self.duplicate_button)
+
+        action_row = QHBoxLayout()
+        self.add_question_button = QPushButton("➕ Add")
+        self.delete_question_button = QPushButton("🗑️ Delete")
+        self.matrix_button = QPushButton("🔢 Answer Matrix")
+        self.matrix_button.setToolTip("Open quick grid to view and edit all answers at once")
+        action_row.addWidget(self.add_question_button)
+        action_row.addWidget(self.delete_question_button)
+        action_row.addWidget(self.matrix_button)
+
         self.open_questions_button = QPushButton("Open questions file...")
         self.open_questions_button.setToolTip("Load questions from any questions.md or questions.json file")
+
         list_layout.addWidget(self.question_status)
+        list_layout.addLayout(filter_row)
         list_layout.addWidget(self.question_list, 1)
-        list_layout.addWidget(self.add_question_button)
-        list_layout.addWidget(self.delete_question_button)
+        list_layout.addLayout(reorder_row)
+        list_layout.addLayout(action_row)
         list_layout.addWidget(self.open_questions_button)
         self.review_splitter.addWidget(list_group)
 
@@ -390,12 +423,18 @@ class MainWindow(QWidget):
         self.launch_ai_button.clicked.connect(self.launch_ai)
         self.preview_button.clicked.connect(self.preview_first_page)
         self.next_review_button.clicked.connect(lambda: self.tabs.setCurrentIndex(1))
+        self.question_filter_edit.textChanged.connect(self.refresh_question_list)
+        self.filter_incomplete_checkbox.toggled.connect(self.refresh_question_list)
         self.question_list.currentRowChanged.connect(self.show_question)
         self.help_button.clicked.connect(self.show_markdown_help)
         self.question_editor.changed.connect(self.mark_dirty)
         self.question_editor.crop_requested.connect(self.open_image_cropper)
+        self.move_up_button.clicked.connect(self.move_question_up)
+        self.move_down_button.clicked.connect(self.move_question_down)
+        self.duplicate_button.clicked.connect(self.duplicate_question)
         self.add_question_button.clicked.connect(self.add_question)
         self.delete_question_button.clicked.connect(self.delete_question)
+        self.matrix_button.clicked.connect(self.open_answer_matrix)
         self.save_button.clicked.connect(self.save_test)
         self.next_export_button.clicked.connect(lambda: (self.save_active_question(), self.tabs.setCurrentIndex(2)))
         self.select_all_button.clicked.connect(self.select_all_exams)
@@ -407,6 +446,9 @@ class MainWindow(QWidget):
         self.open_runs_button.clicked.connect(self.open_runs_folder)
         QShortcut(QKeySequence("Ctrl+S"), self).activated.connect(self.save_test)
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(lambda: (self.exam_search.setFocus(), self.exam_search.selectAll()))
+        QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.duplicate_question)
+        QShortcut(QKeySequence("Alt+Up"), self).activated.connect(self.move_question_up)
+        QShortcut(QKeySequence("Alt+Down"), self).activated.connect(self.move_question_down)
 
     def show_markdown_help(self) -> None:
         QMessageBox.information(self, "questions.md format", "Each question uses this format:\n\n## Question 1\n\nQuestion text\n\n- First choice\n- Second choice\n- Third choice\n- Fourth choice\n\nAnswer: A\n\nUse pageImage: path/to/page.png on its own line when a question references a diagram or table.")
@@ -790,40 +832,199 @@ class MainWindow(QWidget):
             self.question_editor.clear()
 
     def refresh_question_list(self) -> None:
+        self.question_list.blockSignals(True)
         self.question_list.clear()
+        filter_text = self.question_filter_edit.text().strip().lower()
+        incomplete_only = self.filter_incomplete_checkbox.isChecked()
+
         valid = 0
+        total = len(self.state["questions"])
+
         for index, question in enumerate(self.state["questions"]):
             text = (question.get("question", "") or "").strip()
             options = question.get("options", [])
-            ready = bool(text and len(options) >= 2)
-            valid += ready
-            self.question_list.addItem(f"{'OK' if ready else 'Review'} {index + 1}. {text or 'Empty question'}")
-        total = len(self.state["questions"])
-        self.question_status.setText(f"{valid}/{total} questions ready" if total else "No questions in this exam")
+            has_ans = isinstance(question.get("correctIndex"), int) and 0 <= question.get("correctIndex", -1) < len(options)
+            ready = bool(text and len(options) >= 2 and has_ans)
+            if ready:
+                valid += 1
 
-    def show_question(self, index: int) -> None:
+            if incomplete_only and ready:
+                continue
+            if filter_text and filter_text not in text.lower():
+                continue
+
+            prefix = "✅" if ready else "⚠️"
+            display_text = f"{prefix} {index + 1}. {text[:55] + '...' if len(text) > 55 else (text or 'Empty question')}"
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.UserRole, index)
+            self.question_list.addItem(item)
+
+        self.question_list.blockSignals(False)
+
+        if total == 0:
+            self.question_status.setText("No questions in this exam")
+            self.question_status.setStyleSheet("color: var(--muted-color); font-weight: bold;")
+        elif valid == total:
+            self.question_status.setText(f"📊 {total} Questions — All {valid} Complete ✅")
+            self.question_status.setStyleSheet("color: #4ade80; font-weight: bold;")
+        else:
+            self.question_status.setText(f"📊 {total} Questions (✅ {valid} Complete | ⚠️ {total - valid} Incomplete)")
+            self.question_status.setStyleSheet("color: #facc15; font-weight: bold;")
+
+    def show_question(self, row: int) -> None:
         self.save_active_question()
-        self.state["index"] = index
+        item = self.question_list.item(row) if row >= 0 else None
+        real_index = item.data(Qt.ItemDataRole.UserRole) if item is not None else row
+        if real_index is None:
+            real_index = row
+        self.state["index"] = real_index
         workspace = self.state["workspace"]
         workspace_path = workspace.path if workspace else None
-        q = self.state["questions"][index] if 0 <= index < len(self.state["questions"]) else None
+        q = self.state["questions"][real_index] if 0 <= real_index < len(self.state["questions"]) else None
         self.question_editor.set_question(q, workspace_path=workspace_path)
+
+    def _select_question_by_real_index(self, target_index: int) -> None:
+        for row in range(self.question_list.count()):
+            item = self.question_list.item(row)
+            if item and item.data(Qt.ItemDataRole.UserRole) == target_index:
+                self.question_list.setCurrentRow(row)
+                return
 
     def add_question(self) -> None:
         self.save_active_question()
         self.state["questions"].append({"question": "", "options": ["", "", "", ""], "correctIndex": 0})
         self.state["dirty"] = True
         self.refresh_question_list()
-        self.question_list.setCurrentRow(len(self.state["questions"]) - 1)
+        self._select_question_by_real_index(len(self.state["questions"]) - 1)
 
     def delete_question(self) -> None:
         index = self.state["index"]
         if index < 0 or QMessageBox.question(self, "Delete question", "Delete the selected question?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
+        self.save_active_question()
         self.state["questions"].pop(index)
         self.state["dirty"] = True
         self.refresh_question_list()
-        self.question_list.setCurrentRow(min(index, self.question_list.count() - 1))
+        next_index = min(index, len(self.state["questions"]) - 1)
+        self._select_question_by_real_index(next_index)
+
+    def move_question_up(self) -> None:
+        idx = self.state["index"]
+        if idx <= 0 or idx >= len(self.state["questions"]):
+            return
+        self.save_active_question()
+        self.state["questions"][idx - 1], self.state["questions"][idx] = (
+            self.state["questions"][idx],
+            self.state["questions"][idx - 1],
+        )
+        self.state["index"] = idx - 1
+        self.state["dirty"] = True
+        self.refresh_question_list()
+        self._select_question_by_real_index(idx - 1)
+
+    def move_question_down(self) -> None:
+        idx = self.state["index"]
+        if idx < 0 or idx >= len(self.state["questions"]) - 1:
+            return
+        self.save_active_question()
+        self.state["questions"][idx + 1], self.state["questions"][idx] = (
+            self.state["questions"][idx],
+            self.state["questions"][idx + 1],
+        )
+        self.state["index"] = idx + 1
+        self.state["dirty"] = True
+        self.refresh_question_list()
+        self._select_question_by_real_index(idx + 1)
+
+    def duplicate_question(self) -> None:
+        idx = self.state["index"]
+        if idx < 0 or idx >= len(self.state["questions"]):
+            return
+        self.save_active_question()
+        import copy
+        dup = copy.deepcopy(self.state["questions"][idx])
+        self.state["questions"].insert(idx + 1, dup)
+        self.state["index"] = idx + 1
+        self.state["dirty"] = True
+        self.refresh_question_list()
+        self._select_question_by_real_index(idx + 1)
+
+    def open_answer_matrix(self) -> None:
+        self.save_active_question()
+        questions = self.state["questions"]
+        if not questions:
+            QMessageBox.information(self, "Answer Matrix", "No questions available in this exam.")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Quick Answer Matrix — {self.state['workspace'].name if self.state['workspace'] else 'Exam'}")
+        dialog.resize(750, 520)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("<b>Rapid Answer Key Review:</b> Click any choice to update that question's correct answer instantly."))
+
+        table = QTableWidget(len(questions), 6, dialog)
+        table.setHorizontalHeaderLabels(["#", "Question Preview", "א (A)", "ב (B)", "ג (C)", "ד (D)"])
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        for col in range(2, 6):
+            table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+
+        letters = ["א", "ב", "ג", "ד"]
+
+        for row_idx, q in enumerate(questions):
+            num_item = QTableWidgetItem(str(row_idx + 1))
+            num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            table.setItem(row_idx, 0, num_item)
+
+            q_text = (q.get("question", "") or "").strip()
+            preview_item = QTableWidgetItem(q_text[:75] + ("..." if len(q_text) > 75 else ""))
+            table.setItem(row_idx, 1, preview_item)
+
+            curr_ans = q.get("correctIndex", 0)
+
+            btn_widget = QWidget()
+            btn_layout = QHBoxLayout(btn_widget)
+            btn_layout.setContentsMargins(2, 2, 2, 2)
+            btn_layout.setSpacing(4)
+            btn_group = QButtonGroup(btn_widget)
+
+            for opt_idx, letter in enumerate(letters):
+                radio = QRadioButton(letter)
+                btn_group.addButton(radio, opt_idx)
+                if opt_idx == curr_ans:
+                    radio.setChecked(True)
+
+                def make_toggle(r, o):
+                    return lambda checked: (questions[r].__setitem__("correctIndex", o), self.mark_dirty()) if checked else None
+
+                radio.toggled.connect(make_toggle(row_idx, opt_idx))
+                btn_layout.addWidget(radio)
+
+            table.setCellWidget(row_idx, 2 + curr_ans, None) # reset
+            # Put the 4 radios into columns 2, 3, 4, 5
+            for opt_idx, letter in enumerate(letters):
+                radio = QRadioButton(letter)
+                if opt_idx == curr_ans:
+                    radio.setChecked(True)
+                radio.toggled.connect(make_toggle(row_idx, opt_idx))
+                table.setCellWidget(row_idx, 2 + opt_idx, radio)
+
+        layout.addWidget(table)
+
+        btn_box = QHBoxLayout()
+        btn_save = QPushButton("💾 Save questions.md")
+        btn_save.clicked.connect(lambda: (self.save_test(), dialog.accept()))
+        btn_done = QPushButton("Done")
+        btn_done.clicked.connect(dialog.accept)
+        btn_box.addWidget(btn_save)
+        btn_box.addStretch()
+        btn_box.addWidget(btn_done)
+        layout.addLayout(btn_box)
+
+        dialog.exec()
+        self.refresh_question_list()
+        if 0 <= self.state["index"] < len(questions):
+            self.show_question(self.state["index"])
 
     def check_pdf_classification(self, pdf: Path) -> None:
         try:
@@ -880,7 +1081,7 @@ class MainWindow(QWidget):
         worker.signals.failed.connect(lambda error: QMessageBox.critical(self, "Batch processing failed", f"{error}\n\nCheck the PDFs and answer keys, then reload the exam list."))
         self.start_worker(worker)
 
-    def open_super_batch(self) -> None:
+    def open_super_batch(self, custom_items: list[SuperBatchItem] | None = None) -> None:
         if not self.state["root"]:
             QMessageBox.warning(self, "No exam folder", "Choose an exam folder before starting Super Batch.")
             return
@@ -889,7 +1090,10 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "No local CLI AI found", "Super Batch requires a detected local CLI AI provider. Install or configure one, then reload providers.")
             return
         try:
-            plan = build_plan(self.state["root"])
+            if custom_items is not None:
+                plan = SuperBatchPlan(root=self.state["root"], items=tuple(custom_items))
+            else:
+                plan = build_plan(self.state["root"])
             for item in plan.items:
                 classify_plan_item(item)
                 if item.decision is None:
@@ -1248,6 +1452,20 @@ class MainWindow(QWidget):
                     QMessageBox.information(summary_dialog, "HTML Quizzes Built", f"Successfully built {built_count} standalone HTML quiz(zes)!")
 
             build_html_btn.clicked.connect(build_htmls)
+
+        if failed:
+            retry_btn = QPushButton("🔄 Retry Failed Items Only")
+            btn_box.addWidget(retry_btn)
+
+            def retry_failed():
+                summary_dialog.accept()
+                failed_items = [r.item for r in failed]
+                for it in failed_items:
+                    it.status = "pending"
+                    it.error = None
+                self.open_super_batch(custom_items=failed_items)
+
+            retry_btn.clicked.connect(retry_failed)
 
         close_btn = QPushButton("Done")
         close_btn.clicked.connect(summary_dialog.accept)

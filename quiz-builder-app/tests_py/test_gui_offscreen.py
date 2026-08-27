@@ -112,3 +112,58 @@ def test_cli_agent_info_buttons_and_provider_reload(application, tmp_path):
     assert window.ai_provider_combo.count() == initial_count
     window.close()
 
+
+def test_question_reordering_and_duplication(application, tmp_path):
+    window = MainWindow(Config.defaults(root=tmp_path))
+    window.state["questions"] = [
+        {"question": "Q1", "options": ["A", "B"], "correctIndex": 0},
+        {"question": "Q2", "options": ["C", "D"], "correctIndex": 1},
+        {"question": "Q3", "options": ["E", "F"], "correctIndex": 0},
+    ]
+    window.refresh_question_list()
+    assert window.question_list.count() == 3
+
+    # Duplicate Q2
+    window.show_question(1)
+    window.duplicate_question()
+    assert len(window.state["questions"]) == 4
+    assert window.state["questions"][2]["question"] == "Q2"
+
+    # Move Q3 (now at index 3) up
+    window.show_question(3)
+    window.move_question_up()
+    assert window.state["questions"][2]["question"] == "Q3"
+
+    # Move Q1 down
+    window.show_question(0)
+    window.move_question_down()
+    assert window.state["questions"][1]["question"] == "Q1"
+
+    window.close()
+
+
+def test_question_filtering_and_status(application, tmp_path):
+    window = MainWindow(Config.defaults(root=tmp_path))
+    window.state["questions"] = [
+        {"question": "Math calculus integral", "options": ["A", "B"], "correctIndex": 0},
+        {"question": "Physics gravity force", "options": ["C", "D"], "correctIndex": 1},
+        {"question": "", "options": ["E"], "correctIndex": 0},  # incomplete
+    ]
+    window.refresh_question_list()
+    assert "2 Complete" in window.question_status.text()
+    assert "1 Incomplete" in window.question_status.text()
+    assert window.question_list.count() == 3
+
+    # Filter by keyword
+    window.question_filter_edit.setText("calculus")
+    assert window.question_list.count() == 1
+    assert "Math calculus" in window.question_list.item(0).text()
+
+    # Filter by incomplete only
+    window.question_filter_edit.clear()
+    window.filter_incomplete_checkbox.setChecked(True)
+    assert window.question_list.count() == 1
+    assert "Empty question" in window.question_list.item(0).text()
+
+    window.close()
+

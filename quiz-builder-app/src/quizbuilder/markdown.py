@@ -68,9 +68,13 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
                     options.append(opt_str)
 
         metadata: dict[str, Any] = {}
-        image_match = re.search(r"(?mi)^pageImage:\s*(\S+)\s*$", block)
+        image_match = re.search(r"(?mi)^(pageImage|image):\s*(\S+)\s*$", block)
         if image_match:
-            metadata["pageImage"] = image_match.group(1)
+            metadata[image_match.group(1)] = image_match.group(2)
+
+        explanation_match = re.search(r"(?mi)^(?:Explanation|Rationale|הסבר|נימוק):\s*(.+)$", block)
+        if explanation_match:
+            metadata["explanation"] = explanation_match.group(1).strip()
 
         if question and options:
             item = {"question": question, "options": options, "correctIndex": answer}
@@ -86,13 +90,17 @@ def dump_questions(questions: list[dict[str, Any]]) -> str:
     sections: list[str] = ["# Quiz Questions", ""]
     for index, item in enumerate(questions, 1):
         sections.extend([f"## Question {index}", ""])
-        if item.get("pageImage"):
-            sections.extend([f"pageImage: {item['pageImage']}", ""])
+        img = item.get("image") or item.get("pageImage")
+        if img:
+            sections.extend([f"image: {img}", ""])
         sections.extend([str(item.get("question", "")).strip(), ""])
         for option in item.get("options", []):
             sections.append(f"- {str(option).strip()}")
         answer = int(item.get("correctIndex", 0))
-        sections.extend(["", f"Answer: {chr(ord('A') + answer)}", ""])
+        sections.extend(["", f"Answer: {chr(ord('A') + answer)}"])
+        if item.get("explanation"):
+            sections.extend(["", f"Explanation: {str(item['explanation']).strip()}"])
+        sections.append("")
     return "\n".join(sections)
 
 

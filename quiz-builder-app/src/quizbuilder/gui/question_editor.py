@@ -118,9 +118,18 @@ class QuestionEditorWidget(QWidget):
             row.addWidget(edit, 1)
             layout.addLayout(row)
 
+        layout.addWidget(QLabel("Explanation / Solution note (הסבר לתשובה - אופציונלי):"))
+        self.explanation_edit = QPlainTextEdit()
+        self.explanation_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.explanation_edit.setPlaceholderText("הקלד הסבר או נימוק לתשובה הנכונה (יוצג לתלמיד במשוב)...")
+        self.explanation_edit.setMinimumHeight(45)
+        self.explanation_edit.setMaximumHeight(120)
+        layout.addWidget(self.explanation_edit)
+
         layout.addStretch()
 
         self.text_edit.textChanged.connect(self.changed)
+        self.explanation_edit.textChanged.connect(self.changed)
         for edit in self.option_edits:
             edit.textChanged.connect(self.changed)
         for radio in self.option_radios:
@@ -134,6 +143,7 @@ class QuestionEditorWidget(QWidget):
             return
 
         self.text_edit.setPlainText(question.get("question", ""))
+        self.explanation_edit.setPlainText(question.get("explanation", ""))
         options = question.get("options", [])
         for i, field in enumerate(self.option_edits):
             field.setText(options[i] if i < len(options) else "")
@@ -220,8 +230,15 @@ class QuestionEditorWidget(QWidget):
             question.pop("image", None)
             question.pop("pageImage", None)
 
+        exp = self.explanation_edit.toPlainText().strip()
+        if exp:
+            question["explanation"] = exp
+        else:
+            question.pop("explanation", None)
+
     def clear(self) -> None:
         self.text_edit.clear()
+        self.explanation_edit.clear()
         for field in self.option_edits:
             field.clear()
         if self.option_radios:
