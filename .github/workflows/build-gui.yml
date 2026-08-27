@@ -19,7 +19,7 @@ jobs:
             path: cli-legacy/dist/quiz_builder_gui
           - os: windows-latest
             artifact: windows-gui
-            path: cli-legacy/dist/quiz_builder_gui
+            path: cli-legacy/dist/quiz_builder_gui.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -34,11 +34,11 @@ jobs:
         run: python build_gui.py
       - name: Package Linux bundle
         if: runner.os == 'Linux'
-        run: tar -czf quiz_builder_gui-linux-x86_64.tar.gz -C cli-legacy/dist quiz_builder_gui
+        run: tar -czf interactive-quiz-builder-gui-linux-x86_64.tar.gz -C cli-legacy/dist quiz_builder_gui
       - name: Package Windows bundle
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path cli-legacy/dist/quiz_builder_gui -DestinationPath quiz_builder_gui-windows-x64.zip -Force
+        run: Compress-Archive -Path cli-legacy/dist/quiz_builder_gui.exe -DestinationPath interactive-quiz-builder-gui-windows-x64.zip -Force
       - name: Upload GUI bundle
         uses: actions/upload-artifact@v4
         with:
@@ -48,10 +48,10 @@ jobs:
         if: runner.os == 'Linux' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: quiz_builder_gui-linux-x86_64.tar.gz
+          files: interactive-quiz-builder-gui-linux-x86_64.tar.gz
           generate_release_notes: true
       - name: Attach Windows bundle to GitHub Release
         if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: quiz_builder_gui-windows-x64.zip
+          files: interactive-quiz-builder-gui-windows-x64.zip

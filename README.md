@@ -73,6 +73,11 @@ interactive-test-creator/
 ├── .github/workflows/    # Automated CI/CD Pages deployment workflow
 ├── cli-legacy/           # Legacy Python scripts & batch wizard
 └── docs/                 # Guides, future ideas, and archived proposals
+
+### Desktop GUI downloads
+
+Download a release asset whose name starts with `interactive-quiz-builder-gui`.
+The legacy `quiz_builder.exe` file is the console CLI, not the desktop GUI.
 ```
 
 ---
