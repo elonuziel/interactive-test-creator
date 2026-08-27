@@ -41,7 +41,8 @@ class QuestionEditorWidget(QWidget):
         self.text_edit = QPlainTextEdit()
         self.text_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.text_edit.setPlaceholderText("הקלד את נוסח השאלה בעברית...")
-        self.text_edit.setMaximumHeight(110)
+        self.text_edit.setMinimumHeight(65)
+        self.text_edit.setMaximumHeight(260)
         layout.addWidget(self.text_edit)
 
         # Image / Graph display

@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -74,6 +75,7 @@ class MainWindow(QWidget):
             "loading": False,
         }
         self.setWindowTitle("Interactive Quiz Builder")
+        self.setMinimumSize(780, 520)
         self.resize(1120, 780)
         self.dark_mode = self.settings.value("dark_mode", False, type=bool)
         self.setStyleSheet(DARK_STYLESHEET if self.dark_mode else LITE_STYLESHEET)
@@ -135,7 +137,12 @@ class MainWindow(QWidget):
 
     def _build_extract_tab(self) -> None:
         tab = QWidget()
-        layout = QHBoxLayout(tab)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.extract_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.extract_splitter.setChildrenCollapsible(False)
+
         self.exam_group = QGroupBox("1. Choose an exam")
         left = QVBoxLayout(self.exam_group)
         self.exam_search = QLineEdit()
@@ -148,7 +155,7 @@ class MainWindow(QWidget):
         left.addWidget(self.exam_list, 1)
         left.addWidget(self.batch_button)
         left.addWidget(self.super_batch_button)
-        layout.addWidget(self.exam_group, 4)
+        self.extract_splitter.addWidget(self.exam_group)
 
         self.extract_group = QGroupBox("2. Prepare questions (saved as questions.md)")
         right = QVBoxLayout(self.extract_group)
@@ -184,7 +191,7 @@ class MainWindow(QWidget):
         self.form_edit.setMaximumWidth(70)
         self.preview = QLabel("No exam preview available")
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setMinimumSize(280, 240)
+        self.preview.setMinimumSize(200, 150)
         self.preview_button = QPushButton("Preview first page")
         self.next_review_button = QPushButton("Next: review questions")
         right.addWidget(self.current_exam_title)
@@ -244,12 +251,26 @@ class MainWindow(QWidget):
         actions.addStretch()
         actions.addWidget(self.next_review_button)
         right.addLayout(actions)
-        layout.addWidget(self.extract_group, 6)
+
+        extract_scroll = QScrollArea()
+        extract_scroll.setWidgetResizable(True)
+        extract_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        extract_scroll.setWidget(self.extract_group)
+        self.extract_splitter.addWidget(extract_scroll)
+
+        self.extract_splitter.setStretchFactor(0, 4)
+        self.extract_splitter.setStretchFactor(1, 6)
+        tab_layout.addWidget(self.extract_splitter)
         self.tabs.addTab(tab, "Choose & extract")
 
     def _build_review_tab(self) -> None:
         tab = QWidget()
-        layout = QHBoxLayout(tab)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.review_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.review_splitter.setChildrenCollapsible(False)
+
         list_group = QGroupBox("Questions in this exam")
         list_layout = QVBoxLayout(list_group)
         self.question_status = QLabel("No exam selected")
@@ -263,7 +284,8 @@ class MainWindow(QWidget):
         list_layout.addWidget(self.add_question_button)
         list_layout.addWidget(self.delete_question_button)
         list_layout.addWidget(self.open_questions_button)
-        layout.addWidget(list_group, 4)
+        self.review_splitter.addWidget(list_group)
+
         edit_group = QGroupBox("Review and edit questions")
         edit_layout = QVBoxLayout(edit_group)
         self.question_editor = QuestionEditorWidget()
@@ -282,12 +304,21 @@ class MainWindow(QWidget):
         edit_actions.addStretch()
         edit_actions.addWidget(self.next_export_button)
         edit_layout.addLayout(edit_actions)
-        layout.addWidget(edit_group, 6)
+        self.review_splitter.addWidget(edit_group)
+
+        self.review_splitter.setStretchFactor(0, 4)
+        self.review_splitter.setStretchFactor(1, 6)
+        tab_layout.addWidget(self.review_splitter)
         self.tabs.addTab(tab, "Review questions")
 
     def _build_export_tab(self) -> None:
         tab = QWidget()
-        layout = QHBoxLayout(tab)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.export_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.export_splitter.setChildrenCollapsible(False)
+
         selection_group = QGroupBox("Choose exams to include")
         selection_layout = QVBoxLayout(selection_group)
         self.play_list = QListWidget()
@@ -299,7 +330,8 @@ class MainWindow(QWidget):
         selection_layout.addWidget(self.select_all_button)
         selection_layout.addWidget(self.clear_all_button)
         selection_layout.addWidget(self.mix_checkbox)
-        layout.addWidget(selection_group, 5)
+        self.export_splitter.addWidget(selection_group)
+
         action_group = QGroupBox("Play or export your quiz")
         action_layout = QVBoxLayout(action_group)
         self.summary = QLabel("No exams selected. Check one or more exams to continue.")
@@ -312,7 +344,11 @@ class MainWindow(QWidget):
         action_layout.addWidget(self.export_button)
         action_layout.addWidget(self.open_runs_button)
         action_layout.addStretch()
-        layout.addWidget(action_group, 5)
+        self.export_splitter.addWidget(action_group)
+
+        self.export_splitter.setStretchFactor(0, 4)
+        self.export_splitter.setStretchFactor(1, 6)
+        tab_layout.addWidget(self.export_splitter)
         self.tabs.addTab(tab, "Play or export")
 
     def _connect_signals(self) -> None:
@@ -397,12 +433,28 @@ class MainWindow(QWidget):
         geometry = self.settings.value("window_geometry")
         if geometry is not None:
             self.restoreGeometry(geometry)
+        for name, splitter in (
+            ("extract_splitter", getattr(self, "extract_splitter", None)),
+            ("review_splitter", getattr(self, "review_splitter", None)),
+            ("export_splitter", getattr(self, "export_splitter", None)),
+        ):
+            if splitter is not None:
+                state = self.settings.value(name)
+                if state:
+                    splitter.restoreState(state)
 
     def closeEvent(self, event) -> None:
         if not self.confirm_discard_changes():
             event.ignore()
             return
         self.settings.setValue("window_geometry", self.saveGeometry())
+        for name, splitter in (
+            ("extract_splitter", getattr(self, "extract_splitter", None)),
+            ("review_splitter", getattr(self, "review_splitter", None)),
+            ("export_splitter", getattr(self, "export_splitter", None)),
+        ):
+            if splitter is not None:
+                self.settings.setValue(name, splitter.saveState())
         event.accept()
 
     def config_for_root(self, root: Path) -> Config:
