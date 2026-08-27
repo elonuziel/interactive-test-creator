@@ -13,11 +13,8 @@ __all__ = ["main", "QuizBuilderWindow", "LITE_STYLESHEET"]
 
 
 def main() -> int:
-    if sys.modules.get("PySide6.QtWidgets") is None and "PySide6" in sys.modules:
-        raise RuntimeError(
-            "The GUI requires PySide6. Install it with: python -m pip install PySide6"
-        )
     try:
+        import PySide6.QtWidgets
         from .app import main as run
     except ImportError as exc:
         raise RuntimeError(
