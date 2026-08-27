@@ -55,6 +55,7 @@ class MainWindow(QWidget):
         self.config = config or Config.load()
         self.settings = QSettings("InteractiveQuizBuilder", "QuizBuilder")
         self.thread_pool = QThreadPool.globalInstance()
+        self._active_workers: set[Worker] = set()
         self.state = {
             "root": None,
             "workspace": None,
@@ -72,6 +73,12 @@ class MainWindow(QWidget):
         self._connect_signals()
         self._add_theme_action()
         self._restore_session()
+
+    def start_worker(self, worker: Worker) -> None:
+        self._active_workers.add(worker)
+        worker.signals.finished.connect(lambda _: self._active_workers.discard(worker))
+        worker.signals.failed.connect(lambda _: self._active_workers.discard(worker))
+        self.thread_pool.start(worker)
 
     def _add_theme_action(self) -> None:
         self.theme_button = QPushButton("Switch to light theme" if self.dark_mode else "Switch to dark theme")
@@ -504,23 +511,9 @@ class MainWindow(QWidget):
         self.question_list.setCurrentRow(min(index, self.question_list.count() - 1))
 
     def check_pdf_classification(self, pdf: Path) -> None:
-        self.detection_title.setText("Analyzing PDF type...")
-        self.extract_button.setEnabled(False)
-
-        def classify():
-            try:
-                return classify_pdf(pdf)
-            except Exception as exc:
-                return exc
-
-        worker = Worker(classify)
-
-        def done(result):
-            if isinstance(result, Exception):
-                self.detection_title.setText("PDF analysis unavailable")
-                self.detection_description.setText(f"{result} You can still create an AI prompt or check the PDF manually.")
-                self.extract_button.setEnabled(True)
-            elif result:
+        try:
+            is_digital = classify_pdf(pdf)
+            if is_digital:
                 self.detection_title.setText("Digital PDF detected")
                 self.detection_description.setText("This PDF contains selectable text. Extract the questions automatically.")
                 self.extract_button.setEnabled(True)
@@ -528,10 +521,10 @@ class MainWindow(QWidget):
                 self.detection_title.setText("Scanned PDF detected")
                 self.detection_description.setText("Create an AI prompt below to extract questions from this image-based PDF.")
                 self.extract_button.setEnabled(False)
-
-        worker.signals.finished.connect(done)
-        worker.signals.failed.connect(lambda error: done(DocumentError(error)))
-        self.thread_pool.start(worker)
+        except Exception as exc:
+            self.detection_title.setText("PDF analysis unavailable")
+            self.detection_description.setText(f"{exc} You can still create an AI prompt or check the PDF manually.")
+            self.extract_button.setEnabled(True)
 
     def preview_first_page(self, pdf: Path | None = None) -> None:
         target = pdf or self.pdf_combo.currentData()
@@ -547,7 +540,7 @@ class MainWindow(QWidget):
 
         worker.signals.finished.connect(done)
         worker.signals.failed.connect(lambda error: self.preview.setText(f"Preview unavailable: {error}"))
-        self.thread_pool.start(worker)
+        self.start_worker(worker)
 
     def process_selected_exam(self) -> None:
         workspace = self.state["workspace"]
@@ -558,7 +551,7 @@ class MainWindow(QWidget):
         worker = Worker(lambda: process_workspace(self.config_for_root(self.state["root"]), workspace.path, self.answer_combo.currentData(), self.form_edit.text().strip() or "0", self.pdf_combo.currentData()))
         worker.signals.finished.connect(lambda _result: (self.extract_button.setEnabled(True), self.load_workspace(workspace)))
         worker.signals.failed.connect(lambda error: (self.extract_button.setEnabled(True), QMessageBox.critical(self, "Extraction failed", f"{error}\n\nCheck that the PDF is readable and that the selected exam folder is writable.")))
-        self.thread_pool.start(worker)
+        self.start_worker(worker)
 
     def process_batch_checked(self) -> None:
         selected = [self.exam_list.item(index).data(Qt.ItemDataRole.UserRole) for index in range(self.exam_list.count()) if self.exam_list.item(index).checkState() == Qt.CheckState.Checked]
@@ -570,7 +563,7 @@ class MainWindow(QWidget):
         worker = Worker(lambda: process_workspaces(self.config_for_root(self.state["root"]), selected))
         worker.signals.finished.connect(lambda _result: self.populate_tests())
         worker.signals.failed.connect(lambda error: QMessageBox.critical(self, "Batch processing failed", f"{error}\n\nCheck the PDFs and answer keys, then reload the exam list."))
-        self.thread_pool.start(worker)
+        self.start_worker(worker)
 
     def launch_ai(self) -> None:
         workspace = self.state["workspace"]
@@ -592,7 +585,7 @@ class MainWindow(QWidget):
         worker = Worker(launch)
         worker.signals.finished.connect(lambda prompt: (self.launch_ai_button.setEnabled(True), QMessageBox.information(self, "Prompt ready", f"Created prompt at:\n{prompt}")))
         worker.signals.failed.connect(lambda error: (self.launch_ai_button.setEnabled(True), QMessageBox.critical(self, "Could not launch AI provider", error)))
-        self.thread_pool.start(worker)
+        self.start_worker(worker)
 
     def checked_play_workspaces(self) -> list:
         selected = [self.play_list.item(index).data(Qt.ItemDataRole.UserRole) for index in range(self.play_list.count()) if self.play_list.item(index).checkState() == Qt.CheckState.Checked]
@@ -665,7 +658,7 @@ class MainWindow(QWidget):
 
         worker.signals.finished.connect(done)
         worker.signals.failed.connect(failed)
-        self.thread_pool.start(worker)
+        self.start_worker(worker)
 
     def open_runs_folder(self) -> None:
         if not self.state["root"]:

@@ -19,10 +19,12 @@ class Worker(QRunnable):
         super().__init__()
         self.function = function
         self.signals = WorkerSignals()
+        self.setAutoDelete(True)
 
     def run(self):
         try:
-            self.signals.finished.emit(self.function())
+            result = self.function()
+            self.signals.finished.emit(result)
         except Exception as exc:
             logging.getLogger(__name__).exception("Background GUI task failed")
             self.signals.failed.emit(str(exc))
