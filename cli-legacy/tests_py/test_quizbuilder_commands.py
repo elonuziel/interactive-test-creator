@@ -28,7 +28,7 @@ def test_cli_version_command(capsys):
     rc = main(["version"])
     assert rc == 0
     captured = capsys.readouterr()
-    assert "2.1.0" in captured.out
+    assert "2.1.2" in captured.out
 
 
 def test_cli_detect_no_dependencies(capsys):

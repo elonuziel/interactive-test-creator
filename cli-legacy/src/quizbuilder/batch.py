@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 import re
 
@@ -64,4 +65,5 @@ def discover_batch(root: Path) -> list[BatchCandidate]:
 
 def _project_slug(stem: str) -> str:
     slug = re.sub(r"[^\w.-]+", "_", stem, flags=re.UNICODE).strip("._")
-    return slug or "exam"
+    digest = hashlib.sha1(stem.encode("utf-8")).hexdigest()[:8]
+    return f"{slug or 'exam'}-{digest}"
