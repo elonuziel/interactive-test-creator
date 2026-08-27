@@ -95,6 +95,20 @@ document.addEventListener('DOMContentLoaded', () => {
         enableLlmVerification: document.getElementById('enable-llm-verification'),
         verificationWarningBox: document.getElementById('verification-warning-box'),
         verificationBadge: document.getElementById('verification-badge'),
+        progressCard: document.getElementById('progress-card'),
+        progressTitle: document.getElementById('progress-title'),
+        progressDetail: document.getElementById('progress-detail'),
+        progressPercent: document.getElementById('progress-percent'),
+        progressFill: document.getElementById('progress-fill'),
+        progressAbortBtn: document.getElementById('progress-abort-btn'),
+        progressIcon: document.getElementById('progress-icon'),
+        mainProgressBar: document.getElementById('main-progressbar'),
+        stickyProgressBanner: document.getElementById('sticky-progress-banner'),
+        stickyProgressTitle: document.getElementById('sticky-progress-title'),
+        stickyProgressDetail: document.getElementById('sticky-progress-detail'),
+        stickyProgressPercent: document.getElementById('sticky-progress-percent'),
+        stickyProgressFill: document.getElementById('sticky-progress-fill'),
+        stickyProgressAbortBtn: document.getElementById('sticky-progress-abort-btn'),
         themeToggle: document.getElementById('theme-toggle'),
         themeIcon: document.getElementById('theme-icon')
     };
@@ -176,6 +190,164 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => toast.remove(), 300);
         }, duration);
     }
+
+    // ── Global & Integrated Progress System ───────────────────────────────────
+    const ProgressController = {
+        activeTask: null,
+        dismissTimeout: null,
+
+        startTask(title, { cancellable = true, icon = '⚡', detail = 'מתחיל בעיבוד...', indeterminate = false } = {}) {
+            if (this.dismissTimeout) {
+                clearTimeout(this.dismissTimeout);
+                this.dismissTimeout = null;
+            }
+
+            const abortController = new AbortController();
+            const taskId = Symbol('task');
+
+            const task = {
+                id: taskId,
+                title,
+                cancellable,
+                abortController,
+                signal: abortController.signal,
+                isAborted: () => abortController.signal.aborted,
+                update: (percent, newDetail, opts) => this.update(taskId, percent, newDetail, opts),
+                finish: (msg, opts) => this.finish(taskId, msg, opts),
+                fail: (err, opts) => this.fail(taskId, err, opts),
+                abort: (reason) => this.abort(taskId, reason)
+            };
+
+            this.activeTask = task;
+
+            if (elements.progressCard) {
+                elements.progressCard.classList.remove('hidden', 'is-success', 'is-error', 'is-aborted');
+            }
+            if (elements.stickyProgressBanner) {
+                elements.stickyProgressBanner.classList.remove('hidden', 'is-success', 'is-error', 'is-aborted');
+            }
+
+            if (elements.progressTitle) elements.progressTitle.textContent = title;
+            if (elements.stickyProgressTitle) elements.stickyProgressTitle.textContent = title;
+            if (elements.progressDetail) elements.progressDetail.textContent = detail;
+            if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = detail;
+            if (elements.progressIcon) elements.progressIcon.textContent = icon;
+
+            if (elements.progressAbortBtn) {
+                elements.progressAbortBtn.style.display = cancellable ? 'inline-flex' : 'none';
+                elements.progressAbortBtn.disabled = false;
+            }
+            if (elements.stickyProgressAbortBtn) {
+                elements.stickyProgressAbortBtn.style.display = cancellable ? 'inline-flex' : 'none';
+                elements.stickyProgressAbortBtn.disabled = false;
+            }
+
+            this.update(taskId, indeterminate ? 0 : 0, detail, { indeterminate });
+            return task;
+        },
+
+        update(taskId, percent, detailText, { indeterminate = false } = {}) {
+            if (this.activeTask && this.activeTask.id !== taskId) return;
+            const clamped = Math.max(0, Math.min(100, Math.round(percent || 0)));
+
+            if (elements.progressFill) {
+                elements.progressFill.classList.toggle('indeterminate', !!indeterminate);
+                if (!indeterminate) elements.progressFill.style.width = `${clamped}%`;
+            }
+            if (elements.stickyProgressFill) {
+                elements.stickyProgressFill.classList.toggle('indeterminate', !!indeterminate);
+                if (!indeterminate) elements.stickyProgressFill.style.width = `${clamped}%`;
+            }
+
+            const percentLabel = indeterminate ? '...' : `${clamped}%`;
+            if (elements.progressPercent) elements.progressPercent.textContent = percentLabel;
+            if (elements.stickyProgressPercent) elements.stickyProgressPercent.textContent = percentLabel;
+
+            if (elements.mainProgressBar) {
+                elements.mainProgressBar.setAttribute('aria-valuenow', String(indeterminate ? 50 : clamped));
+            }
+
+            if (detailText !== undefined) {
+                if (elements.progressDetail) elements.progressDetail.textContent = detailText;
+                if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = detailText;
+            }
+        },
+
+        finish(taskId, successMessage = 'הפעולה הסתיימה בהצלחה!', { duration = 2000 } = {}) {
+            if (this.activeTask && this.activeTask.id !== taskId) return;
+            this.update(taskId, 100, successMessage, { indeterminate: false });
+
+            if (elements.progressCard) elements.progressCard.classList.add('is-success');
+            if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('is-success');
+            if (elements.progressIcon) elements.progressIcon.textContent = '✅';
+
+            if (elements.progressAbortBtn) elements.progressAbortBtn.style.display = 'none';
+            if (elements.stickyProgressAbortBtn) elements.stickyProgressAbortBtn.style.display = 'none';
+
+            setStatus(successMessage, false);
+
+            this.dismissTimeout = setTimeout(() => {
+                if (elements.progressCard) elements.progressCard.classList.add('hidden');
+                if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('hidden');
+                this.activeTask = null;
+            }, duration);
+        },
+
+        fail(taskId, errorMessage = 'אירעה שגיאה בתהליך.') {
+            if (this.activeTask && this.activeTask.id !== taskId) return;
+            if (elements.progressCard) elements.progressCard.classList.add('is-error');
+            if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('is-error');
+            if (elements.progressIcon) elements.progressIcon.textContent = '⚠️';
+            if (elements.progressDetail) elements.progressDetail.textContent = errorMessage;
+            if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = errorMessage;
+
+            if (elements.progressAbortBtn) elements.progressAbortBtn.style.display = 'none';
+            if (elements.stickyProgressAbortBtn) elements.stickyProgressAbortBtn.style.display = 'none';
+
+            setStatus(errorMessage, true, true);
+
+            this.dismissTimeout = setTimeout(() => {
+                if (elements.progressCard) elements.progressCard.classList.add('hidden');
+                if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('hidden');
+                this.activeTask = null;
+            }, 4500);
+        },
+
+        abort(taskId, reason = 'הפעולה בוטלה על ידי המשתמש.') {
+            if (this.activeTask && this.activeTask.id !== taskId) return;
+            if (this.activeTask) {
+                this.activeTask.abortController.abort();
+            }
+
+            if (elements.progressCard) elements.progressCard.classList.add('is-aborted');
+            if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('is-aborted');
+            if (elements.progressIcon) elements.progressIcon.textContent = '🛑';
+            if (elements.progressDetail) elements.progressDetail.textContent = reason;
+            if (elements.stickyProgressDetail) elements.stickyProgressDetail.textContent = reason;
+
+            if (elements.progressAbortBtn) elements.progressAbortBtn.disabled = true;
+            if (elements.stickyProgressAbortBtn) elements.stickyProgressAbortBtn.disabled = true;
+
+            setStatus(reason, true, true);
+
+            this.dismissTimeout = setTimeout(() => {
+                if (elements.progressCard) elements.progressCard.classList.add('hidden');
+                if (elements.stickyProgressBanner) elements.stickyProgressBanner.classList.add('hidden');
+                this.activeTask = null;
+            }, 2500);
+        }
+    };
+
+    elements.progressAbortBtn?.addEventListener('click', () => {
+        if (ProgressController.activeTask) {
+            ProgressController.abort(ProgressController.activeTask.id);
+        }
+    });
+    elements.stickyProgressAbortBtn?.addEventListener('click', () => {
+        if (ProgressController.activeTask) {
+            ProgressController.abort(ProgressController.activeTask.id);
+        }
+    });
 
     // ── Image Lightbox ──
     // Shows an image in a fullscreen overlay. If pageNum is provided and
@@ -843,12 +1015,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function renderAllPdfPageImages(pdf) {
+    async function renderAllPdfPageImages(pdf, task = null) {
         const imageDatas = [];
         const pagePreviews = [];
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            setStatus(`מכין עמוד ${pageNumber}/${pdf.numPages} לשליחה...`);
+            if (task && task.isAborted()) {
+                throw new Error('הפעולה בוטלה על ידי המשתמש.');
+            }
+            if (task) {
+                const prepPercent = Math.round((pageNumber / pdf.numPages) * 25);
+                task.update(prepPercent, `מכין עמוד ${pageNumber} מתוך ${pdf.numPages} לשליחה...`);
+            } else {
+                setStatus(`מכין עמוד ${pageNumber}/${pdf.numPages} לשליחה...`);
+            }
             const page = await pdf.getPage(pageNumber);
             const imageData = await renderPageImageData(page);
             imageDatas.push(imageData);
@@ -858,19 +1038,32 @@ document.addEventListener('DOMContentLoaded', () => {
         return { imageDatas, pagePreviews };
     }
 
-    async function extractTextViaOfflineOcr(pdf) {
+    async function extractTextViaOfflineOcr(pdf, task = null) {
         if (!window.Tesseract?.createWorker) {
             throw new Error('רכיב OCR חינמי לא נטען בדפדפן. רענן את העמוד ונסה שוב, או בחר Gemini.');
         }
 
-        setStatus('מכין OCR חינמי בדפדפן. האיכות כנראה תהיה נמוכה יותר מ-Gemini...');
-        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf);
+        if (task) {
+            task.update(5, 'מכין OCR חינמי בדפדפן...');
+        } else {
+            setStatus('מכין OCR חינמי בדפדפן. האיכות כנראה תהיה נמוכה יותר מ-Gemini...');
+        }
+
+        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf, task);
         const pages = [];
         const worker = await window.Tesseract.createWorker('heb');
 
         try {
             for (let i = 0; i < imageDatas.length; i++) {
-                setStatus(`OCR חינמי מעבד עמוד ${i + 1}/${imageDatas.length}... האיכות כנראה תהיה נמוכה יותר מ-Gemini.`);
+                if (task && task.isAborted()) {
+                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
+                }
+                const ocrPercent = 25 + Math.round(((i + 1) / imageDatas.length) * 65);
+                if (task) {
+                    task.update(ocrPercent, `OCR מקומי מעבד עמוד ${i + 1} מתוך ${imageDatas.length} (${ocrPercent}%)...`);
+                } else {
+                    setStatus(`OCR חינמי מעבד עמוד ${i + 1}/${imageDatas.length}... האיכות כנראה תהיה נמוכה יותר מ-Gemini.`);
+                }
                 const { data } = await worker.recognize(`data:image/png;base64,${imageDatas[i]}`);
                 pages.push(maybeFixHebrewWordOrder((data && data.text) || ''));
             }
@@ -1061,7 +1254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.min(exponential + jitter, GEMINI_CONFIG.maxRetryDelayMs);
     }
 
-    async function callGeminiOcr(apiKey, imageDatas) {
+    async function callGeminiOcr(apiKey, imageDatas, task = null) {
         const prompt = [
             'You are an expert exam parser for Hebrew multiple-choice exams.',
             'Extract all multiple-choice questions into a clean JSON array of objects.',
@@ -1088,11 +1281,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortedCandidates = sortGeminiModelCandidates(candidates);
 
         for (const candidate of sortedCandidates) {
+            if (task && task.isAborted()) {
+                throw new Error('הפעולה בוטלה על ידי המשתמש.');
+            }
             const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
 
             for (let retryCount = 0; retryCount <= GEMINI_CONFIG.maxQuotaRetries; retryCount++) {
+                if (task && task.isAborted()) {
+                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
+                }
                 const response = await fetch(endpoint, {
                     method: 'POST',
+                    signal: task ? task.signal : undefined,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ parts }],
@@ -1114,10 +1314,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const promptFeedback = payload.promptFeedback?.blockReason || 'NONE';
                         throw new Error(`Gemini returned empty OCR text. Finish Reason: ${finishReason}, Prompt Blocked: ${promptFeedback}. Raw: ${JSON.stringify(payload)}`);
                     }
-                    // The OCR prompt requests a JSON array (responseMimeType: "application/json"),
-                    // so Gemini never emits PAGE_BOUNDARY separators. Return the full response
-                    // as a single element; the caller joins all chunks before parseQuestionsFromText
-                    // which handles JSON-first parsing.
                     return [text];
                 }
 
@@ -1126,7 +1322,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
                     const delayMs = computeRetryDelayMs(response, retryCount);
-                    setStatus(`Gemini החזיר 429. ממתין ${Math.ceil(delayMs / 1000)} שניות ומנסה שוב...`);
+                    const waitSec = Math.ceil(delayMs / 1000);
+                    if (task) {
+                        task.update(task.percent || 30, `Gemini החזיר 429. ממתין ${waitSec} שניות ומנסה שוב...`);
+                    } else {
+                        setStatus(`Gemini החזיר 429. ממתין ${waitSec} שניות ומנסה שוב...`);
+                    }
                     await delay(delayMs);
                     continue;
                 }
@@ -1144,23 +1345,41 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(`Gemini request failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
     }
 
-    async function extractTextViaGemini(pdf, apiKey, chunkSizeOverride = null) {
+    async function extractTextViaGemini(pdf, apiKey, chunkSizeOverride = null, task = null) {
         if (!apiKey) {
             throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
         }
 
         const pages = [];
-        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf);
+        const { imageDatas, pagePreviews } = await renderAllPdfPageImages(pdf, task);
 
         const CHUNK_SIZE = Math.max(1, Number(chunkSizeOverride || GEMINI_CONFIG.ocrChunkSize) || 1);
-        for (let i = 0; i < imageDatas.length; i += CHUNK_SIZE) {
-            const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
-            setStatus(`מפענח עמודים ${i + 1}-${Math.min(i + CHUNK_SIZE, imageDatas.length)} מתוך ${imageDatas.length} ב-Gemini...`);
+        const totalChunks = Math.ceil(imageDatas.length / CHUNK_SIZE);
+        let chunkIndex = 0;
 
-            const chunkPagesText = await callGeminiOcr(apiKey, chunk);
+        for (let i = 0; i < imageDatas.length; i += CHUNK_SIZE) {
+            if (task && task.isAborted()) {
+                throw new Error('הפעולה בוטלה על ידי המשתמש.');
+            }
+            chunkIndex++;
+            const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
+            const startPage = i + 1;
+            const endPage = Math.min(i + CHUNK_SIZE, imageDatas.length);
+            const currentPercent = 25 + Math.round((chunkIndex / totalChunks) * 65);
+
+            if (task) {
+                task.update(currentPercent, `מפענח עמודים ${startPage}-${endPage} מתוך ${imageDatas.length} ב-Gemini (צ'אנק ${chunkIndex}/${totalChunks})...`);
+            } else {
+                setStatus(`מפענח עמודים ${startPage}-${endPage} מתוך ${imageDatas.length} ב-Gemini...`);
+            }
+
+            const chunkPagesText = await callGeminiOcr(apiKey, chunk, task);
             pages.push(...chunkPagesText.map((pageText) => maybeFixHebrewWordOrder(pageText || '')));
 
             if (i + CHUNK_SIZE < imageDatas.length && GEMINI_CONFIG.interPageDelayMs > 0) {
+                if (task) {
+                    task.update(currentPercent, `ממתין בין קריאות API (${GEMINI_CONFIG.interPageDelayMs / 1000} שניות)...`);
+                }
                 await delay(GEMINI_CONFIG.interPageDelayMs);
             }
         }
@@ -1172,13 +1391,16 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-
-    async function extractTextViaGeminiNativePdf(pdfFile, pdf, apiKey, mode = 'schema') {
+    async function extractTextViaGeminiNativePdf(pdfFile, pdf, apiKey, mode = 'schema', task = null) {
         if (!apiKey) {
             throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
         }
 
-        setStatus('מעלה את מסמך ה-PDF ישירות ל-Gemini (Native PDF)...');
+        if (task) {
+            task.update(15, 'מעלה את מסמך ה-PDF ישירות ל-Gemini (Native PDF)...', { indeterminate: true });
+        } else {
+            setStatus('מעלה את מסמך ה-PDF ישירות ל-Gemini (Native PDF)...');
+        }
 
         const base64Pdf = await fileToBase64(pdfFile);
         const prompt = [
@@ -1225,11 +1447,18 @@ document.addEventListener('DOMContentLoaded', () => {
         let extractedPages = null;
 
         for (const candidate of sortedCandidates) {
+            if (task && task.isAborted()) {
+                throw new Error('הפעולה בוטלה על ידי המשתמש.');
+            }
             const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
 
             for (let retryCount = 0; retryCount <= GEMINI_CONFIG.maxQuotaRetries; retryCount++) {
+                if (task && task.isAborted()) {
+                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
+                }
                 const response = await fetch(endpoint, {
                     method: 'POST',
+                    signal: task ? task.signal : undefined,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{
@@ -1261,7 +1490,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (errorInfo.code === 'quota' && retryCount < GEMINI_CONFIG.maxQuotaRetries) {
                     const delayMs = computeRetryDelayMs(response, retryCount);
-                    setStatus(`Gemini החזיר 429 ב-Native PDF (${candidate.model}). ממתין ${Math.ceil(delayMs / 1000)} שניות ומנסה שוב...`);
+                    const waitSec = Math.ceil(delayMs / 1000);
+                    if (task) {
+                        task.update(40, `Gemini החזיר 429 ב-Native PDF (${candidate.model}). ממתין ${waitSec} שניות ומנסה שוב...`);
+                    } else {
+                        setStatus(`Gemini החזיר 429 ב-Native PDF (${candidate.model}). ממתין ${waitSec} שניות ומנסה שוב...`);
+                    }
                     await delay(delayMs);
                     continue;
                 }
@@ -1287,7 +1521,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Generate previews for proof mode
         const pagePreviews = [];
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            setStatus(`מכין תצוגות מקדימות לעמוד ${pageNumber}/${pdf.numPages}...`);
+            if (task && task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
+            if (task) {
+                const prevPercent = 65 + Math.round((pageNumber / pdf.numPages) * 25);
+                task.update(prevPercent, `מכין תצוגות מקדימות לעמוד ${pageNumber}/${pdf.numPages}...`);
+            } else {
+                setStatus(`מכין תצוגות מקדימות לעמוד ${pageNumber}/${pdf.numPages}...`);
+            }
             const page = await pdf.getPage(pageNumber);
             const imageData = await renderPageImageData(page);
             pagePreviews.push(`data:image/png;base64,${imageData}`);
@@ -1301,8 +1541,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    async function verifyTestWithGemini(parsedQuestions, apiKey) {
-        setStatus('מבצע הגהה ותיקון של המבחן עם Gemini...');
+    async function verifyTestWithGemini(parsedQuestions, apiKey, task = null) {
+        if (task) {
+            task.update(92, 'מבצע הגהה ותיקון שאלות עם Gemini (LLM Proofreader)...');
+        } else {
+            setStatus('מבצע הגהה ותיקון של המבחן עם Gemini...');
+        }
         const prompt = [
             'You are an expert exam proofreader.',
             'I am providing you with a JSON array of parsed exam questions extracted via OCR.',
@@ -1320,10 +1564,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortedCandidates = sortGeminiModelCandidates(candidates);
 
         for (const candidate of sortedCandidates) {
+            if (task && task.isAborted()) break;
             const endpoint = buildGeminiEndpoint(candidate.version, candidate.model, apiKey);
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
+                    signal: task ? task.signal : undefined,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
@@ -2801,7 +3047,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function createStandaloneQuizHtml() {
+    async function createStandaloneQuizHtml(task = null) {
         const validationErrors = validateQuestions(state.questions);
         if (validationErrors.length) {
             throw new Error(`לא ניתן לייצא: ${validationErrors.slice(0, 5).join(' ')}`);
@@ -2811,24 +3057,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const qualityVal = Number(elements.compressQualitySlider?.value) || 75;
         const quality = Math.min(Math.max(qualityVal, 10), 90) / 100;
 
-        const cleanedQuestions = await Promise.all(state.questions.map(async (q) => {
+        const totalQ = state.questions.length;
+        let processedQ = 0;
+
+        const cleanedQuestions = [];
+        for (const q of state.questions) {
+            if (task && task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
+            processedQ++;
             let img = q.image;
             if (shouldCompress && img) {
                 const skipCompression = q.imageNoCompress === true;
                 if (!skipCompression) {
-                img = await compressImageBase64(img, quality);
+                    if (task) {
+                        const progressPct = 10 + Math.round((processedQ / totalQ) * 70);
+                        task.update(progressPct, `דוחס תמונה לשאלה ${processedQ} מתוך ${totalQ}...`);
+                    }
+                    img = await compressImageBase64(img, quality);
                 }
+            } else if (task && processedQ % 5 === 0) {
+                const progressPct = 10 + Math.round((processedQ / totalQ) * 70);
+                task.update(progressPct, `מעבד שאלה ${processedQ} מתוך ${totalQ}...`);
             }
-            return {
+
+            cleanedQuestions.push({
                 question: normalizeWhitespace(q.question),
                 options: q.options.map((opt) => normalizeWhitespace(opt)),
                 correctIndex: q.correctIndex,
                 ...(q.shuffleOptions ? { shuffleOptions: true } : {}),
                 ...(img ? { image: img } : {}) // embed base64 image directly
-            };
-        }));
+            });
+        }
 
+        if (task) task.update(85, 'טוען קובצי תבנית HTML/CSS/JS...');
         const { indexHtml, styleCss, quizCoreJs, appJs } = await getTemplateSources();
+        if (task) task.update(92, 'משלב קוד ונתונים למסמך עצמאי...');
         const styledHtml = window.QuizExport.injectStylesheet(indexHtml, styleCss);
         const onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
         const standaloneNavHtml = window.QuizExport.setBuilderLink(styledHtml, onlineBuilderUrl);
@@ -2854,160 +3116,187 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error('יש לבחור קובץ PDF לפענוח.');
         }
 
-        setStatus('קורא קובצי מקור...');
+        const task = ProgressController.startTask('מחלץ ומפענח שאלות', {
+            icon: '🔍',
+            cancellable: true,
+            detail: 'קורא קובצי מקור ומנתח מבנה PDF...'
+        });
 
-        let pdfFileToParse = pdf;
-        let pdfBufferForParse = (await pdf.arrayBuffer()).slice(0);
-        // Store raw bytes so hi-res lightbox zoom works regardless of whether the
-        // sidebar was previously loaded (state.pdfBytes may still be null).
-        if (!state.pdfBytes || state.pdfBytes.length === 0) {
-            state.pdfBytes = new Uint8Array(pdfBufferForParse.slice(0));
-        }
-
-        const useCleanPdf = elements.useCleanPdfForApi ? elements.useCleanPdfForApi.checked : true;
-        if (useCleanPdf) {
-            try {
-                const cleanBuffer = await getCleanPdfBuffer();
-                if (cleanBuffer) {
-                    pdfBufferForParse = cleanBuffer.slice(0);
-                    pdfFileToParse = new File([cleanBuffer], `cleaned_${pdf.name}`, { type: 'application/pdf' });
-                    const keptCount = state.pdfPagesState.filter(p => p.keep).length;
-                    setStatus(`משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל) לעיבוד...`);
-                }
-            } catch (e) {
-                console.warn('Could not build clean PDF for parse:', e);
-            }
-        }
-
-        let answerRows = null;
-        if (csv) {
-            const fileName = csv.name.toLowerCase();
-            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                const xlsxBuffer = await csv.arrayBuffer();
-                answerRows = parseXlsxToRows(xlsxBuffer);
-            } else {
-                const csvText = await csv.text();
-                answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
-            }
-            if (!formNumber) {
-                throw new Error('אם הועלה קובץ תשובות, יש להזין מספר שאלון.');
-            }
-        }
-
-        setStatus('טוען ומנתח את מבנה קובץ ה-PDF...');
-        const extracted = await extractPdfText(pdfBufferForParse);
-
-        let examText = extracted.text;
-        let sourcePages = extracted.rawPages;
-        const useLlmExtraction = llmPolicy === 'force_llm' || (llmPolicy === 'auto' && extracted.isScanned && ocrEngine !== 'offline_local');
-        const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
-
-        if (!extracted.isScanned && llmPolicy !== 'force_llm') {
-            setStatus('זוהה PDF דיגיטלי. מחלץ שאלות מקומית מתוך טקסט ה-PDF ללא LLM.');
-        }
-
-        if (useOfflineOcr) {
-            setStatus('מפעיל OCR מקומי בדפדפן (ללא API Key)...');
-            const offlineExtraction = await extractTextViaOfflineOcr(extracted.pdf);
-            examText = offlineExtraction.text;
-            sourcePages = offlineExtraction.pages;
-            state.proofPageImages = offlineExtraction.pagePreviews || [];
-        } else if (useLlmExtraction) {
-            apiKey = await resolveGeminiApiKey(true);
-            if (ocrEngine.startsWith('gemini_native')) {
-                const mode = ocrEngine === 'gemini_native_markdown' ? 'markdown' : 'schema';
-                setStatus(`שולח את מסמך ה-PDF המלא ל-Gemini API (Native PDF - ${mode === 'schema' ? 'Enforced Schema' : 'Clean Markdown'})...`);
-                const nativeExtraction = await extractTextViaGeminiNativePdf(pdfFileToParse, extracted.pdf, apiKey, mode);
-                examText = nativeExtraction.text;
-                sourcePages = nativeExtraction.pages;
-                const previews = await renderAllPdfPageImages(extracted.pdf);
-                state.proofPageImages = previews.pagePreviews || [];
-            } else {
-                setStatus('שולח עמודי תמונה ל-Gemini API (מצב Page Chunking)...');
-                const geminiExtraction = await extractTextViaGemini(extracted.pdf, apiKey);
-                examText = geminiExtraction.text;
-                sourcePages = geminiExtraction.pages;
-                state.proofPageImages = geminiExtraction.pagePreviews || [];
-            }
-        } else if (extracted.isScanned) {
-            setStatus('זוהה PDF סרוק במצב מקומי בלבד (ללא LLM). התוצאה עלולה להיות חלקית.');
-        }
-
-        let parsedQuestions;
         try {
-            parsedQuestions = parseQuestionsFromText(examText, sourcePages, extracted.pageImages);
-        } catch (error) {
-            if (useLlmExtraction) {
-                setStatus('פורמט תשובת ה-LLM לא תאם מודל צפוי, מנסה ניתוח מקומי מהטקסט הדיגיטלי...');
-                parsedQuestions = parseQuestionsFromText(extracted.text, extracted.rawPages, extracted.pageImages);
-            } else {
-                throw error;
+            task.update(5, 'קורא קובצי מקור...');
+            setStatus('קורא קובצי מקור...');
+
+            let pdfFileToParse = pdf;
+            let pdfBufferForParse = (await pdf.arrayBuffer()).slice(0);
+            // Store raw bytes so hi-res lightbox zoom works regardless of whether the
+            // sidebar was previously loaded (state.pdfBytes may still be null).
+            if (!state.pdfBytes || state.pdfBytes.length === 0) {
+                state.pdfBytes = new Uint8Array(pdfBufferForParse.slice(0));
             }
-        }
 
-        if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
-            setStatus('זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...');
-            const fallbackExtraction = await extractTextViaGemini(extracted.pdf, apiKey, 1);
-            const fallbackQuestions = parseQuestionsFromText(
-                fallbackExtraction.text,
-                fallbackExtraction.pages,
-                extracted.pageImages
-            );
-
-            if (fallbackQuestions.length > parsedQuestions.length) {
-                parsedQuestions = fallbackQuestions;
-                examText = fallbackExtraction.text;
-                sourcePages = fallbackExtraction.pages;
-                state.proofPageImages = fallbackExtraction.pagePreviews || [];
-            }
-        }
-
-        for (const q of parsedQuestions) {
-            if (q._needsPageRender && !q.image && extracted.pdf && q.sourcePage) {
+            const useCleanPdf = elements.useCleanPdfForApi ? elements.useCleanPdfForApi.checked : true;
+            if (useCleanPdf) {
                 try {
-                    const page = await extracted.pdf.getPage(q.sourcePage);
-                    // Use same 2.5 scale as renderPageImageData for consistent quality.
-                    const imageData = await renderPageImageData(page, 2.5);
-                    q.image = `data:image/png;base64,${imageData}`;
-                } catch { /* skip if render fails */ }
+                    const cleanBuffer = await getCleanPdfBuffer();
+                    if (cleanBuffer) {
+                        pdfBufferForParse = cleanBuffer.slice(0);
+                        pdfFileToParse = new File([cleanBuffer], `cleaned_${pdf.name}`, { type: 'application/pdf' });
+                        const keptCount = state.pdfPagesState.filter(p => p.keep).length;
+                        task.update(10, `משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל)...`);
+                        setStatus(`משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל) לעיבוד...`);
+                    }
+                } catch (e) {
+                    console.warn('Could not build clean PDF for parse:', e);
+                }
             }
-            delete q._needsPageRender;
-        }
 
-        // Default correct answer to index 0 ('א') and shuffle options until explicit merge
-        state.questions = parsedQuestions.map(q => ({
-            ...q,
-            correctIndex: (typeof q.correctIndex === 'number' && q.correctIndex >= 0) ? q.correctIndex : 0,
-            shuffleOptions: true
-        }));
+            let answerRows = null;
+            if (csv) {
+                const fileName = csv.name.toLowerCase();
+                if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                    const xlsxBuffer = await csv.arrayBuffer();
+                    answerRows = parseXlsxToRows(xlsxBuffer);
+                } else {
+                    const csvText = await csv.text();
+                    answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
+                }
+                if (!formNumber) {
+                    throw new Error('אם הועלה קובץ תשובות, יש להזין מספר שאלון.');
+                }
+            }
 
-        // Additional AI Verification step (if explicitly enabled by user toggle)
-        const enableVerification = elements.enableLlmVerification ? elements.enableLlmVerification.checked : false;
-        if (enableVerification) {
-            if (!apiKey) {
+            if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
+
+            task.update(15, 'טוען ומנתח את מבנה קובץ ה-PDF...');
+            setStatus('טוען ומנתח את מבנה קובץ ה-PDF...');
+            const extracted = await extractPdfText(pdfBufferForParse);
+
+            let examText = extracted.text;
+            let sourcePages = extracted.rawPages;
+            const useLlmExtraction = llmPolicy === 'force_llm' || (llmPolicy === 'auto' && extracted.isScanned && ocrEngine !== 'offline_local');
+            const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
+
+            if (!extracted.isScanned && llmPolicy !== 'force_llm') {
+                task.update(50, 'זוהה PDF דיגיטלי. מחלץ שאלות ישירות מטקסט המסמך...');
+                setStatus('זוהה PDF דיגיטלי. מחלץ שאלות מקומית מתוך טקסט ה-PDF ללא LLM.');
+            }
+
+            if (useOfflineOcr) {
+                setStatus('מפעיל OCR מקומי בדפדפן (ללא API Key)...');
+                const offlineExtraction = await extractTextViaOfflineOcr(extracted.pdf, task);
+                examText = offlineExtraction.text;
+                sourcePages = offlineExtraction.pages;
+                state.proofPageImages = offlineExtraction.pagePreviews || [];
+            } else if (useLlmExtraction) {
                 apiKey = await resolveGeminiApiKey(true);
+                if (ocrEngine.startsWith('gemini_native')) {
+                    const mode = ocrEngine === 'gemini_native_markdown' ? 'markdown' : 'schema';
+                    setStatus(`שולח את מסמך ה-PDF המלא ל-Gemini API (Native PDF - ${mode === 'schema' ? 'Enforced Schema' : 'Clean Markdown'})...`);
+                    const nativeExtraction = await extractTextViaGeminiNativePdf(pdfFileToParse, extracted.pdf, apiKey, mode, task);
+                    examText = nativeExtraction.text;
+                    sourcePages = nativeExtraction.pages;
+                    const previews = await renderAllPdfPageImages(extracted.pdf, task);
+                    state.proofPageImages = previews.pagePreviews || [];
+                } else {
+                    setStatus('שולח עמודי תמונה ל-Gemini API (מצב Page Chunking)...');
+                    const geminiExtraction = await extractTextViaGemini(extracted.pdf, apiKey, null, task);
+                    examText = geminiExtraction.text;
+                    sourcePages = geminiExtraction.pages;
+                    state.proofPageImages = geminiExtraction.pagePreviews || [];
+                }
+            } else if (extracted.isScanned) {
+                setStatus('זוהה PDF סרוק במצב מקומי בלבד (ללא LLM). התוצאה עלולה להיות חלקית.');
             }
-            if (apiKey) {
-                setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
-                state.questions = await verifyTestWithGemini(state.questions, apiKey);
+
+            if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
+
+            task.update(85, 'מפרק ומבנה שאלות ותשובות מתוך הטקסט...');
+            let parsedQuestions;
+            try {
+                parsedQuestions = parseQuestionsFromText(examText, sourcePages, extracted.pageImages);
+            } catch (error) {
+                if (useLlmExtraction) {
+                    task.update(88, 'מנסה ניתוח מקומי מהטקסט הדיגיטלי...');
+                    setStatus('פורמט תשובת ה-LLM לא תאם מודל צפוי, מנסה ניתוח מקומי מהטקסט הדיגיטלי...');
+                    parsedQuestions = parseQuestionsFromText(extracted.text, extracted.rawPages, extracted.pageImages);
+                } else {
+                    throw error;
+                }
             }
-        }
 
-        const validationErrors = validateQuestions(state.questions);
-        if (validationErrors.length) {
-            throw new Error(`נמצאו שאלות לא תקינות: ${validationErrors.slice(0, 5).join(' ')}`);
-        }
+            if (useLlmExtraction && ocrEngine === 'gemini_chunked' && parsedQuestions.length < 10) {
+                task.update(60, 'זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...');
+                setStatus('זוהה מספר נמוך של שאלות. מנסה פענוח פרטני עמוד-עמוד...');
+                const fallbackExtraction = await extractTextViaGemini(extracted.pdf, apiKey, 1, task);
+                const fallbackQuestions = parseQuestionsFromText(
+                    fallbackExtraction.text,
+                    fallbackExtraction.pages,
+                    extracted.pageImages
+                );
 
-        renderPreview();
-        disableOutputActions(false);
-        setStatus(`הסתיים בהצלחה: ${state.questions.length} שאלות נטענו לעריכה.`);
+                if (fallbackQuestions.length > parsedQuestions.length) {
+                    parsedQuestions = fallbackQuestions;
+                    examText = fallbackExtraction.text;
+                    sourcePages = fallbackExtraction.pages;
+                    state.proofPageImages = fallbackExtraction.pagePreviews || [];
+                }
+            }
+
+            for (const q of parsedQuestions) {
+                if (task.isAborted()) throw new Error('הפעולה בוטלה על ידי המשתמש.');
+                if (q._needsPageRender && !q.image && extracted.pdf && q.sourcePage) {
+                    try {
+                        const page = await extracted.pdf.getPage(q.sourcePage);
+                        // Use same 2.5 scale as renderPageImageData for consistent quality.
+                        const imageData = await renderPageImageData(page, 2.5);
+                        q.image = `data:image/png;base64,${imageData}`;
+                    } catch { /* skip if render fails */ }
+                }
+                delete q._needsPageRender;
+            }
+
+            // Default correct answer to index 0 ('א') and shuffle options until explicit merge
+            state.questions = parsedQuestions.map(q => ({
+                ...q,
+                correctIndex: (typeof q.correctIndex === 'number' && q.correctIndex >= 0) ? q.correctIndex : 0,
+                shuffleOptions: true
+            }));
+
+            // Additional AI Verification step (if explicitly enabled by user toggle)
+            const enableVerification = elements.enableLlmVerification ? elements.enableLlmVerification.checked : false;
+            if (enableVerification) {
+                if (!apiKey) {
+                    apiKey = await resolveGeminiApiKey(true);
+                }
+                if (apiKey) {
+                    setStatus('מבצע סבב הגהה ותיקון נוסף מול Gemini API (Verification Pass)...');
+                    state.questions = await verifyTestWithGemini(state.questions, apiKey, task);
+                }
+            }
+
+            const validationErrors = validateQuestions(state.questions);
+            if (validationErrors.length) {
+                throw new Error(`נמצאו שאלות לא תקינות: ${validationErrors.slice(0, 5).join(' ')}`);
+            }
+
+            renderPreview();
+            disableOutputActions(false);
+            task.finish(`הסתיים בהצלחה: נטענו ${state.questions.length} שאלות לעריכה!`);
+        } catch (error) {
+            if (task.isAborted()) {
+                task.abort('פעולת חילוץ השאלות בוטלה.');
+            } else {
+                task.fail(error.message || 'אירעה שגיאה לא צפויה.');
+            }
+            throw error;
+        }
     }
 
     elements.runParse.addEventListener('click', async () => {
         try {
             await runParse();
         } catch (error) {
-            setStatus(error.message || 'אירעה שגיאה לא צפויה.', true);
+            console.warn('runParse finished with notice/error:', error);
         }
     });
 
@@ -3025,9 +3314,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.compressSettingsPopup) {
             elements.compressSettingsPopup.classList.remove('show');
         }
+        const task = ProgressController.startTask('מייצא מבחן עצמאי (HTML)', {
+            icon: '📥',
+            cancellable: true,
+            detail: 'מכין קובץ HTML ודוחס תמונות...'
+        });
+
         try {
+            task.update(10, 'מכין קובץ HTML להורדה...');
             setStatus('מכין קובץ HTML להורדה...');
-            const html = await createStandaloneQuizHtml();
+            const html = await createStandaloneQuizHtml(task);
+            if (task.isAborted()) {
+                task.abort('ייצוא המבחן בוטל.');
+                return;
+            }
+            task.update(95, 'יוצר קובץ HTML עצמאי ומוריד...');
             const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
@@ -3035,9 +3336,13 @@ document.addEventListener('DOMContentLoaded', () => {
             anchor.download = 'interactive_quiz.html';
             anchor.click();
             URL.revokeObjectURL(url);
-            setStatus('הקובץ נוצר וההורדה התחילה.');
+            task.finish('הקובץ נוצר בהצלחה וההורדה התחילה!');
         } catch (error) {
-            setStatus(error.message || 'נכשלה יצירת קובץ HTML.', true);
+            if (task.isAborted()) {
+                task.abort('ייצוא המבחן בוטל.');
+            } else {
+                task.fail(error.message || 'נכשלה יצירת קובץ HTML.');
+            }
         }
     });
 
@@ -3050,25 +3355,37 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const task = ProgressController.startTask('מכין מבחן לפתרון', {
+            icon: '▶️',
+            cancellable: true,
+            detail: 'בונה את נתוני המבחן ומפעיל בלשונית חדשה...'
+        });
+
         try {
             // Write a minimal loading page immediately so the tab shows a spinner
             // instead of blank while createStandaloneQuizHtml() runs (can be slow
             // for large quizzes with image compression).
             previewWindow.document.write('<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>מכין מבחן...</title><style>body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:Rubik,system-ui,sans-serif;background:#f8fafc;color:#0f172a;direction:rtl}@keyframes bspin{to{transform:rotate(360deg)}}.sp{width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:bspin .7s linear infinite;margin-bottom:16px}.wr{text-align:center}p{font-size:1.1rem;margin:0}</style></head><body><div class="wr"><div class="sp"></div><p>מכין מבחן...</p></div></body></html>');
             previewWindow.document.title = 'מכין מבחן...';
+            task.update(15, 'פותח תצוגת מבחן ומעבד תמונות...');
             setStatus('פותח תצוגת מבחן...');
-            const html = await createStandaloneQuizHtml();
+            const html = await createStandaloneQuizHtml(task);
+            if (task.isAborted()) {
+                previewWindow.close();
+                task.abort('טעינת המבחן בוטלה.');
+                return;
+            }
             previewWindow.document.open();
             previewWindow.document.write(html);
             previewWindow.document.close();
-            setStatus('המבחן נפתח בלשונית חדשה.');
+            task.finish('המבחן נפתח בלשונית חדשה!');
         } catch (error) {
-            try {
-                previewWindow.close();
-            } catch {
-                // Ignore browsers that refuse to close the temporary tab.
+            previewWindow?.close();
+            if (task.isAborted()) {
+                task.abort('טעינת המבחן בוטלה.');
+            } else {
+                task.fail(error.message || 'נכשלה פתיחת המבחן.');
             }
-            setStatus(error.message || 'לא ניתן היה לפתוח את המבחן.', true);
         }
     });
 
@@ -3177,6 +3494,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!state.pdfBytes || state.pdfBytes.length === 0 || !pdfjs?.getDocument) return;
 
+        const task = ProgressController.startTask('טוען ומעבד עמודי PDF', {
+            icon: '📄',
+            cancellable: true,
+            detail: 'טוען מסמך PDF ומכין תצוגות עמודים...'
+        });
+
         try {
             const freshCopy = new Uint8Array(state.pdfBytes);
             const loadingTask = pdfjs.getDocument({ data: freshCopy });
@@ -3187,6 +3510,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (elements.builderLayout) elements.builderLayout.classList.remove('no-sidebar');
 
             for (let i = 1; i <= numPages; i++) {
+                if (task.isAborted()) {
+                    task.abort('טעינת תצוגות העמודים נעצרה.');
+                    return;
+                }
+
+                const percent = Math.round((i / numPages) * 100);
+                task.update(percent, `יוצר תצוגה מקדימה לעמוד ${i} מתוך ${numPages} (${percent}%)...`);
+
                 const page = await pdfDoc.getPage(i);
                 const textContent = await page.getTextContent();
                 const pageText = textContent.items.map(item => item.str).join(' ').trim();
@@ -3212,8 +3543,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             renderSidebarThumbnails();
             if (elements.downloadCleanPdf) elements.downloadCleanPdf.disabled = false;
+            task.finish(`נטענו ${numPages} עמודים בהצלחה!`);
         } catch (err) {
             console.error('Error rendering PDF sidebar thumbnails:', err);
+            task.fail(`שגיאה בטעינת עמודי PDF: ${err.message || err}`);
         }
     }
 
@@ -3360,7 +3693,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const task = ProgressController.startTask('יוצר קובץ PDF נקי', {
+            icon: '✂️',
+            cancellable: false,
+            detail: 'מסיר עמודים ומכין קובץ PDF חדש...'
+        });
+
         try {
+            task.update(15, 'קורא קובץ PDF מקור...');
             setStatus('מכין קובץ PDF נקי להורדה...');
 
             let bytes = state.pdfBytes;
@@ -3369,6 +3709,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const file = elements.pdfFile?.files?.[0];
                 if (!file) {
                     alert('אנא בחר קובץ PDF ראשית.');
+                    task.fail('לא נבחר קובץ PDF.');
                     return;
                 }
                 const buffer = await file.arrayBuffer();
@@ -3376,6 +3717,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 bytes = state.pdfBytes;
             }
 
+            task.update(40, 'מעבד ומסנן עמודים נבחרים...');
             const freshCopy = new Uint8Array(bytes.buffer.slice(0));
             const srcDoc = await window.PDFLib.PDFDocument.load(freshCopy);
             const newDoc = await window.PDFLib.PDFDocument.create();
@@ -3395,9 +3737,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            task.update(70, `מעתיק ${keptIndices.length} עמודים ל-PDF החדש...`);
             const copiedPages = await newDoc.copyPages(srcDoc, keptIndices);
             copiedPages.forEach(page => newDoc.addPage(page));
 
+            task.update(90, 'שומר ומייצר קובץ להורדה...');
             const pdfDataUri = await newDoc.saveAsBase64({ dataUri: true });
 
             const anchor = document.createElement('a');
@@ -3407,11 +3751,11 @@ document.addEventListener('DOMContentLoaded', () => {
             anchor.click();
             document.body.removeChild(anchor);
 
-            setStatus(`PDF נקי נוצר בהצלחה עם ${keptIndices.length} עמודים וההורדה התחילה.`);
+            task.finish(`PDF נקי נוצר בהצלחה עם ${keptIndices.length} עמודים וההורדה התחילה!`);
         } catch (err) {
             console.error('Failed to export clean PDF:', err);
             alert(`שגיאה ביצירת PDF נקי: ${err.message || err}`);
-            setStatus(err.message || 'שגיאה ביצירת PDF נקי.', true);
+            task.fail(err.message || 'שגיאה ביצירת PDF נקי.');
         }
     }
 
@@ -3514,7 +3858,17 @@ STRICT EXTRACTION & FORMATTING RULES:
 
         if (!csv || !formNumber || !state.questions || !state.questions.length) return;
 
+        let task = null;
+        if (explicit) {
+            task = ProgressController.startTask('ממזג מפתח תשובות', {
+                icon: '🔗',
+                cancellable: false,
+                detail: `קורא נתונים וממזג תשובות לשאלון ${formNumber}...`
+            });
+        }
+
         try {
+            if (task) task.update(30, 'מפענח קובץ תשובות...');
             let answerRows = null;
             const fileName = csv.name.toLowerCase();
             if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
@@ -3525,21 +3879,29 @@ STRICT EXTRACTION & FORMATTING RULES:
                 answerRows = parseCsvRows(csvText.replace(/^\uFEFF/, ''));
             }
 
+            if (task) task.update(70, `מחלץ תשובות עבור שאלון ${formNumber}...`);
             const answerMap = extractAnswersForForm(answerRows, formNumber);
             if (!answerMap || !answerMap.size) {
                 if (explicit) {
                     showToast(`לא נמצאו תשובות לשאלון ${formNumber} בקובץ שנבחר.`, 'error');
+                    if (task) task.fail(`לא נמצאו תשובות לשאלון ${formNumber}.`);
                 }
                 return;
             }
 
             state.questions = mergeAnswers(state.questions, answerMap);
             renderPreview();
-            setStatus(`תשובות מ-CSV/XLS מוזגו בהצלחה לשאלון ${formNumber}!`, false, true);
+            const msg = `תשובות מ-CSV/XLS מוזגו בהצלחה לשאלון ${formNumber}!`;
+            if (task) {
+                task.finish(msg);
+            } else {
+                setStatus(msg, false, true);
+            }
         } catch (e) {
             console.warn('Could not merge CSV answers automatically:', e);
             if (explicit) {
                 showToast(`שגיאה במיזוג תשובות: ${e.message}`, 'error');
+                if (task) task.fail(`שגיאה במיזוג תשובות: ${e.message}`);
             }
         }
     }
@@ -3572,7 +3934,14 @@ STRICT EXTRACTION & FORMATTING RULES:
             return;
         }
 
+        const task = ProgressController.startTask('מחבר תמונות עמוד לשאלות', {
+            icon: '🖼️',
+            cancellable: true,
+            detail: 'מנתח עמודי PDF ומחפש תרשימים וטבלאות...'
+        });
+
         try {
+            task.update(10, 'טוען קובץ PDF לבדיקת תרשימים...');
             setStatus('מנתח עמודי PDF ומחבר תמונות לשאלות עם תרשימים/טבלאות...');
             const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBuffer.slice(0)) });
             const pdfDoc = await loadingTask.promise;
@@ -3588,6 +3957,12 @@ STRICT EXTRACTION & FORMATTING RULES:
 
             const pdfPageTexts = [];
             for (let p = 1; p <= pdfDoc.numPages; p++) {
+                if (task.isAborted()) {
+                    task.abort('חיבור התמונות נעצר.');
+                    return;
+                }
+                const scanPct = 10 + Math.round((p / pdfDoc.numPages) * 20);
+                task.update(scanPct, `סורק טקסט עמוד ${p} מתוך ${pdfDoc.numPages}...`);
                 try {
                     const page = await pdfDoc.getPage(p);
                     const textContent = await page.getTextContent();
@@ -3628,14 +4003,21 @@ STRICT EXTRACTION & FORMATTING RULES:
                     }
                 }
 
-                // If we have no lexical signal at all, keep current page assignment.
                 return bestScore > 0 ? bestPage : preferredPage;
             };
 
             const imageKeywords = /(?:^|[\s\(\[\:\,\"\'-])(?:לפניכם|לפניך|גרף|הגרף|תרשים|התרשים|תמונה|התמונה|טבלה|הטבלה|איור|האיור|מפה|המפה|דיאגרמה|הדיאגרמה|צילום|סכמה|הסכמה|שרטוט|עקומה|עקומות|מוצג|המוצג|במוצג|באיור|בגרף|בטבלה|בתרשים)(?:$|[\s\)\.\:\,\?\!\"'-])/i;
             let attachedCount = 0;
+            const totalQ = state.questions.length;
 
-            for (let i = 0; i < state.questions.length; i++) {
+            for (let i = 0; i < totalQ; i++) {
+                if (task.isAborted()) {
+                    task.abort('חיבור התמונות נעצר.');
+                    return;
+                }
+                const renderPct = 30 + Math.round((i / totalQ) * 65);
+                task.update(renderPct, `בודק שאלה ${i + 1} מתוך ${totalQ}...`);
+
                 const q = state.questions[i];
                 const questionText = q.question || '';
                 const isDiagramQuestion = imageKeywords.test(questionText);
@@ -3646,6 +4028,7 @@ STRICT EXTRACTION & FORMATTING RULES:
                 const shouldAttachImage = isDiagramQuestion || q.hasVisualElement || q._needsPageRender;
                 if (shouldAttachImage && pdfDoc.numPages >= 1) {
                     try {
+                        task.update(renderPct, `מרנדר עמוד ${targetPage} לשאלה ${i + 1}...`);
                         const page = await pdfDoc.getPage(targetPage);
                         // Use same 2.5 scale as renderPageImageData for consistent quality.
                         const imageData = await renderPageImageData(page, 2.5);
@@ -3659,13 +4042,14 @@ STRICT EXTRACTION & FORMATTING RULES:
 
             renderPreview();
             if (attachedCount > 0) {
-                setStatus(`חוברו בהצלחה ${attachedCount} תמונות עמוד לשאלות עם תרשימים/טבלאות!`, false, true);
+                task.finish(`חוברו בהצלחה ${attachedCount} תמונות עמוד לשאלות עם תרשימים/טבלאות!`);
             } else {
-                setStatus('לא נמצאו שאלות המפנות לתרשימים/טבלאות לחיבור עמוד.', false, true);
+                task.finish('לא נמצאו שאלות המפנות לתרשימים/טבלאות לחיבור עמוד.');
             }
         } catch (err) {
             console.error('Error auto-attaching diagram images:', err);
             alert(`שגיאה בחיבור תמונות עמוד: ${err.message || err}`);
+            task.fail(`שגיאה בחיבור תמונות עמוד: ${err.message || err}`);
         }
     }
 

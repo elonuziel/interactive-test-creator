@@ -831,6 +831,23 @@
 </head>
 
 <body>
+    <div id="sticky-progress-banner" class="sticky-progress-banner hidden" role="status" aria-live="polite">
+        <div class="sticky-progress-content">
+            <div class="sticky-progress-info">
+                <span class="progress-spinner-icon">⏳</span>
+                <span id="sticky-progress-title" class="sticky-progress-title">מעבד...</span>
+                <span id="sticky-progress-detail" class="sticky-progress-detail"></span>
+            </div>
+            <div class="sticky-progress-actions">
+                <span id="sticky-progress-percent" class="sticky-progress-percent">0%</span>
+                <button id="sticky-progress-abort-btn" type="button" class="progress-abort-btn" title="בטל פעולה">✕ ביטול</button>
+            </div>
+        </div>
+        <div class="progress-bar-track">
+            <div id="sticky-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+    </div>
+
     <header class="navbar">
         <div class="logo">יוצר מבחן אינטראקטיבי</div>
         <div class="navbar-center">
@@ -1096,6 +1113,28 @@
                         <span class="proof-note">הצגת עמוד מקור לכל שאלה</span>
                         <input id="proof-mode-toggle" type="checkbox" checked>
                     </div>
+
+                    <div id="progress-card" class="progress-card hidden" role="region" aria-label="התקדמות פעולת רקע">
+                        <div class="progress-header">
+                            <div class="progress-title-wrap">
+                                <span id="progress-icon" class="progress-icon">⚡</span>
+                                <div>
+                                    <div id="progress-title" class="progress-title">מבצע פעולת רקע...</div>
+                                    <div id="progress-detail" class="progress-detail muted">אנא המתן...</div>
+                                </div>
+                            </div>
+                            <div class="progress-meta">
+                                <span id="progress-percent" class="progress-percent">0%</span>
+                                <button id="progress-abort-btn" type="button" class="progress-abort-btn" title="בטל פעולה">
+                                    ✕ ביטול
+                                </button>
+                            </div>
+                        </div>
+                        <div class="progress-bar-track" role="progressbar" id="main-progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                            <div id="progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
                     <div id="status" class="status muted">מוכן להתחלה. PDF דיגיטלי יעובד מקומית, ו-PDF סרוק יבקש OCR רק
                         אם צריך.</div>
                 </section>

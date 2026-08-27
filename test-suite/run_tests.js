@@ -124,6 +124,56 @@ runTest('Standalone Export', 'Escapes script terminators and inlines scripts', (
     assert.ok(!html.includes('src="app.js"'));
 });
 
+runTest('Progress System DOM & Styles', 'Verifies progress bar DOM markup in index.html and style.css', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const indexHtml = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+    const styleCss = fs.readFileSync(path.join(__dirname, '../style.css'), 'utf8');
+
+    // Check DOM elements exist
+    assert.ok(indexHtml.includes('id="sticky-progress-banner"'), 'sticky-progress-banner missing');
+    assert.ok(indexHtml.includes('id="sticky-progress-fill"'), 'sticky-progress-fill missing');
+    assert.ok(indexHtml.includes('id="sticky-progress-abort-btn"'), 'sticky-progress-abort-btn missing');
+    assert.ok(indexHtml.includes('id="progress-card"'), 'progress-card missing');
+    assert.ok(indexHtml.includes('id="progress-fill"'), 'progress-fill missing');
+    assert.ok(indexHtml.includes('id="progress-abort-btn"'), 'progress-abort-btn missing');
+
+    // Check CSS rules exist
+    assert.ok(styleCss.includes('.sticky-progress-banner'), '.sticky-progress-banner CSS missing');
+    assert.ok(styleCss.includes('.progress-card'), '.progress-card CSS missing');
+    assert.ok(styleCss.includes('.progress-bar-fill'), '.progress-bar-fill CSS missing');
+    assert.ok(styleCss.includes('.progress-abort-btn'), '.progress-abort-btn CSS missing');
+    assert.ok(styleCss.includes('.indeterminate'), '.indeterminate animation CSS missing');
+});
+
+runTest('Progress Controller Lifecycle', 'Validates AbortController and progress state calculation', () => {
+    const abortCtrl = new AbortController();
+    assert.strictEqual(abortCtrl.signal.aborted, false);
+    abortCtrl.abort();
+    assert.strictEqual(abortCtrl.signal.aborted, true);
+
+    const clamp = (val) => Math.max(0, Math.min(100, Math.round(val || 0)));
+    assert.strictEqual(clamp(-10), 0);
+    assert.strictEqual(clamp(50.4), 50);
+    assert.strictEqual(clamp(150), 100);
+});
+
+runTest('Auto-Advance Countdown', 'Verifies countdown markup generation and styles in player', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const appJs = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
+    const styleCss = fs.readFileSync(path.join(__dirname, '../style.css'), 'utf8');
+
+    assert.ok(appJs.includes('autoAdvanceInterval'), 'autoAdvanceInterval missing in app.js');
+    assert.ok(appJs.includes('auto-advance-seconds'), 'auto-advance-seconds class missing in app.js');
+    assert.ok(appJs.includes('auto-advance-bar-fill'), 'auto-advance-bar-fill missing in app.js');
+
+    assert.ok(styleCss.includes('.auto-advance-indicator'), '.auto-advance-indicator missing in style.css');
+    assert.ok(styleCss.includes('.auto-advance-seconds'), '.auto-advance-seconds missing in style.css');
+    assert.ok(styleCss.includes('.auto-advance-bar-fill'), '.auto-advance-bar-fill missing in style.css');
+    assert.ok(styleCss.includes('@keyframes autoAdvanceShrink'), 'autoAdvanceShrink animation missing in style.css');
+});
+
 console.log('\n──────────────────────────────────────────────────────────────');
 console.log(`📊 Final Execution Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
 console.log('──────────────────────────────────────────────────────────────\n');

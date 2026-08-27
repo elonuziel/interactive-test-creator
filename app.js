@@ -8,11 +8,23 @@ document.addEventListener('DOMContentLoaded', () => {
     let userFlags = []; // boolean per question
     let isImmediateFeedback = false;
     let autoAdvanceTimer = null;
+    let autoAdvanceInterval = null;
     let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered' | 'flagged'
     let isReviewMode = false; // true when reviewing from results screen
     let theme = localStorage.getItem('theme') || 'light';
 
     const STORAGE_KEY = 'quiz_answers_v1';
+
+    function clearAutoAdvance() {
+        if (autoAdvanceTimer) {
+            clearTimeout(autoAdvanceTimer);
+            autoAdvanceTimer = null;
+        }
+        if (autoAdvanceInterval) {
+            clearInterval(autoAdvanceInterval);
+            autoAdvanceInterval = null;
+        }
+    }
 
     // ── DOM Elements ─────────────────────────────────────────────────────────
     const setupScreen   = document.getElementById('setup-screen');
@@ -488,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Render Question ───────────────────────────────────────────────────────
     function renderQuestion() {
-        clearTimeout(autoAdvanceTimer);
+        clearAutoAdvance();
         const q = questions[currentQuestionIndex];
         const answered = userAnswers[currentQuestionIndex];
 
@@ -530,6 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Feedback
         feedbackMessage.classList.add('hidden');
         feedbackMessage.className = 'feedback-message hidden';
+        feedbackMessage.innerHTML = '';
 
         // Navigation buttons
         prevBtn.disabled = currentQuestionIndex === 0;
@@ -603,14 +616,35 @@ document.addEventListener('DOMContentLoaded', () => {
             renderQuestion();
             if (isCorrect && !isReviewMode) {
                 const isLast = currentQuestionIndex === questions.length - 1;
+                const targetText = isLast ? 'לסיום המבחן' : 'לשאלה הבאה';
+                showFeedbackMessage(true, true, targetText);
+
+                const totalDurationMs = 1500;
+                const startTime = Date.now();
+
+                autoAdvanceInterval = setInterval(() => {
+                    const elapsed = Date.now() - startTime;
+                    const remainingMs = Math.max(0, totalDurationMs - elapsed);
+                    const remainingSeconds = Math.ceil(remainingMs / 1000);
+                    const secElem = feedbackMessage.querySelector('.auto-advance-seconds');
+                    if (secElem) {
+                        secElem.textContent = String(remainingSeconds > 0 ? remainingSeconds : 1);
+                    }
+                    if (remainingMs <= 0) {
+                        clearInterval(autoAdvanceInterval);
+                        autoAdvanceInterval = null;
+                    }
+                }, 100);
+
                 autoAdvanceTimer = setTimeout(() => {
+                    clearAutoAdvance();
                     if (isLast) {
                         submitBtn.click();
                     } else {
                         currentQuestionIndex++;
                         renderQuestion();
                     }
-                }, 1000);
+                }, totalDurationMs);
             }
         } else {
             // Just update jump bar dot
@@ -619,14 +653,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Feedback Message ──────────────────────────────────────────────────────
-    function showFeedbackMessage(isCorrect) {
+    function showFeedbackMessage(isCorrect, autoAdvance = false, targetName = 'לשאלה הבאה') {
         feedbackMessage.classList.remove('hidden');
+        feedbackMessage.innerHTML = '';
         if (isCorrect) {
-            feedbackMessage.textContent = 'תשובה נכונה! כל הכבוד.';
-            feedbackMessage.classList.add('success');
+            feedbackMessage.className = 'feedback-message success';
+            if (autoAdvance) {
+                const titleSpan = document.createElement('span');
+                titleSpan.className = 'feedback-title';
+                titleSpan.textContent = '✓ תשובה נכונה! כל הכבוד.';
+
+                const indicatorSpan = document.createElement('span');
+                indicatorSpan.className = 'auto-advance-indicator';
+                indicatorSpan.innerHTML = `⏳ עובר ${targetName} בעוד <strong class="auto-advance-seconds">2</strong> שניות...`;
+
+                const barTrack = document.createElement('div');
+                barTrack.className = 'auto-advance-bar-track';
+                const barFill = document.createElement('div');
+                barFill.className = 'auto-advance-bar-fill';
+                barTrack.appendChild(barFill);
+
+                feedbackMessage.appendChild(titleSpan);
+                feedbackMessage.appendChild(indicatorSpan);
+                feedbackMessage.appendChild(barTrack);
+            } else {
+                feedbackMessage.textContent = 'תשובה נכונה! כל הכבוד.';
+            }
         } else {
+            feedbackMessage.className = 'feedback-message error';
             feedbackMessage.textContent = 'תשובה שגויה.';
-            feedbackMessage.classList.add('error');
         }
     }
 
