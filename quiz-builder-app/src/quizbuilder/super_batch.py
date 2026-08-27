@@ -136,6 +136,45 @@ def normalize_answer_key(path: Path) -> dict[int, str]:
     return {}
 
 
+def score_answer_key(pdf: Path, key: Path, metadata: dict[str, str | None], answers_count: int = 0) -> int:
+    score = 0
+    pdf_stem = pdf.stem.casefold()
+    key_stem = key.stem.casefold()
+
+    # 1. Moed variant match
+    pdf_variant = metadata.get("variant") or exam_variant(pdf.name)
+    key_variant = exam_variant(key.name)
+    if pdf_variant and key_variant:
+        if pdf_variant == key_variant:
+            score += 20
+        else:
+            return -100  # Direct Moed conflict (e.g. A vs B)
+    elif pdf_variant and not key_variant:
+        score -= 2
+
+    # 2. Test / Form Number match
+    test_number = metadata.get("test_number")
+    if test_number and test_number in key_stem:
+        score += 30
+
+    # 3. Year match
+    year = metadata.get("year")
+    if year and year in key_stem:
+        score += 15
+
+    # 4. Token overlap
+    pdf_tokens = set(re.findall(r"\w+", pdf_stem)) - {"test", "exam", "pdf", "moed", "בחינה", "מבחן", "טופס"}
+    key_tokens = set(re.findall(r"\w+", key_stem)) - {"answers", "answer", "key", "csv", "xlsx", "xls", "md", "json", "תשובות", "מפתח"}
+    overlap = pdf_tokens & key_tokens
+    score += len(overlap) * 5
+
+    # 5. Has parsed answers
+    if answers_count > 0:
+        score += 5
+
+    return score
+
+
 def build_plan(root: Path) -> SuperBatchPlan:
     root = root.resolve()
     if not root.is_dir():
@@ -161,33 +200,38 @@ def build_plan(root: Path) -> SuperBatchPlan:
                 workspace = folder
                 exam_name = pdf.stem
 
-            sources = discover_sources(Workspace(folder.name, folder))
-            keys = match_answer_keys(pdf, sources.answer_keys) or sources.answer_keys
-            candidates = tuple(AnswerKeyCandidate(key, normalize_answer_key(key)) for key in keys)
             metadata = extract_exam_metadata(pdf.stem, pdf.name)
-            overview = ExamOverview(
-                pdf=pdf,
-                workspace=workspace,
-                name=exam_name,
+            
+            candidates_list: list[AnswerKeyCandidate] = []
+            for key in folder_key_files:
+                answers = normalize_answer_key(key)
+                candidates_list.append(AnswerKeyCandidate(key, answers, score))
+            
+            # Sort candidates: highest match score first, then alphabetically
+            candidates_list.sort(key=lambda c: (c.score, -len(c.path.name)), reverse=True)
+            candidates = tuple(candidates_list)
+
                 is_digital=None,
                 test_number=metadata["test_number"],
                 year=metadata["year"],
                 variant=metadata["variant"],
                 warnings=("PDF classification pending",),
             )
-            items.append(SuperBatchItem(overview, candidates))
+            
+            # Auto-select the top matched answer key (if score > 0 or only 1 key available)
+            selected_key = candidates[0].path if (candidates and (candidates[0].score > 0 or len(candidates) == 1)) else None
+            items.append(SuperBatchItem(overview, candidates, selected_answer_key=selected_key))
 
     return SuperBatchPlan(root, tuple(items))
 
 
 def classify_plan_item(item: SuperBatchItem) -> SuperBatchItem:
-    digital = classify_pdf(item.overview.pdf, workspace=item.overview.workspace)
-    warnings = tuple(w for w in item.overview.warnings if w != "PDF classification pending")
     item.overview = replace(item.overview, is_digital=digital, warnings=warnings)
-    if len(item.answer_keys) == 1:
-        item.selected_answer_key = item.answer_keys[0].path
-    elif len(item.answer_keys) > 1:
-        item.error = "Multiple answer keys require confirmation."
+    if not item.selected_answer_key and item.answer_keys:
+        if len(item.answer_keys) == 1:
+            item.selected_answer_key = item.answer_keys[0].path
+        elif item.answer_keys[0].score > (item.answer_keys[1].score if len(item.answer_keys) > 1 else 0):
+            item.selected_answer_key = item.answer_keys[0].path
     return item
 
 
@@ -247,10 +291,10 @@ Document Context Excerpt:
 
 
 def default_decision(item: SuperBatchItem) -> str:
-    if item.overview.is_digital:
-        return "zero_test"
     if item.selected_answer_key:
         return "use_answer_key"
+    if item.overview.is_digital:
+        return "zero_test"
     return "generate_only"
 
 

@@ -96,3 +96,19 @@ def test_generation_prompt_includes_file_paths(tmp_path):
     assert "zero_test" in prompt
     assert str(pdf.resolve()) in prompt
     assert str(item.overview.workspace.resolve()) in prompt
+
+
+def test_auto_match_and_selection_of_correct_answer_key(tmp_path):
+    folder = tmp_path / "exam_project"
+    folder.mkdir()
+    pdf_a = folder / "biology_2024_moed_a.pdf"
+    pdf_a.write_bytes(b"%PDF")
+    key_a = folder / "answers_moed_a.csv"
+    key_a.write_text("1,A\n2,B\n", encoding="utf-8")
+    key_b = folder / "answers_moed_b.csv"
+    key_b.write_text("1,C\n2,D\n", encoding="utf-8")
+
+    plan = build_plan(tmp_path)
+    assert len(plan.items) == 1
+    # Both keys from the folder are available in the dropdown
+    assert default_decision(plan.items[0]) == "use_answer_key"

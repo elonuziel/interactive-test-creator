@@ -853,8 +853,10 @@ class MainWindow(QWidget):
             mode.setCurrentIndex(0 if self.config.super_batch_ai_mode == "two_phase" else 1)
             form.addRow("AI mode:", mode)
 
-            clean = QCheckBox("Apply configured digital PDF page cleaning (discard blank/boilerplate pages)")
+            discard_rule = self.discard_range_edit.text().strip() or self.config.default_discard_pages or "std"
+            clean = QCheckBox(f"Apply digital PDF page cleaning (rule: '{discard_rule}')")
             clean.setChecked(True)
+            clean.setToolTip(f"Cleans digital PDFs using the '{discard_rule}' rule before question extraction.")
             form.addRow("PDF cleanup:", clean)
 
             context_mode = QComboBox()
@@ -932,11 +934,16 @@ class MainWindow(QWidget):
                     if candidate.answers:
                         label += f" ({len(candidate.answers)} ans)"
                     key_combo.addItem(label, candidate.path)
+
+                # Auto-select the matched answer key in the dropdown
                 if item.selected_answer_key:
                     for i in range(key_combo.count()):
                         if key_combo.itemData(i) == item.selected_answer_key:
                             key_combo.setCurrentIndex(i)
                             break
+                elif item.answer_keys and item.answer_keys[0].score >= 0:
+                    key_combo.setCurrentIndex(1)
+                    item.selected_answer_key = item.answer_keys[0].path
                 table.setCellWidget(row_idx, 4, key_combo)
 
                 # 5: Decision
@@ -944,13 +951,21 @@ class MainWindow(QWidget):
                 decision_combo.addItem("Use answer key", "use_answer_key")
                 decision_combo.addItem("Generate only (unanswered)", "generate_only")
                 decision_combo.addItem("Zero test (all A)", "zero_test")
-                if item.overview.is_digital:
-                    decision_combo.setCurrentIndex(2)
-                elif item.selected_answer_key:
+                if key_combo.currentIndex() > 0 or item.selected_answer_key:
                     decision_combo.setCurrentIndex(0)
+                elif item.overview.is_digital:
+                    decision_combo.setCurrentIndex(2)
                 else:
                     decision_combo.setCurrentIndex(1)
                 table.setCellWidget(row_idx, 5, decision_combo)
+
+                # Connect key_combo changes to automatically update decision
+                def on_key_changed(idx: int, d_combo=decision_combo, itm=item):
+                    if idx > 0:
+                        d_combo.setCurrentIndex(0)  # Use answer key
+                    else:
+                        d_combo.setCurrentIndex(2 if itm.overview.is_digital else 1)
+                key_combo.currentIndexChanged.connect(on_key_changed)
 
                 # 6: Overwrite
                 exists = (item.overview.workspace / "questions.md").exists()
@@ -978,14 +993,16 @@ class MainWindow(QWidget):
                     inc.setChecked(checked)
 
             def set_all_zero_test():
-                for itm, _, _, dec, _, _ in rows_data:
+                for itm, _, k_combo, dec, _, _ in rows_data:
                     if itm.overview.is_digital:
+                        k_combo.setCurrentIndex(0)
                         dec.setCurrentIndex(2)
 
             def auto_match_all():
-                for itm, _, k_combo, _, _, _ in rows_data:
-                    if itm.answer_keys:
+                for itm, _, k_combo, dec_combo, _, _ in rows_data:
+                    if itm.answer_keys and itm.answer_keys[0].score >= 0:
                         k_combo.setCurrentIndex(1)
+                        dec_combo.setCurrentIndex(0)
 
             btn_select_all.clicked.connect(lambda: select_all(True))
             btn_deselect_all.clicked.connect(lambda: select_all(False))
@@ -1095,7 +1112,7 @@ class MainWindow(QWidget):
                     workers=workers.value(),
                     ai_mode=mode.currentData(),
                     context_mode=context_mode.currentData(),
-                    discard_pages=self.config.default_discard_pages if clean.isChecked() else "",
+                    discard_pages=discard_rule if clean.isChecked() else "",
                     clean_digital=clean.isChecked(),
                     cancel_event=cancel_event,
                     progress=on_progress,
