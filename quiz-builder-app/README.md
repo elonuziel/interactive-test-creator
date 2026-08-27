@@ -56,7 +56,7 @@ Designed for AI agents (such as Antigravity, Gemini, ChatGPT, Claude) to extract
 ## 📁 Directory Structure
 
 ```
-cli-legacy/
+quiz-builder-app/
 ├── start.bat                  # Interactive Windows wizard CLI
 ├── start.sh                   # Linux/macOS wizard launcher
 ├── LLM_RUNBOOK.md             # AI Agent instructions for PDF extraction

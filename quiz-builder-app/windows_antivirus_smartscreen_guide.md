@@ -36,11 +36,11 @@ web_dir_src = os.path.join(spec_dir, 'web')
 
 datas = [
     (python_scripts_src, 'python_scripts'),
-    (python_scripts_src, 'cli-legacy/python_scripts'),
+    (python_scripts_src, 'quiz-builder-app/python_scripts'),
 ]
 
 if os.path.isdir(web_dir_src):
-    datas.append((web_dir_src, 'cli-legacy/web'))
+    datas.append((web_dir_src, 'quiz-builder-app/web'))
     datas.append((web_dir_src, 'web'))
     datas.append((web_dir_src, '.'))
 

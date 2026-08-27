@@ -26,12 +26,12 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CLI_LEGACY_DIR = os.path.dirname(SCRIPT_DIR) if os.path.basename(SCRIPT_DIR) == 'python_scripts' else SCRIPT_DIR
 
 def resolve_web_asset(filename):
-    """Find template assets (index.html, style.css, app.js) strictly inside cli-legacy/web/."""
+    """Find template assets (index.html, style.css, app.js) strictly inside quiz-builder-app/web/."""
     frozen_base = getattr(sys, '_MEIPASS', None)
     candidates = []
     if frozen_base:
         candidates.extend([
-            os.path.join(frozen_base, 'cli-legacy', 'web', filename),
+            os.path.join(frozen_base, 'quiz-builder-app', 'web', filename),
             os.path.join(frozen_base, 'web', filename),
             os.path.join(frozen_base, filename),
         ])

@@ -16,10 +16,10 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: linux-gui
-            path: cli-legacy/dist/quiz_builder_gui
+            path: quiz-builder-app/dist/quiz_builder_gui
           - os: windows-latest
             artifact: windows-gui
-            path: cli-legacy/dist/quiz_builder_gui.exe
+            path: quiz-builder-app/dist/quiz_builder_gui.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -27,18 +27,18 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install GUI and packaging dependencies
-        working-directory: cli-legacy
-        run: python -m pip install -e ".[gui,package]"
+        working-directory: quiz-builder-app
+        run: python -m pip install -e ".[package]"
       - name: Build GUI bundle
-        working-directory: cli-legacy
+        working-directory: quiz-builder-app
         run: python build_gui.py
       - name: Package Linux bundle
         if: runner.os == 'Linux'
-        run: tar -czf interactive-quiz-builder-gui-linux-x86_64.tar.gz -C cli-legacy/dist quiz_builder_gui
+        run: tar -czf interactive-quiz-builder-gui-linux-x86_64.tar.gz -C quiz-builder-app/dist quiz_builder_gui
       - name: Package Windows bundle
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path cli-legacy/dist/quiz_builder_gui.exe -DestinationPath interactive-quiz-builder-gui-windows-x64.zip -Force
+        run: Compress-Archive -Path quiz-builder-app/dist/quiz_builder_gui.exe -DestinationPath interactive-quiz-builder-gui-windows-x64.zip -Force
       - name: Upload GUI bundle
         uses: actions/upload-artifact@v4
         with:

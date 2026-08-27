@@ -71,7 +71,7 @@ interactive-test-creator/
 ├── test-suite/           # In-Browser, Node, and Playwright tests
 ├── vendor/               # Third-party dependencies (PDF.js)
 ├── .github/workflows/    # Automated CI/CD Pages deployment workflow
-├── cli-legacy/           # Legacy Python scripts & batch wizard
+├── quiz-builder-app/           # Legacy Python scripts & batch wizard
 └── docs/                 # Guides, future ideas, and archived proposals
 
 ### Desktop GUI downloads

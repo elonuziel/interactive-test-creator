@@ -151,7 +151,6 @@ def main() -> int:
             QPlainTextEdit,
             QPushButton,
             QRadioButton,
-            QScrollArea,
             QTabWidget,
             QVBoxLayout,
             QWidget,
@@ -221,6 +220,7 @@ def main() -> int:
         "index": -1,
         "is_digital": None,
         "batch_candidates": [],
+        "loading": False,   # guard: suppresses combo signals while repopulating
     }
 
     # =========================================================================
@@ -612,33 +612,47 @@ def main() -> int:
             q_status_badge.setStyleSheet("background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-weight: 600; color: #475569;")
 
     def check_pdf_classification(pdf_path: Path) -> None:
+        from .documents import DocumentError
+
         def run_classify():
+            # Returns True (digital), False (scanned), or the exception string to
+            # distinguish "fitz missing" from a genuine scan result.
             try:
                 return classify_pdf(pdf_path)
-            except Exception:
-                return None
+            except DocumentError as exc:
+                return exc  # propagate as value so the GUI thread handles it
+            except Exception as exc:
+                return exc
 
         detection_title.setText("🔍 Analyzing PDF type...")
         detection_desc.setText("Inspecting text streams and structure...")
         detection_card.setStyleSheet("background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px;")
+        extract_digital_btn.setEnabled(False)  # reset while we re-analyse
 
         worker = Worker(run_classify)
 
-        def on_classify_done(is_digital):
-            state["is_digital"] = is_digital
-            if is_digital is True:
+        def on_classify_done(result):
+            if isinstance(result, Exception):
+                # Bug 4: fitz/PyMuPDF not installed or PDF unreadable
+                state["is_digital"] = None
+                detection_title.setText("⚠️ PDF Analysis Unavailable")
+                detection_desc.setText(f"{result}  — Install PyMuPDF to enable auto-detection.")
+                detection_card.setStyleSheet("background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 10px;")
+                extract_digital_btn.setEnabled(True)  # allow manual attempt
+                return
+
+            state["is_digital"] = result
+            if result is True:
                 detection_title.setText("✨ Digital PDF Detected (Extractable Text)")
                 detection_desc.setText("This exam has clean text. Click 'Extract Questions Automatically' for instant conversion.")
                 detection_card.setStyleSheet("background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 10px;")
-                extract_digital_btn.setEnabled(True)
-            elif is_digital is False:
-                detection_title.setText("📷 Scanned / Vector PDF Detected (Images Only)")
-                detection_desc.setText("This exam requires AI vision/rendering. Click 'Generate AI Prompt' to extract questions.")
-                detection_card.setStyleSheet("background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px;")
+                extract_digital_btn.setEnabled(True)   # Bug 5 fix: enable only for digital
             else:
-                detection_title.setText("📄 Document Ready")
-                detection_desc.setText("Select extraction mode below.")
-                detection_card.setStyleSheet("background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px;")
+                # Bug 5 fix: explicitly disable for scanned PDFs
+                detection_title.setText("📷 Scanned / Vector PDF Detected (Images Only)")
+                detection_desc.setText("This exam requires AI vision/rendering. Use 'Generate AI Prompt & Launch' below.")
+                detection_card.setStyleSheet("background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px;")
+                extract_digital_btn.setEnabled(False)
 
         worker.signals.finished.connect(on_classify_done)
         thread_pool.start(worker)
@@ -656,6 +670,9 @@ def main() -> int:
         state["workspace"] = workspace
         state["index"] = -1
         current_exam_title.setText(f"Exam: {workspace.name}")
+
+        # Bug 2 fix: block currentIndexChanged while repopulating combos
+        state["loading"] = True
 
         # Update PDF dropdown
         pdf_source_combo.clear()
@@ -679,12 +696,19 @@ def main() -> int:
         for key_path in discover_sources(workspace).answer_keys:
             answer_key_combo.addItem(key_path.name, key_path)
 
+        state["loading"] = False  # unlock before triggering classification/preview
+
         # Smart classification
         chosen_pdf = pdf_source_combo.currentData()
         if chosen_pdf and chosen_pdf.is_file():
             check_pdf_classification(chosen_pdf)
             # Auto-preview
             preview_first_page(chosen_pdf)
+        else:
+            detection_title.setText("📂 No PDF Found")
+            detection_desc.setText("Add a PDF to the exam folder, then Refresh.")
+            detection_card.setStyleSheet("background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 10px;")
+            extract_digital_btn.setEnabled(False)
 
         # Load questions for Step 2
         try:
@@ -988,8 +1012,9 @@ def main() -> int:
     tab1_exam_list.currentItemChanged.connect(
         lambda curr, _prev: load_workspace(curr.data(Qt.ItemDataRole.UserRole)) if curr else None
     )
+    # Bug 2 fix: only re-preview when not currently repopulating the combo
     pdf_source_combo.currentIndexChanged.connect(
-        lambda _i: preview_first_page()
+        lambda _i: preview_first_page() if not state["loading"] else None
     )
 
     extract_digital_btn.clicked.connect(process_selected_exam)
@@ -1006,14 +1031,22 @@ def main() -> int:
     save_test_btn.clicked.connect(save_test)
     proceed_to_step3_btn.clicked.connect(lambda: (save_active_question(), tabs.setCurrentIndex(2)))
 
-    select_all_btn.clicked.connect(
-        lambda: [tab3_exam_list.item(i).setCheckState(Qt.CheckState.Checked) for i in range(tab3_exam_list.count())] + [update_tab3_summary()]
-    )
-    clear_all_btn.clicked.connect(
-        lambda: [tab3_exam_list.item(i).setCheckState(Qt.CheckState.Unchecked) for i in range(tab3_exam_list.count())] + [update_tab3_summary()]
-    )
+    # Bug 1 fix: named handlers so update_tab3_summary() is actually called
+    def select_all_exams() -> None:
+        for i in range(tab3_exam_list.count()):
+            tab3_exam_list.item(i).setCheckState(Qt.CheckState.Checked)
+        update_tab3_summary()
+
+    def clear_all_exams() -> None:
+        for i in range(tab3_exam_list.count()):
+            tab3_exam_list.item(i).setCheckState(Qt.CheckState.Unchecked)
+        update_tab3_summary()
+
+    select_all_btn.clicked.connect(select_all_exams)
+    clear_all_btn.clicked.connect(clear_all_exams)
     tab3_exam_list.itemChanged.connect(lambda _item: update_tab3_summary())
     mix_checkbox.toggled.connect(lambda _v: update_tab3_summary())
+
 
     play_browser_btn.clicked.connect(lambda: prepare_and_play_quiz())
     export_html_btn.clicked.connect(export_quiz_as)

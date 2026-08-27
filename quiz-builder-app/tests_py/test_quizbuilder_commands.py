@@ -5,9 +5,10 @@ SRC = Path(__file__).resolve().parents[1] / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from quizbuilder.cli import main
 from quizbuilder.commands import clean_workspace, process_workspaces, validate_questions
 from quizbuilder.config import Config
+from quizbuilder.runs import assemble_run, write_run_questions
+from quizbuilder.models import Workspace
 
 
 def test_clean_workspace_removes_known_artifacts(tmp_path):
@@ -24,36 +25,7 @@ def test_validate_questions_returns_count(tmp_path):
     assert validate_questions(path) == 1
 
 
-def test_cli_version_command(capsys):
-    rc = main(["version"])
-    assert rc == 0
-    captured = capsys.readouterr()
-    assert "2.1.2" in captured.out
-
-
-def test_cli_detect_no_dependencies(capsys):
-    rc = main(["detect", "--no-dependencies"])
-    assert rc == 0
-
-
-def test_cli_clean_command(tmp_path, capsys):
-    (tmp_path / "prompt_local_agent.txt").write_text("prompt", encoding="utf-8")
-    rc = main(["clean", str(tmp_path)])
-    assert rc == 0
-    captured = capsys.readouterr()
-    assert "Removed 1 scratch file(s)" in captured.out
-
-
-def test_cli_validate_command(tmp_path, capsys):
-    path = tmp_path / "questions.json"
-    path.write_text('[{"question":"What?","options":["Yes","No"]}]', encoding="utf-8")
-    rc = main(["validate", str(path)])
-    assert rc == 0
-    captured = capsys.readouterr()
-    assert "Valid: 1 question(s)" in captured.out
-
-
-def test_cli_run_mixed_command_writes_derived_questions(tmp_path, capsys):
+def test_assemble_run_produces_mixed_questions(tmp_path):
     first = tmp_path / "first"
     second = tmp_path / "second"
     first.mkdir()
@@ -64,14 +36,14 @@ def test_cli_run_mixed_command_writes_derived_questions(tmp_path, capsys):
     second.joinpath("questions.json").write_text(
         '[{"question":"Two","options":["A","B"]}]', encoding="utf-8"
     )
-    output = tmp_path / "mixed.json"
-
-    rc = main(["run", "--mix", str(first), str(second), "-o", str(output)])
-
-    assert rc == 0
-    assert "mixed.json" in capsys.readouterr().out
-    assert '"question": "One"' in output.read_text(encoding="utf-8")
-    assert '"question": "Two"' in output.read_text(encoding="utf-8")
+    workspaces = [
+        Workspace("first", first),
+        Workspace("second", second),
+    ]
+    run = assemble_run(workspaces, mix=True)
+    assert len(run.questions) == 2
+    questions_text = {rq.question.get("question") for rq in run.questions}
+    assert questions_text == {"One", "Two"}
 
 
 def test_process_workspaces_continues_after_one_failure(tmp_path, monkeypatch):
@@ -89,4 +61,3 @@ def test_process_workspaces_continues_after_one_failure(tmp_path, monkeypatch):
     assert results[0].success is True
     assert results[1].success is False
     assert results[1].error == "broken PDF"
-

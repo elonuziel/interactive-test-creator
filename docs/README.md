@@ -12,6 +12,6 @@
 
 ## Archive
 
-The `archive/` folder contains superseded plans and historical site reviews. The active architecture is documented in [cli-legacy-refactor-spec.md](../cli-legacy-refactor-spec.md), and the active desktop direction is in [desktop-architecture-options.md](future/desktop-architecture-options.md).
+The `archive/` folder contains superseded plans and historical site reviews. The active architecture is documented in [quiz-builder-app-refactor-spec.md](../quiz-builder-app-refactor-spec.md), and the active desktop direction is in [desktop-architecture-options.md](future/desktop-architecture-options.md).
 
-The authoritative runnable scripts remain under [cli-legacy/python_scripts](../cli-legacy/python_scripts); no duplicate script copy is maintained here.
+The authoritative runnable scripts remain under [quiz-builder-app/python_scripts](../quiz-builder-app/python_scripts); no duplicate script copy is maintained here.
