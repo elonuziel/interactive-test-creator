@@ -192,6 +192,19 @@ def build_plan(root: Path) -> SuperBatchPlan:
 
     for folder, pdfs in by_folder.items():
         is_multi = len(pdfs) > 1 and not (folder / "questions.md").is_file()
+        
+        # Discover all CSV, Excel, and answer key files in this folder
+        ignored_names = {"questions.md", "questions.json", "raw_text.md", "page_map.json", "manifest.json"}
+        folder_key_files = sorted(
+            [
+                f for f in folder.iterdir()
+                if f.is_file()
+                and f.suffix.lower() in {".csv", ".xlsx", ".xls", ".md", ".json"}
+                and f.name.lower() not in ignored_names
+            ],
+            key=lambda p: p.name.casefold()
+        )
+
         for pdf in pdfs:
             if is_multi:
                 workspace = folder / ".quizbuilder" / _project_slug(pdf.stem)
@@ -205,12 +218,17 @@ def build_plan(root: Path) -> SuperBatchPlan:
             candidates_list: list[AnswerKeyCandidate] = []
             for key in folder_key_files:
                 answers = normalize_answer_key(key)
+                score = score_answer_key(pdf, key, metadata, len(answers))
                 candidates_list.append(AnswerKeyCandidate(key, answers, score))
             
             # Sort candidates: highest match score first, then alphabetically
             candidates_list.sort(key=lambda c: (c.score, -len(c.path.name)), reverse=True)
             candidates = tuple(candidates_list)
 
+            overview = ExamOverview(
+                pdf=pdf,
+                workspace=workspace,
+                name=exam_name,
                 is_digital=None,
                 test_number=metadata["test_number"],
                 year=metadata["year"],
@@ -226,6 +244,8 @@ def build_plan(root: Path) -> SuperBatchPlan:
 
 
 def classify_plan_item(item: SuperBatchItem) -> SuperBatchItem:
+    digital = classify_pdf(item.overview.pdf, workspace=item.overview.workspace)
+    warnings = tuple(w for w in item.overview.warnings if w != "PDF classification pending")
     item.overview = replace(item.overview, is_digital=digital, warnings=warnings)
     if not item.selected_answer_key and item.answer_keys:
         if len(item.answer_keys) == 1:
