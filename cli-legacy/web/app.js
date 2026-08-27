@@ -1,10 +1,14 @@
+import { createQuizState, loadProgress, saveProgress, storageKey } from './player-state.js';
+import { applyTheme, toggleTheme } from './player-theme.js';
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // ── State ────────────────────────────────────────────────────────────────
     let questions = [];
-    let currentQuestionIndex = 0;
-    let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
-    let isImmediateFeedback = false;
+    const playerState = createQuizState(0);
+    let currentQuestionIndex = playerState.currentQuestionIndex;
+    let userAnswers = playerState.userAnswers; // { selectedOptionId: number, isCorrect: boolean } | null
+    let isImmediateFeedback = playerState.isImmediateFeedback;
     let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered'
     let theme = localStorage.getItem('theme') || 'light';
 
@@ -48,17 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Theme ────────────────────────────────────────────────────────────────
     function setTheme(newTheme) {
         theme = newTheme;
-        document.documentElement.setAttribute('data-theme', theme);
+        applyTheme(theme, document.documentElement, themeIcon);
         localStorage.setItem('theme', theme);
-        if (theme === 'dark') {
-            themeIcon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>';
-        } else {
-            themeIcon.innerHTML = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>';
-        }
     }
     setTheme(theme);
 
-    themeToggle.addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
+    themeToggle.addEventListener('click', () => setTheme(toggleTheme(theme)));
     feedbackToggle.addEventListener('change', e => { isImmediateFeedback = e.target.checked; });
 
     // ── localStorage Persistence ──────────────────────────────────────────────

@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+import shutil
+import subprocess
+import webbrowser
+
+
+@dataclass(frozen=True)
+class Provider:
+    id: str
+    label: str
+    kind: str
+    commands: tuple[str, ...] = ()
+    url: str | None = None
+
+    def detect(self, lookup=shutil.which) -> str | None:
+        for command in self.commands:
+            found = lookup(command)
+            if found:
+                return found
+        return None
+
+
+WEB_PROVIDERS = (
+    Provider("chatgpt", "ChatGPT", "web", url="https://chatgpt.com"),
+    Provider("gemini-web", "Gemini Web", "web", url="https://gemini.google.com"),
+    Provider("claude-web", "Claude Web", "web", url="https://claude.ai"),
+    Provider("ai-studio", "Google AI Studio", "web", url="https://aistudio.google.com"),
+)
+
+
+def local_providers(freebuff_commands=("freebuff", "freebuff-cli")):
+    return (
+        Provider("agy", "agy", "local", commands=("agy",)),
+        Provider("gemini", "Gemini CLI", "local", commands=("gemini",)),
+        Provider("claude", "Claude CLI", "local", commands=("claude",)),
+        Provider("freebuff", "Freebuff CLI", "freebuff", commands=tuple(freebuff_commands)),
+    )
+
+
+def detect_freebuff_command(path_lookup=shutil.which, command_names=("freebuff", "freebuff-cli")) -> str | None:
+    for name in command_names:
+        command_path = path_lookup(name)
+        if command_path:
+            return command_path
+    return None
+
+
+def detect_providers(freebuff_commands=("freebuff", "freebuff-cli"), lookup=shutil.which):
+    detected = []
+    for provider in local_providers(freebuff_commands):
+        command = provider.detect(lookup)
+        if command:
+            detected.append((provider, command))
+    return detected
+
+
+def send_prompt_to_command(command: str, prompt_path: Path) -> subprocess.Popen:
+    prompt_file = prompt_path.open("r", encoding="utf-8")
+    return subprocess.Popen([command], stdin=prompt_file)
+
+
+def open_web_provider(provider: Provider) -> bool:
+    return bool(provider.url and webbrowser.open(provider.url))

@@ -3,7 +3,7 @@
 This document is the definitive guide for an AI Agent (like yourself!) processing an exam folder.
 
 **CRITICAL UPDATE: You do NOT need to run any Python scripts.**
-The `start.bat` wizard handles **all** pre-processing (detecting PDF types, rendering PDF pages to images, extracting answer keys from CSV) and **all** post-processing (merging answers, QA checks, building the standalone HTML file).
+The `start.bat` / `start.sh` wizard and `quizbuilder` CLI handle **all** pre-processing (detecting PDF types, rendering PDF pages to images, extracting answer keys from CSV) and **all** post-processing (merging answers, QA checks, building the standalone HTML file).
 
 Your **ONLY** job is to read the rendered images and extract the questions into `questions.json`.
 
@@ -11,7 +11,7 @@ Your **ONLY** job is to read the rendered images and extract the questions into 
 
 ## Your Task: Create `questions.json`
 
-When you are invoked by `start.bat`, you will be placed inside a test directory (e.g. `tests/2022_moed_b/`).
+When you are invoked by the CLI / wizard, you will be placed inside a test directory (e.g. `tests/2022_moed_b/`).
 You will see a folder named `pages_output/` containing images of the exam pages (e.g., `page_1.png`, `page_2.png`).
 
 You must read these images using your Vision capabilities, extract the multiple-choice questions, and output exactly one file: `questions.json`.

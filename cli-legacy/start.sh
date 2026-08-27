@@ -12,4 +12,5 @@ else
     exit 1
 fi
 
-exec "$PYTHON_BIN" "$SCRIPT_DIR/quiz_builder_cli.py" "$@"
+export PYTHONPATH="$SCRIPT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
+exec "$PYTHON_BIN" -m quizbuilder "$@"

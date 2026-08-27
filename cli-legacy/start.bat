@@ -35,7 +35,8 @@ if "!PYTHON_EXE!"=="" (
 
 :: 3. Execute Python CLI wizard script
 if not "!PYTHON_EXE!"=="" (
-    "!PYTHON_EXE!" "%~dp0quiz_builder_cli.py" %*
+    set "PYTHONPATH=%~dp0src;!PYTHONPATH!"
+    "!PYTHON_EXE!" -m quizbuilder %*
     if !errorlevel! neq 0 (
         echo.
         echo [X] Execution failed with error code !errorlevel!. Press any key to exit.

@@ -1,51 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Change to repo root (parent of servers/)
-cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+cd "$SCRIPT_DIR"
+export PYTHONPATH="$SCRIPT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
 
-# Port to run the server on
-PORT=8000
-URL="http://localhost:$PORT/web/index.html"
-
-echo "=================================================="
-echo " Starting Interactive Quiz Server on Port $PORT..."
-echo "=================================================="
-
-# Auto-generate manifest.json from available test folders
-echo "Generating test manifest..."
 if command -v python3 >/dev/null 2>&1; then
-    python3 python_scripts/8_generate_manifest.py
+    PYTHON_BIN="$(command -v python3)"
 elif command -v python >/dev/null 2>&1; then
-    python python_scripts/8_generate_manifest.py
-fi
-
-# Function to open the browser once the server is starting
-open_browser() {
-    # Wait a moment for the server to spin up
-    sleep 1
-    if command -v xdg-open >/dev/null 2>&1; then
-        xdg-open "$URL"
-    elif command -v open >/dev/null 2>&1; then
-        open "$URL"
-    elif command -v explorer.exe >/dev/null 2>&1; then
-        explorer.exe "$URL"
-    else
-        echo " Could not detect default browser launcher."
-    fi
-    echo "Please open your browser and navigate to:"
-    echo "  $URL"
-    echo "=================================================="
-}
-
-# Run the browser opener in the background
-open_browser &
-
-# Determine correct Python executable and start server
-if command -v python3 >/dev/null 2>&1; then
-    python3 -m http.server $PORT
-elif command -v python >/dev/null 2>&1; then
-    python -m http.server $PORT
+    PYTHON_BIN="$(command -v python)"
 else
-    echo "Error: Python is not installed. Please install Python to run the server."
+    printf '%s\n' 'Error: Python 3 is required but was not found on PATH.' >&2
     exit 1
 fi
+
+exec "$PYTHON_BIN" -m quizbuilder serve --port "${PORT:-8000}"

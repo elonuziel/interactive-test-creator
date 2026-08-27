@@ -3,7 +3,9 @@
 import os
 import sys
 import subprocess
-import fitz
+import pytest
+
+fitz = pytest.importorskip("fitz")
 
 SCRIPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'python_scripts')
 sys.path.insert(0, SCRIPTS_DIR)

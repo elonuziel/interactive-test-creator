@@ -10,7 +10,10 @@ spec_dir = SPECPATH
 python_scripts_src = os.path.join(spec_dir, 'python_scripts')
 web_dir_src = os.path.join(spec_dir, 'web')
 
+src_dir = os.path.join(spec_dir, 'src')
+
 datas = [
+    (src_dir, 'src'),
     (python_scripts_src, 'python_scripts'),
     (python_scripts_src, 'cli-legacy/python_scripts'),
 ]
@@ -22,7 +25,7 @@ if os.path.isdir(web_dir_src):
 
 a = Analysis(
     [os.path.join(spec_dir, 'quiz_builder_cli.py')],
-    pathex=[spec_dir],
+    pathex=[spec_dir, os.path.join(spec_dir, 'src')],
     binaries=[],
     datas=datas,
     hiddenimports=[

@@ -22,8 +22,8 @@ The web application (`web/index.html`, `web/app.js`, `style.css` in `web/`) offe
 
 ---
 
-### 🧙 Interactive CLI Wizard (`start.bat` / `start.sh`)
-A step-by-step wizard that automates:
+### 🧙 Interactive CLI (`quizbuilder`, `start.bat` / `start.sh`)
+A command-oriented CLI with an optional guided wizard automates:
 1. Environment & package prerequisite verification (`pymupdf`, `pandas`, `openpyxl`).
 2. Test folder creation and exam source drop-folder setup (`.pdf` or `.docx`) plus answer-key sheets.
 3. PDF type detection & page image rendering for Vision LLM extraction.
@@ -31,7 +31,7 @@ A step-by-step wizard that automates:
 5. Building portable single-file HTML apps or starting local web servers.
 6. Detecting an installed `freebuff` or `freebuff-cli` command and offering it as a prompt-helper destination.
 
-On Linux/macOS, run `bash start.sh` (or `./start.sh` after making it executable). The launcher resolves its own directory and uses `python3`, falling back to `python`.
+Install the CLI from this directory with `python -m pip install -e .` (or `python -m pip install -e '.[test]'` for tests). Copy `quizbuilder.toml.example` to `quizbuilder.toml` to customize defaults. On Linux/macOS, run `bash start.sh` (or `./start.sh` after making it executable). The launcher resolves its own directory and uses `python3`, falling back to `python`.
 
 If `.docx` files are detected, the wizard asks once whether to convert all DOCX files to PDF. If matching PDFs already exist, it also asks once whether to overwrite them. If a local converter backend is available, conversion is attempted automatically. If not, the wizard provides manual export-to-PDF steps and resumes after you place PDFs in the same folder.
 
@@ -95,18 +95,37 @@ Double-click `start.bat` or run from terminal:
 start.bat
 ```
 
-### 2. Using the Interactive Wizard (Linux/macOS)
+### 2. Using the Interactive CLI (Linux/macOS)
 ```bash
 bash start.sh
 # Or, once executable:
 ./start.sh
 ```
 
+Useful commands include:
+```bash
+python -m quizbuilder --help
+python -m quizbuilder detect
+python -m quizbuilder serve --port 8000
+python -m quizbuilder init biology_101
+python -m quizbuilder process tests/biology_101
+python -m quizbuilder prompt tests/biology_101 --kind local
+python -m quizbuilder validate tests/biology_101/questions.json
+python -m quizbuilder build tests/biology_101
+python -m quizbuilder clean tests/biology_101
+python -m quizbuilder wizard
+python -m quizbuilder --config quizbuilder.toml detect
+```
+
 If `freebuff` or `freebuff-cli` is installed on `PATH`, the prompt-helper menu includes a Freebuff option. Selecting it pipes the generated local prompt to the command through standard input and waits for you to return after it completes.
 
 Follow the interactive prompts to set up test folders, render pages for LLM processing, validate JSON outputs, build standalone HTML files, or launch the web player.
 
-### 3. Manual Workflow & Test Creation
+### 3. Configuration
+
+Copy `quizbuilder.toml.example` to `quizbuilder.toml` and customize workspace defaults. Pass a different file with `--config path/to/config.toml`.
+
+### 4. Manual Workflow & Test Creation
 1. **Create a Test Folder**: Place raw source files under `tests/` (e.g. `tests/botany_2024_a/`):
    - Exam source: `tests/botany_2024_a/exam.pdf` or `tests/botany_2024_a/exam.docx`
    - Answer key spreadsheet: `tests/botany_2024_a/answers.csv` or `answers.xlsx`

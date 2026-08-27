@@ -1,0 +1,9 @@
+# Copy to quizbuilder.toml or pass with --config.
+workspace_root = "tests"
+default_form = "0"
+default_discard_pages = "std"
+auto_build = true
+
+[provider]
+freebuff_commands = ["freebuff", "freebuff-cli"]
+open_browser = true
