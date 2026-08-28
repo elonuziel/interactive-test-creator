@@ -109,6 +109,7 @@ class DraggablePdfWidget(QFrame):
         self.setCursor(Qt.CursorShape.OpenHandCursor)
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setToolTip("Click and drag this PDF directly into ChatGPT, Claude, Gemini Web, or Google AI Studio!")
+        self.setEnabled(False)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -440,7 +441,10 @@ class WebAIBatchDialog(QDialog):
             pdf = preferred_pdf(item.workspace.source_pdf or sources.pdf, item.workspace.path)
             item.pdf_path = pdf
             item.answer_key_path = sources.answer_keys[0] if sources.answer_keys else None
-            item.is_digital = classify_pdf(pdf, workspace=item.workspace.path) if (pdf and pdf.is_file()) else False
+            try:
+                item.is_digital = classify_pdf(pdf, workspace=item.workspace.path) if (pdf and pdf.is_file()) else False
+            except Exception:
+                item.is_digital = False
 
             # Check if questions.md already exists
             q_file = item.workspace.path / "questions.md"

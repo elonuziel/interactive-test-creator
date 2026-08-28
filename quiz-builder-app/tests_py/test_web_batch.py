@@ -49,19 +49,32 @@ def test_reveal_in_file_manager(application, tmp_path):
     reveal_in_file_manager(test_file)
 
 
+def _create_test_pdf(path: Path) -> Path:
+    try:
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "Test PDF exam content.")
+        doc.save(str(path))
+        doc.close()
+    except Exception:
+        path.write_bytes(b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj xref 0 4 0000000000 65535 f 0000000010 00000 n 0000000053 00000 n 0000000099 00000 n trailer<</Size 4/Root 1 0 R>>startxref 178 %%EOF\n")
+    return path
+
+
 def test_draggable_pdf_widget(application, tmp_path):
     from quizbuilder.gui.web_batch_dialog import DraggablePdfWidget
     widget = DraggablePdfWidget()
     assert widget.pdf_path is None
     assert not widget.isEnabled()
 
-    pdf_file = tmp_path / "exam.pdf"
-    pdf_file.write_bytes(b"%PDF-1.4 content")
+    pdf_file = _create_test_pdf(tmp_path / "exam.pdf")
     widget.set_pdf(pdf_file)
 
     assert widget.pdf_path == pdf_file
     assert widget.isEnabled()
     assert pdf_file.name in widget.name_label.text()
+    widget.deleteLater()
 
 
 def test_web_batch_dialog_queue_and_save(application, tmp_path):
@@ -73,13 +86,11 @@ def test_web_batch_dialog_queue_and_save(application, tmp_path):
     # Setup 2 test exam folders
     exam1 = tmp_path / "exam_chem_1"
     exam1.mkdir()
-    pdf1 = exam1 / "chemistry.pdf"
-    pdf1.write_bytes(b"%PDF-1.4 chem")
+    pdf1 = _create_test_pdf(exam1 / "chemistry.pdf")
 
     exam2 = tmp_path / "exam_bio_2"
     exam2.mkdir()
-    pdf2 = exam2 / "biology.pdf"
-    pdf2.write_bytes(b"%PDF-1.4 bio")
+    pdf2 = _create_test_pdf(exam2 / "biology.pdf")
     (exam2 / "answers.csv").write_text("1,A\n2,B\n", encoding="utf-8")
 
     ws1 = Workspace("exam_chem_1", exam1)
