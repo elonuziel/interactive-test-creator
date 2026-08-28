@@ -98,11 +98,41 @@ document.addEventListener('DOMContentLoaded', () => {
         themeIcon: document.getElementById('theme-icon')
     };
 
-    const DEFAULT_LLM_PROMPT = `Please extract all multiple-choice questions from this exam PDF document as a clean Markdown file (questions.md) for an interactive Hebrew quiz system.
+    function buildLlmPrompt({ pdfName = '', formNumber = '', isScanned = false } = {}) {
+        const formClean = (formNumber || '').trim();
+        const pdfClean = (pdfName || '').trim();
+
+        let formInstruction = '';
+        if (formClean) {
+            formInstruction = `===========================================================================
+EXAM FORM / TEST NUMBER:
+===========================================================================
+This document belongs to Form ${formClean} (שאלון / מבחן מס' ${formClean}).
+Please include the form metadata at the very top of your questions.md output:
+<!-- Form: ${formClean} -->
+(Note: If Form 0 / 000 is indicated, all official correct answers are option 1 and will be shuffled at runtime).`;
+        } else {
+            formInstruction = `===========================================================================
+FORM NUMBER / TEST IDENTIFICATION (CRITICAL):
+===========================================================================
+1. Inspect the exam header and first page to detect the exam form number (e.g. "מבחן מס' 063", "שאלון 063", "טופס 000", "Form 063").
+2. Include the detected form number as the very first line of questions.md:
+   <!-- Form: [NUMBER_OR_0] --> (e.g. <!-- Form: 063 --> or <!-- Form: 0 -->)`;
+        }
+
+        const headerLine = pdfClean
+            ? `Please extract all multiple-choice questions from the exam PDF "${pdfClean}" as a clean Markdown file (questions.md) for an interactive Hebrew quiz system.`
+            : `Please extract all multiple-choice questions from this exam PDF document as a clean Markdown file (questions.md) for an interactive Hebrew quiz system.`;
+
+        return `${headerLine}
+
+${formInstruction}
 
 ===========================================================================
 REQUIRED MARKDOWN FORMAT (questions.md):
 ===========================================================================
+<!-- Form: ${formClean || '[FORM_NUMBER_OR_0]'} -->
+
 ### שאלה 1: [נוסח השאלה המלא בעברית] (עמוד 1)
 - א. [אפשרות 1]
 - ב. [אפשרות 2]
@@ -118,14 +148,31 @@ REQUIRED MARKDOWN FORMAT (questions.md):
 ===========================================================================
 STRICT EXTRACTION & FORMATTING RULES:
 ===========================================================================
-1. QUESTION HEADERS: Include full question text on the header line starting with \`### שאלה X: [נוסח השאלה בעברית]\` and ending with the 1-based PDF page number in parentheses \`(עמוד X)\`, e.g. \`(עמוד 1)\`.
-2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: \`- א.\`, \`- ב.\`, \`- ג.\`, \`- ד.\`, \`- ה.\`. Extract ALL options for each question (questions may have 4, 5, 6 or more choices).
-3. IMAGE-BASED OPTIONS (IMPORTANT): If an option is visual (diagram/graph/table/image) and not fully textual, use a short placeholder option text such as "ראה דיאגרמה א", "ראה גרף ב", "ראה טבלה ג".
-4. MIXED OPTIONS: If an option has text plus visual content, keep the text and append a short note like "(ראה גרף בעמוד זה)".
-5. HEBREW ACCURACY & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve all scientific terms, equations, and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
-6. PRESERVE DIAGRAM & TABLE KEYWORDS: Preserve words referencing figures or diagrams (e.g. "לפניכם", "באיור", "בגרף", "בטבלה", "בתרשים") as they appear in the original text.
-7. NO CITATION TAGS OR CONVERSATIONAL CHATTER: Do NOT include web citations like \`[cite: X]\`. Do NOT write intro or outro commentary outside the code box.
-8. DELIVERABLE FORMAT: Provide your entire response strictly inside a single, copyable Markdown code block (wrapped in \`\`\`markdown ... \`\`\`) OR as a downloadable \`questions.md\` file.`;
+1. FORM NUMBER IDENTIFICATION: Always include the form number (<!-- Form: X -->) on line 1 so answers can be automatically merged with the official answer key.
+2. QUESTION HEADERS: Include full question text on the header line starting with \`### שאלה X: [נוסח השאלה בעברית]\` and ending with the 1-based PDF page number in parentheses \`(עמוד X)\`, e.g. \`(עמוד 1)\`.
+3. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: \`- א.\`, \`- ב.\`, \`- ג.\`, \`- ד.\`, \`- ה.\`. Extract ALL options for each question (questions may have 4, 5, 6 or more choices).
+4. IMAGE-BASED OPTIONS (IMPORTANT): If an option is visual (diagram/graph/table/image) and not fully textual, use a short placeholder option text such as "ראה דיאגרמה א", "ראה גרף ב", "ראה טבלה ג".
+5. MIXED OPTIONS: If an option has text plus visual content, keep the text and append a short note like "(ראה גרף בעמוד זה)".
+6. HEBREW ACCURACY & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve all scientific terms, equations, and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
+7. PRESERVE DIAGRAM & TABLE KEYWORDS: Preserve words referencing figures or diagrams (e.g. "לפניכם", "באיור", "בגרף", "בטבלה", "בתרשים") as they appear in the original text.
+8. NO CITATION TAGS OR CONVERSATIONAL CHATTER: Do NOT include web citations like \`[cite: X]\`. Do NOT write intro or outro commentary outside the code box.
+9. DELIVERABLE FORMAT: Provide your entire response strictly inside a single, copyable Markdown code block (wrapped in \`\`\`markdown ... \`\`\`) OR as a downloadable \`questions.md\` file.`;
+    }
+
+    const DEFAULT_LLM_PROMPT = buildLlmPrompt();
+
+    function updatePromptBoxes() {
+        const pdf = elements.pdfFile?.files?.[0];
+        const pdfName = pdf?.name || state.pdfFileName || '';
+        const formNumber = (elements.formNumber?.value || '').trim();
+        const promptText = buildLlmPrompt({
+            pdfName,
+            formNumber,
+            isScanned: state.isScanned
+        });
+        if (elements.llmPromptBox) elements.llmPromptBox.value = promptText;
+        if (elements.digitalLlmPromptBox) elements.digitalLlmPromptBox.value = promptText;
+    }
 
     // Initialize Services & UI Components
     ProgressController.init(elements, (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements));
@@ -163,8 +210,7 @@ STRICT EXTRACTION & FORMATTING RULES:
     }
 
     // Default Prompt Injections
-    if (elements.llmPromptBox) elements.llmPromptBox.value = DEFAULT_LLM_PROMPT;
-    if (elements.digitalLlmPromptBox) elements.digitalLlmPromptBox.value = DEFAULT_LLM_PROMPT;
+    updatePromptBoxes();
 
     // Main Parse Orchestrator
     async function runParse() {
@@ -633,6 +679,7 @@ STRICT EXTRACTION & FORMATTING RULES:
     });
 
     elements.formNumber?.addEventListener('input', () => {
+        updatePromptBoxes();
         QuestionParser.tryMergeAnswersFromCsv({
             explicit: false,
             elements,
@@ -755,11 +802,13 @@ STRICT EXTRACTION & FORMATTING RULES:
     elements.pdfFile?.addEventListener('change', async () => {
         const file = elements.pdfFile.files?.[0];
         if (!file) {
+            state.pdfFileName = '';
             EditorUi.setPdfTypeNote('', 'neutral', elements);
             if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
             if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
             if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
             if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
+            updatePromptBoxes();
             return;
         }
 
@@ -770,6 +819,8 @@ STRICT EXTRACTION & FORMATTING RULES:
             if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
             if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
             state.pdfArrayBuffer = null;
+            state.pdfFileName = '';
+            updatePromptBoxes();
             return;
         }
 
@@ -777,8 +828,10 @@ STRICT EXTRACTION & FORMATTING RULES:
             EditorUi.setPdfTypeNote('מזהה את סוג ה-PDF...', 'loading', elements);
             const pdfBuffer = await file.arrayBuffer();
             state.pdfArrayBuffer = pdfBuffer.slice(0);
+            state.pdfFileName = file.name;
 
             const detection = await PdfService.detectPdfType(state.pdfArrayBuffer.slice(0));
+            state.isScanned = detection.isScanned;
             EditorUi.setPdfTypeNote(
                 `${detection.pdfTypeLabel}: ${detection.recommendation}`,
                 detection.isScanned ? 'scanned' : 'digital',
@@ -792,18 +845,30 @@ STRICT EXTRACTION & FORMATTING RULES:
                 elements.digitalActionsBox.classList.toggle('hidden', detection.isScanned);
             }
 
+            // Quick form detection from digital text if available
+            if (window.QuizCore?.detectFormNumber && elements.formNumber && !elements.formNumber.value.trim()) {
+                const quickForm = window.QuizCore.detectFormNumber(detection.rawSnippet || '', file.name);
+                if (quickForm && quickForm.rawValue) {
+                    elements.formNumber.value = quickForm.rawValue;
+                }
+            }
+
+            updatePromptBoxes();
             await PdfService.loadPdfSidebar(state.pdfArrayBuffer.slice(0), state, elements, ProgressController);
         } catch (error) {
             EditorUi.setPdfTypeNote(error.message || 'לא ניתן היה לזהות את סוג ה-PDF.', 'error', elements);
+            updatePromptBoxes();
         }
     });
 
     document.querySelector('[data-target="pdf-file"]')?.addEventListener('click', () => {
+        state.pdfFileName = '';
         EditorUi.setPdfTypeNote('', 'neutral', elements);
         if (elements.scannedActionsBox) elements.scannedActionsBox.classList.add('hidden');
         if (elements.digitalActionsBox) elements.digitalActionsBox.classList.add('hidden');
         if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.add('hidden');
         if (elements.builderLayout) elements.builderLayout.classList.add('no-sidebar');
+        updatePromptBoxes();
     });
 
     // Preset & Clean PDF listeners

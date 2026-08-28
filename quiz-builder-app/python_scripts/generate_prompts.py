@@ -17,10 +17,11 @@ HEBREW_PROOFREAD_GUIDELINES = """1. HEBREW TEXT ACCURACY:
    - Preserve question order and all options per question.
    - Deliverable: Return only raw Markdown for `questions.md` (no JSON, no explanations, no code fences)."""
 
-HEBREW_EXTRACTION_RULES = """1. HEBREW READING ORDER & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve scientific terms and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
-2. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: - א., - ב., - ג., - ד., - ה., etc. Extract all options for each question.
-3. PAGE NUMBER TRACKING: Always end each question header with the exact 1-based PDF source page number in parentheses: (עמוד X), e.g. (עמוד 1), (עמוד 5). This is CRITICAL for matching visual questions with diagrams/tables.
-4. DELIVERABLE FORMAT: Return only raw Markdown body for `questions.md` (no JSON, no explanations, no code fences)."""
+HEBREW_EXTRACTION_RULES = """1. FORM NUMBER IDENTIFICATION: Inspect the exam header and first page to detect the exam form number (e.g. "מבחן מס' 063", "שאלון 063", "טופס 000", "Form 063"). Include the detected form number as the very first line of questions.md: <!-- Form: [NUMBER_OR_0] --> (e.g. <!-- Form: 063 -->).
+2. HEBREW READING ORDER & ACRONYMS: Extract text in natural Hebrew reading order. Do NOT reverse words, letters, or numbers. Preserve scientific terms and acronyms (e.g. "ATP", "DNA", "pH", "GSI", "DVM", "CO2") exactly as written.
+3. OPTIONS FORMATTING: Each option MUST start on a new line with standard bullet format: - א., - ב., - ג., - ד., - ה., etc. Extract all options for each question.
+4. PAGE NUMBER TRACKING: Always end each question header with the exact 1-based PDF source page number in parentheses: (עמוד X), e.g. (עמוד 1), (עמוד 5). This is CRITICAL for matching visual questions with diagrams/tables.
+5. DELIVERABLE FORMAT: Return only raw Markdown body for `questions.md` (no JSON, no explanations, no code fences)."""
 
 IMAGE_OPTION_RULES = """Rules for visual/image options:
 1. For image-based or diagram options, keep placeholder text such as "ראה דיאגרמה א" / "ראה גרף ב" / "ראה טבלה ג".

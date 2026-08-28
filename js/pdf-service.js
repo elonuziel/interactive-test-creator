@@ -254,17 +254,22 @@
         const loadingTask = pdfjs.getDocument({ data: freshData });
         const pdf = await loadingTask.promise;
         let nonWhitespaceChars = 0;
+        let firstPageText = '';
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
             const page = await pdf.getPage(pageNumber);
             const textContent = await page.getTextContent();
             const pageText = textContent.items.map((item) => (item.str || '').trim()).join(' ');
+            if (pageNumber === 1) {
+                firstPageText = pageText;
+            }
             nonWhitespaceChars += pageText.replace(/\s/g, '').length;
         }
 
         const isScanned = nonWhitespaceChars < Math.max(pdf.numPages * 60, 120);
         return {
             isScanned,
+            rawSnippet: firstPageText,
             pdfTypeLabel: isScanned ? '📷 PDF סרוק (תמונה)' : '📄 PDF דיגיטלי (עם טקסט)',
             recommendation: isScanned
                 ? 'יזדקק ל-OCR. אפשר להשתמש ב-Gemini או ב-OCR החינמי בדפדפן.'
