@@ -7,6 +7,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 SRC = Path(__file__).resolve().parents[1] / "src"
@@ -17,6 +18,18 @@ from quizbuilder.config import Config
 from quizbuilder.gui.app import MainWindow
 from quizbuilder.gui.question_editor import QuestionEditorWidget
 from quizbuilder.models import Workspace
+
+
+def _make_dummy_pdf(path: Path) -> None:
+    try:
+        import fitz
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "Sample Exam Page")
+        doc.save(str(path))
+        doc.close()
+    except Exception:
+        path.write_bytes(b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 3 3]>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000101 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n149\n%%EOF\n")
 
 
 @pytest.fixture(scope="module")
@@ -50,7 +63,7 @@ def test_main_window_populates_real_tests_folder(application, tmp_path):
         exam_dir = tmp_path / name
         exam_dir.mkdir()
         (exam_dir / "questions.md").write_text("## Question 1\nTest?\n- A\n- B\n\nAnswer: A\n", encoding="utf-8")
-        (exam_dir / f"{name}.pdf").write_bytes(b"%PDF-1.4\n")
+        _make_dummy_pdf(exam_dir / f"{name}.pdf")
 
     window = MainWindow(Config.defaults(root=tmp_path))
 
@@ -65,7 +78,7 @@ def test_main_window_exam_selection_controls(application, tmp_path):
         exam_dir = tmp_path / name
         exam_dir.mkdir()
         (exam_dir / "questions.md").write_text("## Question 1\nTest?\n- A\n- B\n\nAnswer: A\n", encoding="utf-8")
-        (exam_dir / f"{name}.pdf").write_bytes(b"%PDF-1.4\n")
+        _make_dummy_pdf(exam_dir / f"{name}.pdf")
 
     window = MainWindow(Config.defaults(root=tmp_path))
     assert window.exam_list.count() == 3
