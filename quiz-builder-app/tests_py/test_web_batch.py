@@ -142,6 +142,7 @@ Answer: A
     assert dialog.items[1].status == "skipped"
 
     dialog.close()
+    dialog.deleteLater()
 
 
 def test_main_window_has_web_batch_button(application, tmp_path):
@@ -151,3 +152,4 @@ def test_main_window_has_web_batch_button(application, tmp_path):
     assert hasattr(window, "web_batch_button")
     assert "Web AI Batch" in window.web_batch_button.text()
     window.close()
+    window.deleteLater()

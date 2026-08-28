@@ -27,6 +27,7 @@ def test_welcome_dialog(application):
     dialog = WelcomeDialog()
     assert dialog.windowTitle() == "Welcome to Interactive Quiz Builder"
     dialog.close()
+    dialog.deleteLater()
 
 
 def test_cli_guide_dialog(application, monkeypatch):
@@ -36,12 +37,12 @@ def test_cli_guide_dialog(application, monkeypatch):
         reloaded[0] += 1
         return 2
 
-    monkeypatch.setattr("quizbuilder.gui.dialogs.cli_guide.QMessageBox.information", lambda *args, **kwargs: None)
     dialog = CliAgentGuideDialog(on_reload_providers=on_reload)
     assert "CLI AI Agents" in dialog.windowTitle()
     dialog._handle_reload()
     assert reloaded[0] == 1
     dialog.close()
+    dialog.deleteLater()
 
 
 def test_answer_matrix_dialog(application):
@@ -70,6 +71,7 @@ def test_answer_matrix_dialog(application):
     dialog._handle_save()
     assert saved[0] is True
     dialog.close()
+    dialog.deleteLater()
 
 
 def test_super_batch_summary_dialog(application, tmp_path):
@@ -91,4 +93,5 @@ def test_super_batch_summary_dialog(application, tmp_path):
     )
     assert dialog.windowTitle() == "Super Batch Results"
     dialog.close()
+    dialog.deleteLater()
 

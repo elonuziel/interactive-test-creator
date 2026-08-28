@@ -29,3 +29,19 @@ def write_json(tmp_path):
         p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
         return str(p)
     return _write
+
+
+@pytest.fixture(autouse=True)
+def no_modal_dialogs(monkeypatch):
+    """Ensure no modal QMessageBox blocks headless test suites."""
+    try:
+        from PySide6.QtWidgets import QMessageBox
+        monkeypatch.setattr(QMessageBox, "exec", lambda *args, **kwargs: 0)
+        monkeypatch.setattr(QMessageBox, "exec_", lambda *args, **kwargs: 0)
+        monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
+        monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
+        monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
+        monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+    except Exception:
+        pass
+
