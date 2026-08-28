@@ -26,7 +26,7 @@ def application():
 
 def test_question_editor_round_trips_question(application):
     editor = QuestionEditorWidget()
-    source = {"question": "מה נשמע?", "options": ["טוב", "מצוין"], "correctIndex": 1}
+    source = {"question": "מה נשמע?", "options": ["אחד", "שתיים", "שלוש", "ארבע", "חמש", "שש"], "correctIndex": 4}
 
     editor.set_question(source)
     result = {}
@@ -34,7 +34,14 @@ def test_question_editor_round_trips_question(application):
 
     assert result["question"] == source["question"]
     assert result["options"] == source["options"]
-    assert result["correctIndex"] == source["correctIndex"]
+    assert result["correctIndex"] == 4
+
+    # Test dynamic add & remove row
+    editor._add_option_row()
+    assert editor.option_rows[6].isVisible()
+    editor._remove_option_row()
+    assert not editor.option_rows[6].isVisible()
+
     editor.deleteLater()
 
 

@@ -70,9 +70,9 @@ def clean_question_text(text: str) -> str:
 def _parse_answer(val: str) -> int:
     val = val.strip().upper()
     mapping = {
-        "A": 0, "B": 1, "C": 2, "D": 3,
-        "א": 0, "ב": 1, "ג": 2, "ד": 3,
-        "1": 0, "2": 1, "3": 2, "4": 3,
+        "A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9,
+        "א": 0, "ב": 1, "ג": 2, "ד": 3, "ה": 4, "ו": 5, "ז": 6, "ח": 7, "ט": 8, "י": 9,
+        "1": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9,
     }
     return mapping.get(val, 0)
 
@@ -95,10 +95,10 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
         block = text[start:end].strip()
         lines = [line.rstrip() for line in block.splitlines()]
 
-        answer_match = re.search(r"(?mi)^(?:Answer|תשובה):\s*([A-Dא-ד1-4])\s*$", block)
+        answer_match = re.search(r"(?mi)^(?:Answer|תשובה):\s*([A-Jא-י1-9]|10)\s*$", block)
         answer = _parse_answer(answer_match.group(1)) if answer_match else 0
 
-        option_indexes = [idx for idx, line in enumerate(lines) if re.match(r"^(?:[-*+]|\d+\.|\([1-4]\)|[א-ד]\.)\s+", line)]
+        option_indexes = [idx for idx, line in enumerate(lines) if re.match(r"^(?:[-*+]|\d+\.|\([1-9]\)|\(10\)|[א-יA-Ja-j]\.)\s+", line)]
         if not option_indexes:
             continue
 
@@ -119,7 +119,7 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
             line_str = lines[idx]
             if re.match(r"(?mi)^(?:Answer|תשובה):", line_str):
                 continue
-            match_opt = re.match(r"^(?:[-*+]|\d+\.|\([1-4]\)|[א-ד]\.)\s*(?:(?:[א-דA-D1-4][\.\)]|\([א-דA-D1-4]\))\s+)?(.*)$", line_str)
+            match_opt = re.match(r"^(?:[-*+]|\d+\.|\([1-9]\)|\(10\)|[א-יA-Ja-j]\.)\s*(?:(?:[א-יA-Ja-j1-9]|10)[\.\)]|\((?:[א-יA-Ja-j1-9]|10)\)\s+)?(.*)$", line_str)
             if match_opt:
                 opt_str = match_opt.group(1).strip()
                 if opt_str:
@@ -155,7 +155,8 @@ def dump_questions(questions: list[dict[str, Any]]) -> str:
         for option in item.get("options", []):
             sections.append(f"- {str(option).strip()}")
         answer = int(item.get("correctIndex", 0))
-        sections.extend(["", f"Answer: {chr(ord('A') + answer)}"])
+        letter = chr(ord('A') + answer) if 0 <= answer < 26 else str(answer + 1)
+        sections.extend(["", f"Answer: {letter}"])
         if item.get("explanation"):
             sections.extend(["", f"Explanation: {str(item['explanation']).strip()}"])
         sections.append("")

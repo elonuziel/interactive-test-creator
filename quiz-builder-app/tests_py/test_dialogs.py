@@ -47,7 +47,7 @@ def test_cli_guide_dialog(application, monkeypatch):
 
 def test_answer_matrix_dialog(application):
     questions = [
-        {"question": "מה צבע השמיים?", "options": ["כחול", "ירוק", "אדום", "צהוב"], "correctIndex": 0},
+        {"question": "מה צבע השמיים?", "options": ["כחול", "ירוק", "אדום", "צהוב", "סגול", "כתום"], "correctIndex": 4},
         {"question": "מה שטח ישראל?", "options": ["1000", "22000", "50000", "100000"], "correctIndex": 1},
     ]
     saved = [False]

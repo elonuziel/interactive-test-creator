@@ -18,11 +18,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-HEBREW_LETTERS = ["א.", "ב.", "ג.", "ד."]
+HEBREW_LETTERS = ["א.", "ב.", "ג.", "ד.", "ה.", "ו.", "ז.", "ח."]
 
 
 class QuestionEditorWidget(QWidget):
-    """Form for editing one question: text, four options, correct answer.
+    """Form for editing one question: text, dynamic options (2-8), correct answer.
 
     Emits ``changed`` whenever the user modifies any field so the owning
     window can track unsaved changes.
@@ -95,10 +95,18 @@ class QuestionEditorWidget(QWidget):
 
         self.option_edits: list[QLineEdit] = []
         self.option_radios: list[QRadioButton] = []
+        self.option_rows: list[QWidget] = []
         self.radio_group = QButtonGroup(self)
 
+        self.options_layout = QVBoxLayout()
+        self.options_layout.setSpacing(4)
+
         for idx, letter in enumerate(HEBREW_LETTERS):
-            row = QHBoxLayout()
+            row_widget = QWidget()
+            row = QHBoxLayout(row_widget)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(6)
+
             radio = QRadioButton()
             self.radio_group.addButton(radio, idx)
             if idx == 0:
@@ -116,7 +124,29 @@ class QuestionEditorWidget(QWidget):
             row.addWidget(radio)
             row.addWidget(badge)
             row.addWidget(edit, 1)
-            layout.addLayout(row)
+            self.options_layout.addWidget(row_widget)
+            self.option_rows.append(row_widget)
+
+            # Default: show first 4 options, hide 5-8 until needed
+            if idx >= 4:
+                row_widget.setVisible(False)
+
+        layout.addLayout(self.options_layout)
+
+        # Dynamic add/remove option buttons
+        opt_mgmt_row = QHBoxLayout()
+        self.add_option_btn = QPushButton("➕ Add Option")
+        self.add_option_btn.setToolTip("Add another choice row (e.g. ה, ו, ז, ח)")
+        self.add_option_btn.clicked.connect(self._add_option_row)
+
+        self.remove_option_btn = QPushButton("➖ Remove Option")
+        self.remove_option_btn.setToolTip("Remove the last choice row (minimum 2)")
+        self.remove_option_btn.clicked.connect(self._remove_option_row)
+
+        opt_mgmt_row.addWidget(self.add_option_btn)
+        opt_mgmt_row.addWidget(self.remove_option_btn)
+        opt_mgmt_row.addStretch()
+        layout.addLayout(opt_mgmt_row)
 
         layout.addWidget(QLabel("Explanation / Solution note (הסבר לתשובה - אופציונלי):"))
         self.explanation_edit = QPlainTextEdit()
@@ -135,6 +165,26 @@ class QuestionEditorWidget(QWidget):
         for radio in self.option_radios:
             radio.toggled.connect(lambda checked: self.changed.emit() if checked else None)
 
+    def _add_option_row(self) -> None:
+        """Reveal the next hidden option row (up to 8 options)."""
+        for i, row in enumerate(self.option_rows):
+            if not row.isVisible():
+                row.setVisible(True)
+                self.option_edits[i].setFocus()
+                self.changed.emit()
+                break
+
+    def _remove_option_row(self) -> None:
+        """Hide the last visible option row (minimum 2 options kept)."""
+        visible_indices = [i for i, row in enumerate(self.option_rows) if row.isVisible()]
+        if len(visible_indices) > 2:
+            last_idx = visible_indices[-1]
+            self.option_rows[last_idx].setVisible(False)
+            self.option_edits[last_idx].clear()
+            if self.option_radios[last_idx].isChecked():
+                self.option_radios[0].setChecked(True)
+            self.changed.emit()
+
     def set_question(self, question: dict | None, workspace_path: Path | None = None) -> None:
         """Populate the fields from a question dict, or clear when None."""
         self._workspace_path = workspace_path
@@ -145,10 +195,14 @@ class QuestionEditorWidget(QWidget):
         self.text_edit.setPlainText(question.get("question", ""))
         self.explanation_edit.setPlainText(question.get("explanation", ""))
         options = question.get("options", [])
-        for i, field in enumerate(self.option_edits):
-            field.setText(options[i] if i < len(options) else "")
+        visible_count = max(4, min(len(self.option_rows), len(options)))
+
+        for i, row in enumerate(self.option_rows):
+            row.setVisible(i < visible_count)
+            self.option_edits[i].setText(options[i] if i < len(options) else "")
+
         answer_index = question.get("correctIndex", 0)
-        if isinstance(answer_index, int) and 0 <= answer_index < len(self.option_radios):
+        if isinstance(answer_index, int) and 0 <= answer_index < visible_count:
             self.option_radios[answer_index].setChecked(True)
         elif self.option_radios:
             self.option_radios[0].setChecked(True)
@@ -239,6 +293,8 @@ class QuestionEditorWidget(QWidget):
     def clear(self) -> None:
         self.text_edit.clear()
         self.explanation_edit.clear()
+        for i, row in enumerate(self.option_rows):
+            row.setVisible(i < 4)
         for field in self.option_edits:
             field.clear()
         if self.option_radios:

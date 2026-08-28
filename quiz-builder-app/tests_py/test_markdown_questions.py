@@ -51,3 +51,35 @@ def test_markdown_explanation_parsing_and_dumping(tmp_path):
     path.write_text(dumped, encoding="utf-8")
     loaded = load_questions(path)
     assert loaded == questions
+
+
+def test_markdown_many_options(tmp_path):
+    md_content = """## Question 1: Multiple choices
+- א. אפשרות א
+- ב. אפשרות ב
+- ג. אפשרות ג
+- ד. אפשרות ד
+- ה. אפשרות ה
+- ו. אפשרות ו
+
+תשובה: ה
+
+## Question 2: English letters
+- A. Choice 1
+- B. Choice 2
+- C. Choice 3
+- D. Choice 4
+- E. Choice 5
+- F. Choice 6
+- G. Choice 7
+
+Answer: F
+"""
+    path = tmp_path / "questions_6_opts.md"
+    path.write_text(md_content, encoding="utf-8")
+    loaded = load_questions(path)
+    assert len(loaded) == 2
+    assert len(loaded[0]["options"]) == 6
+    assert loaded[0]["correctIndex"] == 4  # 'ה' -> 4
+    assert len(loaded[1]["options"]) == 7
+    assert loaded[1]["correctIndex"] == 5  # 'F' -> 5

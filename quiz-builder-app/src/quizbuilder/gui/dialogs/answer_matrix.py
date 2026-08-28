@@ -43,14 +43,20 @@ class AnswerMatrixDialog(QDialog):
             QLabel("<b>Rapid Answer Key Review:</b> Click any choice to update that question's correct answer instantly.")
         )
 
-        table = QTableWidget(len(questions), 6, self)
-        table.setHorizontalHeaderLabels(["#", "Question Preview", "א (A)", "ב (B)", "ג (C)", "ד (D)"])
+        HEBREW_LETTERS = ["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט", "י"]
+        LATIN_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
+        max_options = max(4, min(10, max((len(q.get("options", [])) for q in questions), default=4)))
+        headers = ["#", "Question Preview"] + [
+            f"{HEBREW_LETTERS[i]} ({LATIN_LETTERS[i]})" for i in range(max_options)
+        ]
+
+        table = QTableWidget(len(questions), len(headers), self)
+        table.setHorizontalHeaderLabels(headers)
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for col in range(2, 6):
+        for col in range(2, len(headers)):
             table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
-
-        letters = ["א", "ב", "ג", "ד"]
 
         for row_idx, q in enumerate(questions):
             num_item = QTableWidgetItem(str(row_idx + 1))
@@ -62,6 +68,7 @@ class AnswerMatrixDialog(QDialog):
             table.setItem(row_idx, 1, preview_item)
 
             curr_ans = q.get("correctIndex", 0)
+            q_options_count = len(q.get("options", [])) or 4
 
             def make_toggle(r: int, o: int):
                 def _handler(checked: bool):
@@ -72,12 +79,18 @@ class AnswerMatrixDialog(QDialog):
                             self.on_dirty()
                 return _handler
 
-            for opt_idx, letter in enumerate(letters):
-                radio = QRadioButton(letter)
-                if opt_idx == curr_ans:
-                    radio.setChecked(True)
-                radio.toggled.connect(make_toggle(row_idx, opt_idx))
-                table.setCellWidget(row_idx, 2 + opt_idx, radio)
+            for opt_idx in range(max_options):
+                if opt_idx < q_options_count:
+                    radio = QRadioButton(HEBREW_LETTERS[opt_idx])
+                    if opt_idx == curr_ans:
+                        radio.setChecked(True)
+                    radio.toggled.connect(make_toggle(row_idx, opt_idx))
+                    table.setCellWidget(row_idx, 2 + opt_idx, radio)
+                else:
+                    placeholder = QTableWidgetItem("—")
+                    placeholder.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+                    table.setItem(row_idx, 2 + opt_idx, placeholder)
 
         layout.addWidget(table)
 
