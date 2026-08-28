@@ -23,8 +23,10 @@ a = Analysis(
     datas=datas,
     hiddenimports=[
         "fitz",
+        "pymupdf",
         "pandas",
         "openpyxl",
+        "xlrd",
         "runpy",
         "quizbuilder.markdown",
         "quizbuilder.gui.dialogs",

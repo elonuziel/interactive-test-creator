@@ -123,6 +123,40 @@ def normalize_answer_key(path: Path) -> dict[int, str]:
         try:
             import pandas as pd
             frame = pd.read_excel(path, header=None)
+            rows = frame.fillna("").astype(str).values.tolist()
+            for h_idx, row in enumerate(rows):
+                cols = [str(c).strip() for c in row]
+                q_cols = [(col_idx, c) for col_idx, c in enumerate(cols) if re.search(r"(?:שאלה|question)\s*(\d+)", c, re.IGNORECASE)]
+                if q_cols:
+                    for d_idx in range(h_idx + 1, len(rows)):
+                        data_row = rows[d_idx]
+                        if not any(data_row):
+                            continue
+                        res: dict[int, str] = {}
+                        for col_idx, q_header in q_cols:
+                            q_num_m = re.search(r"(?:שאלה|question)\s*(\d+)", q_header, re.IGNORECASE)
+                            if not q_num_m or col_idx >= len(data_row):
+                                continue
+                            q_num = int(q_num_m.group(1))
+                            val = data_row[col_idx].strip()
+                            form0_m = re.search(r"\{(\d+|[A-Dא-ד])\}", val)
+                            ans_m = re.search(r"\((\d+|[A-Dא-ד])\)", val)
+                            if form0_m:
+                                raw_a = form0_m.group(1)
+                                letter = chr(ord("A") + int(raw_a) - 1) if raw_a.isdigit() and 1 <= int(raw_a) <= 26 else raw_a.upper()
+                                res[q_num] = letter
+                            elif ans_m:
+                                raw_a = ans_m.group(1)
+                                letter = chr(ord("A") + int(raw_a) - 1) if raw_a.isdigit() and 1 <= int(raw_a) <= 26 else raw_a.upper()
+                                res[q_num] = letter
+                            elif val.isdigit():
+                                raw_a = int(val)
+                                letter = chr(ord("A") + raw_a - 1) if 1 <= raw_a <= 26 else str(raw_a)
+                                res[q_num] = letter
+                            elif val and val[0].upper() in "ABCDאבגד":
+                                res[q_num] = val[0].upper()
+                        if len(res) >= 3:
+                            return res
             raw_text = "\n".join(frame.fillna("").astype(str).apply(lambda row: " ".join(row), axis=1))
             return _parse_answer_text(raw_text)
         except Exception:
