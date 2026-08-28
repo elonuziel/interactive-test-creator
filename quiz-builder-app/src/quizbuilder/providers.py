@@ -62,10 +62,13 @@ def detect_providers(freebuff_commands=("freebuff", "freebuff-cli"), lookup=shut
     return detected
 
 
+import sys
+
+
 def send_prompt_to_command(command: str, prompt_path: Path) -> subprocess.Popen:
     """Run a provider command and report failures with actionable context."""
     with prompt_path.open("r", encoding="utf-8") as prompt_file:
-        process = subprocess.Popen([command], stdin=prompt_file)
+        process = subprocess.Popen([command], stdin=prompt_file, shell=(sys.platform == "win32"))
         return_code = process.wait()
     if return_code:
         logging.getLogger(__name__).error("Provider command %s exited with status %s", command, return_code)

@@ -28,6 +28,7 @@ def generate_prompt(runner, workspace: Path, test_name: str, form_number: str, h
 
 
 import re
+import sys
 
 
 def extract_markdown_from_response(text: str) -> str:
@@ -55,6 +56,7 @@ def send_to_provider(provider: Provider, command: str, prompt: Path, cwd: Path |
             cwd=str(cwd) if cwd else None,
             encoding="utf-8",
             errors="replace",
+            shell=(sys.platform == "win32"),
         )
     except OSError as exc:
         raise PromptError(f"Could not execute '{command}': {exc}") from exc
