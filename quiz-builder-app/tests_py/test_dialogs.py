@@ -15,8 +15,7 @@ from quizbuilder.gui.dialogs import (
     SuperBatchSummaryDialog,
     WelcomeDialog,
 )
-from quizbuilder.super_batch import SuperBatchResult, SuperBatchItem
-from quizbuilder.workspace import ExamOverview
+from quizbuilder.super_batch import SuperBatchResult, SuperBatchItem, ExamOverview
 
 
 @pytest.fixture(scope="module")
