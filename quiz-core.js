@@ -104,6 +104,7 @@
         const candidates = [];
         let match;
         while ((match = re.exec(source))) {
+            if (/^קוד\s+מבחן/i.test(match[0])) continue;
             const normalized = normalizeFormNumber(match[1]);
             if (normalized !== null) candidates.push({ rawValue: match[1], normalizedValue: normalized, isFormZero: normalized === '0', confidence: match.index < String(text || '').length ? 1 : 0.65 });
         }

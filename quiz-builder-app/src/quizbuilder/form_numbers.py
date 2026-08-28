@@ -64,7 +64,12 @@ def detect_form_candidates(text: str = "", filename: str = "") -> tuple[FormCand
     filename = str(filename or "")
     for match in _LABEL_RE.finditer(text):
         context = text[max(0, match.start() - 30):min(len(text), match.end() + 30)].strip()
-        candidates.append(_candidate(match.group(1), "pdf-content", 1.0, context))
+        # The broad "מבחן" alternative can match inside "קוד מבחן"; inspect
+        # the actual label span, not surrounding text from another header.
+        label_start = match.start()
+        if re.search(r"קוד\s+מבחן\s*$", text[max(0, label_start - 12):match.start(1)], re.IGNORECASE):
+            continue
+        candidates.append(_candidate(match.group(1), "pdf-content", 1.0, context.replace("קוד מבחן", "")))
     for match in _LABEL_RE.finditer(filename):
         context = filename[max(0, match.start() - 20):min(len(filename), match.end() + 20)]
         candidates.append(_candidate(match.group(1), "filename", 0.65, context))
@@ -90,6 +95,11 @@ def resolve_form_number(text: str = "", filename: str = "", override: str | None
     top = candidates[0]
     close = [item for item in candidates[1:] if top.confidence - item.confidence < 0.15 and item.normalized_value != top.normalized_value]
     if close:
+        # Prefer an explicit Form 0/טופס 0 candidate over unrelated numeric
+        # metadata such as an exam code when the filename confirms Form 0.
+        zero_candidates = [item for item in candidates if item.is_form_zero and item.source == "filename"]
+        if zero_candidates:
+            return FormResolution(zero_candidates[0], candidates, "resolved")
         return FormResolution(None, candidates, "ambiguous")
     return FormResolution(top, candidates, "resolved")
 
