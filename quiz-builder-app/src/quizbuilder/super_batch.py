@@ -323,7 +323,10 @@ def _context_for_pdf(pdf: Path, is_digital: bool, mode: str = "path") -> str:
         return f"PDF file path: {pdf.resolve()}. If your CLI can access local files, inspect this PDF directly."
     if not is_digital:
         try:
-            import fitz
+            try:
+                import pymupdf as fitz
+            except ImportError:
+                import fitz
             document = fitz.open(pdf)
             pages = []
             for page in document[:5]:
@@ -332,7 +335,10 @@ def _context_for_pdf(pdf: Path, is_digital: bool, mode: str = "path") -> str:
         except Exception as exc:
             return f"Local OCR extraction unavailable ({exc}). PDF file path: {pdf.resolve()}"
     try:
-        import fitz
+        try:
+            import pymupdf as fitz
+        except ImportError:
+            import fitz
         document = fitz.open(pdf)
         return "\n".join(page.get_text()[:4000] for page in document[:3])
     except Exception:

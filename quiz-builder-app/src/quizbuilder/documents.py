@@ -127,9 +127,12 @@ def classify_pdf(pdf_path: Path, minimum_chars_per_page: int = 50, workspace: Pa
     """Return True when the preferred PDF contains enough extractable text to be digital."""
     pdf_path = preferred_pdf(pdf_path, workspace)
     try:
-        import fitz
-    except ImportError as exc:
-        raise DocumentError("PyMuPDF is required for PDF classification.") from exc
+        import pymupdf as fitz
+    except ImportError:
+        try:
+            import fitz
+        except ImportError as exc:
+            raise DocumentError("PyMuPDF is required for PDF classification.") from exc
 
     try:
         document = fitz.open(pdf_path)
@@ -191,7 +194,10 @@ def parse_page_ranges(pages_str: str, total_pages: int = 0) -> set[int]:
 def describe_page_cleaning(pdf_path: Path, discard_spec: str) -> dict:
     """Return summary dictionary with total, discarded, and kept page counts."""
     try:
-        import fitz
+        try:
+            import pymupdf as fitz
+        except ImportError:
+            import fitz
         document = fitz.open(pdf_path)
         total = len(document)
     except Exception:
@@ -210,9 +216,12 @@ def describe_page_cleaning(pdf_path: Path, discard_spec: str) -> dict:
 def clean_pdf(source_pdf: Path, output_pdf: Path, discard_spec: str) -> tuple[int, int]:
     """Create a cleaned PDF copy discarding specified pages. Returns (total_pages, kept_pages)."""
     try:
-        import fitz
-    except ImportError as exc:
-        raise DocumentError("PyMuPDF is required for PDF cleaning.") from exc
+        import pymupdf as fitz
+    except ImportError:
+        try:
+            import fitz
+        except ImportError as exc:
+            raise DocumentError("PyMuPDF is required for PDF cleaning.") from exc
 
     if not source_pdf.is_file():
         raise DocumentError(f"Source PDF not found: {source_pdf}")

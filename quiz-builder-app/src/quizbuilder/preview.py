@@ -9,9 +9,12 @@ class PreviewError(RuntimeError):
 
 def render_pdf_page(pdf_path: Path, page_number: int = 0, scale: float = 1.5) -> bytes:
     try:
-        import fitz
-    except ImportError as exc:
-        raise PreviewError("PDF preview requires PyMuPDF.") from exc
+        import pymupdf as fitz
+    except ImportError:
+        try:
+            import fitz
+        except ImportError as exc:
+            raise PreviewError("PDF preview requires PyMuPDF.") from exc
 
     try:
         document = fitz.open(pdf_path)

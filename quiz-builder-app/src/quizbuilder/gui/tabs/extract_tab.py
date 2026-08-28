@@ -346,23 +346,29 @@ class ExtractTabWidget(QWidget):
     def _on_pdf_selection_changed(self) -> None:
         workspace = self.main_window.state["workspace"]
         selected_pdf = self.pdf_combo.currentData()
-        if not workspace or not selected_pdf or not selected_pdf.is_file():
+        if not workspace or not selected_pdf or not Path(selected_pdf).is_file():
             self.update_clean_summary()
             return
         self.main_window._set_status("Analyzing selected PDF...", "busy")
+        pdf_path = Path(selected_pdf)
         def _classify():
-            return classify_pdf(selected_pdf)
-        def _classified(report):
+            return classify_pdf(pdf_path)
+        def _classified(is_digital):
             self.main_window._set_status("")
-            self.detection_title.setText(f"PDF type: {'Digital text' if report.is_digital else 'Scanned / images'}")
-            self.detection_description.setText(report.reason)
-            self.extract_button.setEnabled(report.is_digital)
+            if is_digital:
+                self.detection_title.setText("Digital PDF detected")
+                self.detection_description.setText("This PDF contains selectable text. Extract the questions automatically.")
+                self.extract_button.setEnabled(True)
+            else:
+                self.detection_title.setText("Scanned PDF detected")
+                self.detection_description.setText("Create an AI prompt below to extract questions from this image-based PDF.")
+                self.extract_button.setEnabled(False)
             self.update_clean_summary()
-        def _classify_failed(_err):
+        def _classify_failed(err):
             self.main_window._set_status("")
-            self.detection_title.setText("PDF type: unknown")
-            self.detection_description.setText("Could not inspect the selected PDF.")
-            self.extract_button.setEnabled(False)
+            self.detection_title.setText("PDF analysis unavailable")
+            self.detection_description.setText(f"{err} You can still create an AI prompt or check the PDF manually.")
+            self.extract_button.setEnabled(True)
             self.update_clean_summary()
         worker = Worker(_classify)
         worker.signals.finished.connect(_classified)
