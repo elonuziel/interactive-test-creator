@@ -707,7 +707,8 @@ STRICT EXTRACTION & FORMATTING RULES:
     elements.toggleProcessingSettingsBtn?.addEventListener('click', () => toggleProcessingSettings(false));
 
     elements.copyPromptBtn?.addEventListener('click', async () => {
-        const textToCopy = elements.llmPromptBox ? elements.llmPromptBox.value : DEFAULT_LLM_PROMPT;
+        updatePromptBoxes();
+        const textToCopy = (elements.llmPromptBox && elements.llmPromptBox.value) ? elements.llmPromptBox.value : buildLlmPrompt();
         try {
             await navigator.clipboard.writeText(textToCopy);
             const originalText = elements.copyPromptBtn.textContent;
@@ -746,8 +747,18 @@ STRICT EXTRACTION & FORMATTING RULES:
         elements.compressQualityVal.textContent = `${val}% ${note}`;
     });
 
+    elements.compressSettingsBtn?.addEventListener('click', () => {
+        if (elements.compressSettingsPopup) elements.compressSettingsPopup.classList.add('show');
+    });
+
+    elements.confirmDownloadBtn?.addEventListener('click', async () => {
+        if (elements.compressSettingsPopup) elements.compressSettingsPopup.classList.remove('show');
+        await ExportService.downloadQuiz(state, elements, ProgressController, (msg, isErr, toast) => EditorUi.setStatus(msg, isErr, toast, elements));
+    });
+
     elements.copyDigitalPromptBtn?.addEventListener('click', async () => {
-        const textToCopy = elements.digitalLlmPromptBox ? elements.digitalLlmPromptBox.value : DEFAULT_LLM_PROMPT;
+        updatePromptBoxes();
+        const textToCopy = (elements.digitalLlmPromptBox && elements.digitalLlmPromptBox.value) ? elements.digitalLlmPromptBox.value : buildLlmPrompt();
         try {
             await navigator.clipboard.writeText(textToCopy);
             const originalText = elements.copyDigitalPromptBtn.textContent;
