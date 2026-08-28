@@ -86,7 +86,9 @@ def test_context_mode_extracted_uses_local_text(tmp_path, monkeypatch):
     class Document(list):
         pass
 
-    monkeypatch.setitem(__import__("sys").modules, "fitz", type("Fitz", (), {"open": lambda self, path: Document([Page()])})())
+    mock_fitz = type("Fitz", (), {"open": lambda self, path: Document([Page()])})()
+    monkeypatch.setitem(__import__("sys").modules, "fitz", mock_fitz)
+    monkeypatch.setitem(__import__("sys").modules, "pymupdf", mock_fitz)
     context = _context_for_pdf(pdf, False, "extracted")
     assert "OCR text" in context
 
