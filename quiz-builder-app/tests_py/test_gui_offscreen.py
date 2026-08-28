@@ -38,9 +38,9 @@ def test_question_editor_round_trips_question(application):
 
     # Test dynamic add & remove row
     editor._add_option_row()
-    assert editor.option_rows[6].isVisible()
+    assert not editor.option_rows[6].isHidden()
     editor._remove_option_row()
-    assert not editor.option_rows[6].isVisible()
+    assert editor.option_rows[6].isHidden()
 
     editor.deleteLater()
 
