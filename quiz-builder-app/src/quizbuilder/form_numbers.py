@@ -64,10 +64,14 @@ def detect_form_candidates(text: str = "", filename: str = "") -> tuple[FormCand
     filename = str(filename or "")
     for match in _LABEL_RE.finditer(text):
         context = text[max(0, match.start() - 30):min(len(text), match.end() + 30)].strip()
-        # The broad "מבחן" alternative can match inside "קוד מבחן"; inspect
-        # the actual label span, not surrounding text from another header.
+        # The broad "מבחן" alternative can match inside "קוד מבחן" or "קוד בחינה";
+        # inspect surrounding text for exam/course code markers.
         label_start = match.start()
-        if re.search(r"קוד\s+מבחן\s*$", text[max(0, label_start - 12):match.start(1)], re.IGNORECASE):
+        before = text[max(0, label_start - 15):match.start(1)]
+        after = text[match.end(1):min(len(text), match.end(1) + 20)]
+        if re.search(r"קוד\s*(?:בחינה|מבחן|שאלון)|exam\s*code|course\s*code", before, re.IGNORECASE):
+            continue
+        if re.search(r"קוד\s*(?:בחינה|מבחן|שאלון)|exam\s*code|course\s*code", after, re.IGNORECASE):
             continue
         candidates.append(_candidate(match.group(1), "pdf-content", 1.0, context.replace("קוד מבחן", "")))
     for match in _LABEL_RE.finditer(filename):

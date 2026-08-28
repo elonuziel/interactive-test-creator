@@ -93,7 +93,7 @@ def main():
                         if q_match and ans_match:
                             answers_map[q_match.group(1)] = int(ans_match.group(1))
 
-            elif header_row_index is not None:
+            if not answers_map and header_row_index is not None:
                 target_row = None
                 available_forms = []
                 for row in rows[header_row_index + 1:]:
@@ -104,13 +104,11 @@ def main():
                         cell_val = str(cell).strip()
                         if cell_val.replace('.', '').isdigit():
                             val = str(int(float(cell_val))) if '.' in cell_val else cell_val
-                            val = val.lstrip('0')
-                            if not val:
-                                val = '0'
-                            if val not in available_forms and val != '0':
+                            val = val.lstrip('0') or '0'
+                            if val not in available_forms:
                                 available_forms.append(val)
 
-                    if any(str(cell).strip().lstrip('0') == form_str for cell in row[:3]):
+                    if any((str(cell).strip().lstrip('0') or '0') == form_str for cell in row[:3]):
                         target_row = row
                         break
 
