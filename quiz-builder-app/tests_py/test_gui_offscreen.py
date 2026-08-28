@@ -57,6 +57,47 @@ def test_main_window_populates_real_tests_folder(application, tmp_path):
     assert window.exam_list.count() == 2
     assert window.ai_provider_combo.findText("Web: Freebuff Chat") >= 0
     window.close()
+    window.deleteLater()
+
+
+def test_main_window_exam_selection_controls(application, tmp_path):
+    for name in ["exam_1", "exam_2", "exam_3"]:
+        exam_dir = tmp_path / name
+        exam_dir.mkdir()
+        (exam_dir / "questions.md").write_text("## Question 1\nTest?\n- A\n- B\n\nAnswer: A\n", encoding="utf-8")
+        (exam_dir / f"{name}.pdf").write_bytes(b"%PDF-1.4\n")
+
+    window = MainWindow(Config.defaults(root=tmp_path))
+    assert window.exam_list.count() == 3
+
+    # Main exam list selection controls
+    window.select_all_extract_exams()
+    for i in range(3):
+        assert window.exam_list.item(i).checkState() == Qt.CheckState.Checked
+
+    window.deselect_all_extract_exams()
+    for i in range(3):
+        assert window.exam_list.item(i).checkState() == Qt.CheckState.Unchecked
+
+    window.invert_extract_exams_selection()
+    for i in range(3):
+        assert window.exam_list.item(i).checkState() == Qt.CheckState.Checked
+
+    # Play list selection controls
+    window.clear_all_play_exams()
+    for i in range(3):
+        assert window.play_list.item(i).checkState() == Qt.CheckState.Unchecked
+
+    window.select_all_play_exams()
+    for i in range(3):
+        assert window.play_list.item(i).checkState() == Qt.CheckState.Checked
+
+    window.invert_play_exams_selection()
+    for i in range(3):
+        assert window.play_list.item(i).checkState() == Qt.CheckState.Unchecked
+
+    window.close()
+    window.deleteLater()
 
 
 def test_main_window_tracks_editor_changes(application, tmp_path):

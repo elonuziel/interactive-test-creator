@@ -7,7 +7,7 @@ from pathlib import Path
 import webbrowser
 import threading
 
-from PySide6.QtCore import QSettings, QThreadPool, Qt, QTimer
+from PySide6.QtCore import QPoint, QSettings, QThreadPool, Qt, QTimer
 from PySide6.QtGui import QCursor, QGuiApplication, QImage, QKeySequence, QPixmap, QShortcut, QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -268,6 +268,17 @@ class MainWindow(QWidget):
         self.exam_search = QLineEdit()
         self.exam_search.setPlaceholderText("Search exams...")
         self.exam_list = QListWidget()
+        self.exam_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.exam_list.customContextMenuRequested.connect(self._show_exam_list_context_menu)
+
+        exam_sel_row = QHBoxLayout()
+        self.exam_select_all_btn = QPushButton("Select all")
+        self.exam_select_all_btn.setToolTip("Check all visible exams in the list")
+        self.exam_deselect_all_btn = QPushButton("Deselect all")
+        self.exam_deselect_all_btn.setToolTip("Uncheck all exams in the list")
+        exam_sel_row.addWidget(self.exam_select_all_btn)
+        exam_sel_row.addWidget(self.exam_deselect_all_btn)
+
         self.batch_button = QPushButton("Process selected exams")
         
         super_batch_row = QHBoxLayout()
@@ -282,6 +293,7 @@ class MainWindow(QWidget):
 
         left.addWidget(self.exam_search)
         left.addWidget(self.exam_list, 1)
+        left.addLayout(exam_sel_row)
         left.addWidget(self.batch_button)
 
         self.web_batch_button = QPushButton("🌐 Web AI Batch")
@@ -497,13 +509,21 @@ class MainWindow(QWidget):
         selection_group = QGroupBox("Choose exams to include")
         selection_layout = QVBoxLayout(selection_group)
         self.play_list = QListWidget()
+        self.play_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.play_list.customContextMenuRequested.connect(self._show_play_list_context_menu)
+
+        play_sel_row = QHBoxLayout()
         self.select_all_button = QPushButton("Select all")
-        self.clear_all_button = QPushButton("Clear all")
+        self.select_all_button.setToolTip("Check all exams to include in the quiz")
+        self.clear_all_button = QPushButton("Deselect all")
+        self.clear_all_button.setToolTip("Uncheck all exams")
+        play_sel_row.addWidget(self.select_all_button)
+        play_sel_row.addWidget(self.clear_all_button)
+
         self.mix_checkbox = QCheckBox("Mix and shuffle questions (mixed mode)")
         self.mix_checkbox.setToolTip("Combine the checked exams into one shuffled quiz.")
         selection_layout.addWidget(self.play_list, 1)
-        selection_layout.addWidget(self.select_all_button)
-        selection_layout.addWidget(self.clear_all_button)
+        selection_layout.addLayout(play_sel_row)
         selection_layout.addWidget(self.mix_checkbox)
         self.export_splitter.addWidget(selection_group)
 
@@ -533,6 +553,8 @@ class MainWindow(QWidget):
         self.recent_btn.clicked.connect(self._show_recent_menu)
         self.exam_search.textChanged.connect(self.filter_exams)
         self.exam_list.currentItemChanged.connect(self.select_exam)
+        self.exam_select_all_btn.clicked.connect(self.select_all_extract_exams)
+        self.exam_deselect_all_btn.clicked.connect(self.deselect_all_extract_exams)
         self.pdf_combo.currentIndexChanged.connect(self._on_pdf_selection_changed)
         self.browse_pdf_button.clicked.connect(self.choose_custom_exam_file)
         self.browse_answer_button.clicked.connect(self.choose_custom_answer_key)
@@ -567,8 +589,8 @@ class MainWindow(QWidget):
         self.matrix_button.clicked.connect(self.open_answer_matrix)
         self.save_button.clicked.connect(self.save_test)
         self.next_export_button.clicked.connect(lambda: (self.save_active_question(), self.tabs.setCurrentIndex(2)))
-        self.select_all_button.clicked.connect(self.select_all_exams)
-        self.clear_all_button.clicked.connect(self.clear_all_exams)
+        self.select_all_button.clicked.connect(self.select_all_play_exams)
+        self.clear_all_button.clicked.connect(self.clear_all_play_exams)
         self.play_list.itemChanged.connect(lambda: self.update_summary())
         self.mix_checkbox.toggled.connect(lambda: self.update_summary())
         self.play_button.clicked.connect(self.prepare_and_play_quiz)
@@ -1425,15 +1447,79 @@ class MainWindow(QWidget):
         self.summary.setText(f"{len(selected)} exam(s), {total} question(s) ready\n{'Mixed mode' if self.mix_checkbox.isChecked() else 'Standard mode'}")
         self._update_tab_labels()
 
-    def select_all_exams(self) -> None:
+    def _show_exam_list_context_menu(self, pos: QPoint) -> None:
+        menu = QMenu(self)
+        sel_all = menu.addAction("Select all visible")
+        sel_all.triggered.connect(self.select_all_extract_exams)
+        desel_all = menu.addAction("Deselect all")
+        desel_all.triggered.connect(self.deselect_all_extract_exams)
+        invert = menu.addAction("Invert selection")
+        invert.triggered.connect(self.invert_extract_exams_selection)
+        menu.exec(self.exam_list.mapToGlobal(pos))
+
+    def _show_play_list_context_menu(self, pos: QPoint) -> None:
+        menu = QMenu(self)
+        sel_all = menu.addAction("Select all")
+        sel_all.triggered.connect(self.select_all_play_exams)
+        desel_all = menu.addAction("Deselect all")
+        desel_all.triggered.connect(self.clear_all_play_exams)
+        invert = menu.addAction("Invert selection")
+        invert.triggered.connect(self.invert_play_exams_selection)
+        menu.exec(self.play_list.mapToGlobal(pos))
+
+    def select_all_extract_exams(self) -> None:
+        """Check all visible exams in the main extract exam list."""
+        for index in range(self.exam_list.count()):
+            item = self.exam_list.item(index)
+            if not item.isHidden():
+                item.setCheckState(Qt.CheckState.Checked)
+
+    def deselect_all_extract_exams(self) -> None:
+        """Uncheck all exams in the main extract exam list."""
+        for index in range(self.exam_list.count()):
+            self.exam_list.item(index).setCheckState(Qt.CheckState.Unchecked)
+
+    def invert_extract_exams_selection(self) -> None:
+        """Invert checked state for all visible exams in the main exam list."""
+        for index in range(self.exam_list.count()):
+            item = self.exam_list.item(index)
+            if not item.isHidden():
+                new_state = (
+                    Qt.CheckState.Unchecked
+                    if item.checkState() == Qt.CheckState.Checked
+                    else Qt.CheckState.Checked
+                )
+                item.setCheckState(new_state)
+
+    def select_all_play_exams(self) -> None:
+        """Check all exams in the play/export exam list."""
         for index in range(self.play_list.count()):
             self.play_list.item(index).setCheckState(Qt.CheckState.Checked)
         self.update_summary()
 
-    def clear_all_exams(self) -> None:
+    def clear_all_play_exams(self) -> None:
+        """Uncheck all exams in the play/export exam list."""
         for index in range(self.play_list.count()):
             self.play_list.item(index).setCheckState(Qt.CheckState.Unchecked)
         self.update_summary()
+
+    def invert_play_exams_selection(self) -> None:
+        """Invert checked state for all exams in the play/export exam list."""
+        for index in range(self.play_list.count()):
+            item = self.play_list.item(index)
+            new_state = (
+                Qt.CheckState.Unchecked
+                if item.checkState() == Qt.CheckState.Checked
+                else Qt.CheckState.Checked
+            )
+            item.setCheckState(new_state)
+        self.update_summary()
+
+    def select_all_exams(self) -> None:
+        self.select_all_play_exams()
+
+    def clear_all_exams(self) -> None:
+        self.clear_all_play_exams()
 
     def prepare_and_play_quiz(self) -> None:
         self._build_quiz(None)
