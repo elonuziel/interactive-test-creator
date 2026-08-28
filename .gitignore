@@ -1,5 +1,6 @@
 # Sample test files & test runs
 tests/
+runs/
 
 # Python & Pytest Caches
 __pycache__/
@@ -10,10 +11,24 @@ __pycache__/
 .venv/
 venv/
 env/
+*.egg-info/
+.eggs/
+*.egg
+
+# Coverage & Linters
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
 # PyInstaller Build Outputs & Binaries
 dist/
 build/
+*.spec.bak
+quiz-builder-app/dist/
+quiz-builder-app/build/
 
 # Generated Standalone Quiz Exports
 interactive_quiz*.html
@@ -23,7 +38,6 @@ test-suite/fixtures/generated-quiz.html
 test-results/
 playwright-report/
 blob-report/
-
 
 # OS & IDE Artifacts
 .DS_Store
@@ -36,9 +50,8 @@ desktop.ini
 # Temporary & Log Files
 *.log
 *.tmp
-
-#build directory
-build/
-dist/
+*.tmp.md
+*.bak
+*.manifest
 
 node_modules/
