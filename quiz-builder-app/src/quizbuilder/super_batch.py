@@ -391,6 +391,7 @@ def process_item(
     context_mode: str = "path",
     discard_pages: str = "",
     clean_digital: bool = False,
+    auto_build_html: bool = True,
     cancel_event: threading.Event | None = None,
     progress: Callable[[SuperBatchItem], None] | None = None,
 ) -> SuperBatchResult:
@@ -469,6 +470,14 @@ def process_item(
         missing_images = validate_image_references(load_questions(output), output.parent)
         if missing_images:
             item.overview = replace(item.overview, warnings=item.overview.warnings + tuple(missing_images))
+        
+        if auto_build_html:
+            try:
+                from .exporter import build_standalone_quiz
+                build_standalone_quiz(item.overview.workspace, output=item.overview.workspace / "quiz.html")
+            except Exception:
+                pass
+
         item.status = "saved"
         if progress:
             progress(item)
@@ -496,29 +505,15 @@ def process_plan(
     context_mode: str = "path",
     discard_pages: str = "",
     clean_digital: bool = False,
+    auto_build_html: bool = True,
+    auto_build_hub: bool = True,
     cancel_event: threading.Event | None = None,
     progress: Callable[[SuperBatchItem], None] | None = None,
 ) -> tuple[SuperBatchResult, ...]:
-    if workers <= 1:
-        return tuple(
-            process_item(
-                item,
-                provider,
-                command,
-                ai_mode=ai_mode,
-                context_mode=context_mode,
-                discard_pages=discard_pages,
-                clean_digital=clean_digital,
-                cancel_event=cancel_event,
-                progress=progress,
-            )
-            for item in plan.items
-        )
     results: list[SuperBatchResult] = []
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [
-            executor.submit(
-                process_item,
+    if workers <= 1:
+        for item in plan.items:
+            res = process_item(
                 item,
                 provider,
                 command,
@@ -526,11 +521,48 @@ def process_plan(
                 context_mode=context_mode,
                 discard_pages=discard_pages,
                 clean_digital=clean_digital,
+                auto_build_html=auto_build_html,
                 cancel_event=cancel_event,
                 progress=progress,
             )
-            for item in plan.items
-        ]
-        for future in as_completed(futures):
-            results.append(future.result())
+            results.append(res)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(
+                    process_item,
+                    item,
+                    provider,
+                    command,
+                    ai_mode=ai_mode,
+                    context_mode=context_mode,
+                    discard_pages=discard_pages,
+                    clean_digital=clean_digital,
+                    auto_build_html=auto_build_html,
+                    cancel_event=cancel_event,
+                    progress=progress,
+                )
+                for item in plan.items
+            ]
+            for future in as_completed(futures):
+                results.append(future.result())
+
+    if auto_build_hub:
+        try:
+            from .hub import build_central_hub
+            from .models import Workspace
+            ready_workspaces = [
+                Workspace(
+                    name=res.item.overview.name,
+                    path=res.item.overview.workspace,
+                    source_pdf=res.item.overview.pdf,
+                )
+                for res in results
+                if res.success and (res.item.overview.workspace / "questions.md").is_file()
+            ]
+            if ready_workspaces:
+                build_central_hub(plan.root, ready_workspaces, output=plan.root / "quiz_hub.html")
+        except Exception:
+            pass
+
     return tuple(results)

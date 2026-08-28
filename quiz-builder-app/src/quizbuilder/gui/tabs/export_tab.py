@@ -17,13 +17,18 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
 
-from ...exporter import build_run_standalone_quiz
-from ...runs import RunError, assemble_run, write_run_questions
+from ...exporter import (
+    build_all_standalone_quizzes,
+    build_central_hub,
+    build_run_standalone_quiz,
+)
+from ...runs import QuizRun, RunError, assemble_run, write_run_questions
 from ...validation import ValidationError, load_questions
 from ..workers import Worker
 
@@ -64,9 +69,24 @@ class ExportTabWidget(QWidget):
 
         self.mix_checkbox = QCheckBox("Mix and shuffle questions (mixed mode)")
         self.mix_checkbox.setToolTip("Combine the checked exams into one shuffled quiz.")
+
+        pool_size_row = QHBoxLayout()
+        pool_size_row.addWidget(QLabel("Question pool size:"))
+        self.pool_size_spin = QSpinBox()
+        self.pool_size_spin.setRange(1, 1000)
+        self.pool_size_spin.setValue(30)
+        self.pool_size_spin.setToolTip("Number of questions in mixed mode (default 30)")
+        pool_size_row.addWidget(self.pool_size_spin)
+
+        self.all_pool_check = QCheckBox("All questions")
+        self.all_pool_check.setToolTip("Include all available questions without limit")
+        pool_size_row.addWidget(self.all_pool_check)
+        pool_size_row.addStretch()
+
         selection_layout.addWidget(self.play_list, 1)
         selection_layout.addLayout(play_sel_row)
         selection_layout.addWidget(self.mix_checkbox)
+        selection_layout.addLayout(pool_size_row)
         self.export_splitter.addWidget(selection_group)
 
         # Right panel: Play or export your quiz
@@ -74,11 +94,21 @@ class ExportTabWidget(QWidget):
         action_layout = QVBoxLayout(action_group)
         self.summary = QLabel("No exams selected. Check one or more exams to continue.")
         self.summary.setWordWrap(True)
-        self.play_button = QPushButton("Play quiz in browser")
-        self.play_button.setObjectName("primary")
-        self.export_button = QPushButton("Export quiz as HTML...")
+
+        self.build_hub_button = QPushButton("🌐 Build Centralized Hub (quiz_hub.html)")
+        self.build_hub_button.setObjectName("primary")
+        self.build_hub_button.setToolTip("Compile master quiz hub with exam picker, mixed practice, and progress tracking.")
+
+        self.build_all_button = QPushButton("⚡ Build All Standalone HTMLs")
+        self.build_all_button.setToolTip("Compile standalone quiz.html in each ready exam folder.")
+
+        self.play_button = QPushButton("Play selected quiz in browser")
+        self.export_button = QPushButton("Export selected quiz as HTML...")
         self.open_runs_button = QPushButton("Open saved quizzes folder")
+
         action_layout.addWidget(self.summary)
+        action_layout.addWidget(self.build_hub_button)
+        action_layout.addWidget(self.build_all_button)
         action_layout.addWidget(self.play_button)
         action_layout.addWidget(self.export_button)
         action_layout.addWidget(self.open_runs_button)
@@ -95,6 +125,9 @@ class ExportTabWidget(QWidget):
         self.clear_all_button.clicked.connect(self.clear_all_play_exams)
         self.play_list.itemChanged.connect(lambda: self.update_summary())
         self.mix_checkbox.toggled.connect(lambda: self.update_summary())
+        self.all_pool_check.toggled.connect(lambda checked: self.pool_size_spin.setEnabled(not checked))
+        self.build_hub_button.clicked.connect(self.build_central_hub_action)
+        self.build_all_button.clicked.connect(self.build_all_standalone_action)
         self.play_button.clicked.connect(self.prepare_and_play_quiz)
         self.export_button.clicked.connect(self.export_quiz)
         self.open_runs_button.clicked.connect(self.open_runs_folder)
@@ -171,6 +204,103 @@ class ExportTabWidget(QWidget):
         if filename:
             self._build_quiz(Path(filename))
 
+    def build_central_hub_action(self) -> None:
+        root = self.main_window.state.get("root")
+        if not root:
+            QMessageBox.warning(self, "No exam folder", "Choose an exam folder first.")
+            return
+
+        selected = self.checked_play_workspaces()
+        if not selected:
+            # Fallback to all available workspaces under root with questions.md
+            from ...workspace import discover_batch
+            candidates = discover_batch(root)
+            selected = [c.workspace for c in candidates if c.workspace.questions_path.is_file()]
+
+        if not selected:
+            QMessageBox.warning(self, "No questions found", "No workspaces containing questions.md were found to build the hub.")
+            return
+
+        self.build_hub_button.setEnabled(False)
+        self.main_window._set_status(f"Building Centralized Quiz Hub from {len(selected)} exams...", "busy")
+
+        def build():
+            hub_path = build_central_hub(root, selected, output=root / "quiz_hub.html")
+            return hub_path
+
+        worker = Worker(build)
+
+        def done(hub_path: Path):
+            self.build_hub_button.setEnabled(True)
+            self.main_window._set_status("Centralized Quiz Hub built successfully", "ready")
+
+            box = QMessageBox(self)
+            box.setWindowTitle("Quiz Hub Ready")
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setText(f"Centralized Master Quiz Hub generated successfully!\n\nLocation:\n{hub_path}")
+            open_btn = box.addButton("🌐 Open Hub in Browser", QMessageBox.ButtonRole.ActionRole)
+            folder_btn = box.addButton("📁 Open Folder", QMessageBox.ButtonRole.ActionRole)
+            box.addButton(QMessageBox.StandardButton.Ok)
+            box.exec()
+
+            if box.clickedButton() == open_btn:
+                webbrowser.open(hub_path.as_uri())
+            elif box.clickedButton() == folder_btn:
+                webbrowser.open(hub_path.parent.as_uri())
+
+        def failed(error):
+            self.build_hub_button.setEnabled(True)
+            self.main_window._set_status("Could not build Quiz Hub", "error")
+            QMessageBox.critical(self, "Could not build Quiz Hub", f"{error}\n\nMake sure at least one exam folder contains a valid questions.md file.")
+
+        worker.signals.finished.connect(done)
+        worker.signals.failed.connect(failed)
+        self.main_window.start_worker(worker)
+
+    def build_all_standalone_action(self) -> None:
+        root = self.main_window.state.get("root")
+        if not root:
+            QMessageBox.warning(self, "No exam folder", "Choose an exam folder first.")
+            return
+
+        selected = self.checked_play_workspaces()
+        if not selected:
+            from ...workspace import discover_batch
+            candidates = discover_batch(root)
+            selected = [c.workspace for c in candidates if c.workspace.questions_path.is_file()]
+
+        if not selected:
+            QMessageBox.warning(self, "No questions found", "No workspaces containing questions.md were found.")
+            return
+
+        self.build_all_button.setEnabled(False)
+        self.main_window._set_status(f"Compiling standalone quiz.html for {len(selected)} exams...", "busy")
+
+        def build():
+            scripts_dir = self.config.scripts_root
+            generated = build_all_standalone_quizzes(selected, scripts_dir=scripts_dir)
+            return generated
+
+        worker = Worker(build)
+
+        def done(generated: list[Path]):
+            self.build_all_button.setEnabled(True)
+            self.main_window._set_status(f"Generated {len(generated)} standalone quiz.html files", "ready")
+            QMessageBox.information(
+                self,
+                "Batch Standalone HTMLs Ready",
+                f"Successfully compiled {len(generated)} standalone quiz.html files inside each exam workspace!",
+            )
+
+        def failed(error):
+            self.build_all_button.setEnabled(True)
+            self.main_window._set_status("Batch standalone build failed", "error")
+            QMessageBox.critical(self, "Batch Build Error", str(error))
+
+        worker.signals.finished.connect(done)
+        worker.signals.failed.connect(failed)
+        self.main_window.start_worker(worker)
+
     def _build_quiz(self, custom_path: Path | None) -> None:
         selected = self.checked_play_workspaces()
         if not selected:
@@ -187,8 +317,9 @@ class ExportTabWidget(QWidget):
         def build():
             mix_mode = self.mix_checkbox.isChecked()
             output = self.main_window.state["root"] / "runs" / ("mixed_quiz.html" if mix_mode else f"{selected[0].name}.html")
-            run = assemble_run(self.main_window.state["root"], selected, mix=mix_mode)
-            write_run_questions(run)
+            limit = None if self.all_pool_check.isChecked() else self.pool_size_spin.value()
+            run = assemble_run(selected, mix=mix_mode, limit=limit, shuffle=True)
+            write_run_questions(run, output.with_suffix(".json"))
             html = custom_path or output.with_suffix(".html")
             build_run_standalone_quiz(run, html)
             opened = bool(not custom_path and webbrowser.open(html.as_uri()))
@@ -207,7 +338,7 @@ class ExportTabWidget(QWidget):
             box.setText(f"Successfully generated quiz with {len(run.questions)} question(s)!\n\nSaved to:\n{html}")
             open_btn = box.addButton("🌐 Open in Browser", QMessageBox.ButtonRole.ActionRole)
             folder_btn = box.addButton("📁 Open Folder", QMessageBox.ButtonRole.ActionRole)
-            ok_btn = box.addButton(QMessageBox.StandardButton.Ok)
+            box.addButton(QMessageBox.StandardButton.Ok)
             box.exec()
 
             if box.clickedButton() == open_btn:
@@ -245,4 +376,5 @@ class ExportTabWidget(QWidget):
         runs = self.main_window.state["root"] / "runs"
         runs.mkdir(parents=True, exist_ok=True)
         webbrowser.open(runs.as_uri())
+
 

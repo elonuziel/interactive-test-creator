@@ -526,6 +526,14 @@ class SuperBatchDialog(QDialog):
 
         layout.addWidget(self.table)
 
+        options_bottom_row = QHBoxLayout()
+        self.auto_build_html_check = QCheckBox("Automatically build standalone HTMLs and Central Hub (quiz_hub.html) upon completion")
+        self.auto_build_html_check.setChecked(True)
+        self.auto_build_html_check.setToolTip("Compile standalone quiz.html in each exam folder and generate quiz_hub.html in the root directory.")
+        options_bottom_row.addWidget(self.auto_build_html_check)
+        options_bottom_row.addStretch()
+        layout.addLayout(options_bottom_row)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Start Super Batch")
         buttons.accepted.connect(self.accept)
@@ -580,6 +588,7 @@ class SuperBatchDialog(QDialog):
     def get_execution_params(self) -> dict[str, Any]:
         provider, command = self.provider_combo.currentData()
         rule = self.discard_rule or self.config.default_discard_pages or "std"
+        auto_build = self.auto_build_html_check.isChecked()
         return {
             "provider": provider,
             "command": command,
@@ -588,5 +597,7 @@ class SuperBatchDialog(QDialog):
             "context_mode": self.context_mode.currentData(),
             "discard_pages": rule if self.clean_check.isChecked() else "",
             "clean_digital": self.clean_check.isChecked(),
+            "auto_build_html": auto_build,
+            "auto_build_hub": auto_build,
         }
 

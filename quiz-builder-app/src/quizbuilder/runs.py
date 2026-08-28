@@ -43,7 +43,10 @@ def assemble_run(
     *,
     name: str | None = None,
     mix: bool = False,
+    limit: int | None = None,
+    shuffle: bool = False,
 ) -> QuizRun:
+    import random
     selected = tuple(workspaces)
     if not selected:
         raise RunError("Select at least one test to run.")
@@ -68,6 +71,13 @@ def assemble_run(
 
     if not run_questions:
         raise RunError("The selected tests contain no questions.")
+
+    if mix and (shuffle or limit):
+        if shuffle:
+            random.shuffle(run_questions)
+        if limit and limit > 0 and len(run_questions) > limit:
+            run_questions = run_questions[:limit]
+
     default_name = "mixed_quiz" if mix else source_names[0]
     return QuizRun(name=name or default_name, questions=tuple(run_questions), sources=tuple(source_names))
 

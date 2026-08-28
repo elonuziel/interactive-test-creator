@@ -676,6 +676,8 @@ class ExtractTabWidget(QWidget):
                 context_mode=params.get("context_mode", "path"),
                 discard_pages=params.get("discard_pages", ""),
                 clean_digital=params.get("clean_digital", False),
+                auto_build_html=params.get("auto_build_html", True),
+                auto_build_hub=params.get("auto_build_hub", True),
                 workers=workers,
                 cancel_event=cancel_event,
                 progress=progress_dlg.update_item_progress,
