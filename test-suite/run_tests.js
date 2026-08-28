@@ -325,6 +325,25 @@ runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts ar
     }
 });
 
+runTest('PWA Manifest & Service Worker Integrity', 'Verifies web manifest and service worker precache assets exist', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const manifestPath = path.join(__dirname, '../manifest.webmanifest');
+    const swPath = path.join(__dirname, '../sw.js');
+
+    assert.ok(fs.existsSync(manifestPath), 'manifest.webmanifest is missing');
+    assert.ok(fs.existsSync(swPath), 'sw.js is missing');
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    assert.ok(manifest.name && manifest.name.length > 0, 'PWA manifest name is missing');
+    assert.strictEqual(manifest.display, 'standalone');
+    assert.ok(Array.isArray(manifest.icons) && manifest.icons.length > 0, 'PWA manifest icons are missing');
+
+    const swContent = fs.readFileSync(swPath, 'utf8');
+    assert.ok(swContent.includes('CACHE_NAME'), 'CACHE_NAME missing in sw.js');
+    assert.ok(swContent.includes('PRECACHE_ASSETS'), 'PRECACHE_ASSETS missing in sw.js');
+});
+
 console.log('\n──────────────────────────────────────────────────────────────');
 console.log(`📊 Final Execution Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
 console.log('──────────────────────────────────────────────────────────────\n');

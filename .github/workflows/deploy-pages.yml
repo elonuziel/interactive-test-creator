@@ -80,6 +80,15 @@ jobs:
         run: |
           mkdir -p site
           cp index.html app.js style.css quiz_player.html generator.js quiz-core.js quiz-export.js site/
+          if [ -f manifest.webmanifest ]; then
+            cp manifest.webmanifest site/manifest.webmanifest
+          fi
+          if [ -f sw.js ]; then
+            cp sw.js site/sw.js
+          fi
+          if [ -d icons ]; then
+            cp -R icons site/icons
+          fi
           if [ -d js ]; then
             cp -R js site/js
           fi

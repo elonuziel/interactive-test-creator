@@ -8,6 +8,13 @@
         content="מחולל מבחנים בעברית – העלה קובץ PDF סרוק, חלץ שאלות באמצעות Gemini OCR, וצור מבחן אינטראקטיבי להורדה.">
     <title>יוצר מבחן אינטראקטיבי</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="יוצר מבחנים">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -857,6 +864,7 @@
             </button>
         </div>
         <div class="controls">
+            <button id="pwa-install-btn" class="secondary-btn sm-btn" type="button" title="התקן כאפליקציה לטלפון או למחשב" style="display: none; align-items: center; gap: 4px;">📲 התקן אפליקציה</button>
             <button id="download-quiz" class="success-btn sm-btn" disabled title="הורד מבחן עצמאי (HTML)">📥 הורד מבחן עצמאי (HTML)</button>
             <button id="take-quiz" class="secondary-btn sm-btn" disabled title="פתור מבחן כעת בלשונית חדשה">▶ פתור מבחן כעת</button>
             <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
@@ -1560,6 +1568,39 @@
             syncVisibility();
         })();
 
+        // PWA Service Worker Registration & Install Prompt Handler
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch((err) => {
+                    console.warn('ServiceWorker registration deferred:', err);
+                });
+            });
+        }
+
+        let deferredPwaPrompt = null;
+        const pwaInstallBtn = document.getElementById('pwa-install-btn');
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPwaPrompt = e;
+            if (pwaInstallBtn) {
+                pwaInstallBtn.style.display = 'inline-flex';
+            }
+        });
+
+        pwaInstallBtn?.addEventListener('click', async () => {
+            if (!deferredPwaPrompt) return;
+            deferredPwaPrompt.prompt();
+            const { outcome } = await deferredPwaPrompt.userChoice;
+            if (outcome === 'accepted') {
+                pwaInstallBtn.style.display = 'none';
+            }
+            deferredPwaPrompt = null;
+        });
+
+        window.addEventListener('appinstalled', () => {
+            if (pwaInstallBtn) pwaInstallBtn.style.display = 'none';
+            deferredPwaPrompt = null;
+        });
     </script>
 
     <div id="toast-container" class="toast-container"></div>
