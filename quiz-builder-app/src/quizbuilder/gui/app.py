@@ -57,6 +57,7 @@ from ..validation import ValidationError, load_questions
 from ..workspace import discover_sources
 from .question_editor import QuestionEditorWidget
 from .styles import DARK_STYLESHEET, LITE_STYLESHEET
+from .web_batch_dialog import WebAIBatchDialog
 from .workers import Worker
 
 LOGGER = logging.getLogger(__name__)
@@ -274,6 +275,10 @@ class MainWindow(QWidget):
         left.addWidget(self.exam_search)
         left.addWidget(self.exam_list, 1)
         left.addWidget(self.batch_button)
+
+        self.web_batch_button = QPushButton("🌐 Web AI Batch")
+        self.web_batch_button.setToolTip("Step-by-step batch assistant for ChatGPT, Claude, Gemini Web, and Google AI Studio (1 PDF at a time with auto prompt copying and answer merging).")
+        left.addWidget(self.web_batch_button)
         left.addLayout(super_batch_row)
         self.extract_splitter.addWidget(self.exam_group)
 
@@ -533,6 +538,7 @@ class MainWindow(QWidget):
         self.save_as_button.clicked.connect(self.save_questions_as)
         self.extract_button.clicked.connect(self.process_selected_exam)
         self.batch_button.clicked.connect(self.process_batch_checked)
+        self.web_batch_button.clicked.connect(self.open_web_batch_wizard)
         self.super_batch_button.clicked.connect(self.open_super_batch)
         self.ai_provider_combo.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.launch_ai_button.clicked.connect(self.launch_ai)
@@ -1237,6 +1243,44 @@ class MainWindow(QWidget):
         worker.signals.finished.connect(lambda _result: self.populate_tests())
         worker.signals.failed.connect(lambda error: QMessageBox.critical(self, "Batch processing failed", f"{error}\n\nCheck the PDFs and answer keys, then reload the exam list."))
         self.start_worker(worker)
+
+    def open_web_batch_wizard(self, custom_workspaces: list | None = None) -> None:
+        if not self.state["root"]:
+            QMessageBox.warning(self, "No exam folder", "Choose an exam folder before starting Web AI Batch.")
+            return
+
+        if custom_workspaces is not None:
+            workspaces = custom_workspaces
+        else:
+            selected = [
+                self.exam_list.item(index).data(Qt.ItemDataRole.UserRole)
+                for index in range(self.exam_list.count())
+                if self.exam_list.item(index).checkState() == Qt.CheckState.Checked
+            ]
+            if not selected:
+                if self.state["workspace"]:
+                    selected = [self.state["workspace"]]
+                else:
+                    selected = [
+                        self.exam_list.item(index).data(Qt.ItemDataRole.UserRole)
+                        for index in range(self.exam_list.count())
+                        if self.exam_list.item(index).data(Qt.ItemDataRole.UserRole) is not None
+                    ]
+
+        if not selected:
+            QMessageBox.information(self, "Web AI Batch", "No exams available to process.")
+            return
+
+        dialog = WebAIBatchDialog(
+            self,
+            workspaces=selected,
+            config=self.config_for_root(self.state["root"]),
+            dark_mode=self.dark_mode,
+        )
+        dialog.exec()
+        self.populate_tests()
+        if self.state["workspace"]:
+            self.load_workspace(self.state["workspace"])
 
     def open_super_batch(self, custom_items: list[SuperBatchItem] | None = None) -> None:
         if not self.state["root"]:

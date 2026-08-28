@@ -26,6 +26,8 @@ QPushButton#primary:disabled { background: #bfdbfe; color: #f8fafc; border-color
 QTabBar::tab { background: #f1f5f9; color: #64748b; padding: 10px 22px; }
 QTabBar::tab:selected { background: #ffffff; color: #2563eb; font-weight: 600; }
 QListWidget::item:selected { background: #e0e7ff; color: #1e1b4b; }
+QFrame#draggablePdf { background: #eff6ff; border: 2px dashed #93c5fd; border-radius: 8px; }
+QFrame#draggablePdf:hover { background: #dbeafe; border-color: #3b82f6; }
 QProgressBar { background: #e2e8f0; }
 QProgressBar::chunk { background: #2563eb; }
 """
@@ -44,6 +46,8 @@ QPushButton#primary:disabled { background: #1d4ed8; color: #bfdbfe; border-color
 QTabBar::tab { background: #1e293b; color: #94a3b8; padding: 10px 22px; }
 QTabBar::tab:selected { background: #334155; color: #93c5fd; font-weight: 600; }
 QListWidget::item:selected { background: #3730a3; color: #eef2ff; }
+QFrame#draggablePdf { background: #1e293b; border: 2px dashed #3b82f6; border-radius: 8px; }
+QFrame#draggablePdf:hover { background: #1e3a8a; border-color: #60a5fa; }
 QLabel { color: #e2e8f0; }
 QProgressBar { background: #334155; }
 QProgressBar::chunk { background: #3b82f6; }
