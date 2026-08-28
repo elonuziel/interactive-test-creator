@@ -315,8 +315,11 @@ runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts ar
 
     let lastIndex = -1;
     for (const script of expectedScripts) {
-        const idx = indexHtml.indexOf(`src="${script}"`);
-        assert.ok(idx !== -1, `Script ${script} is missing from index.html`);
+        const escaped = script.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`src="${escaped}(?:\\?[^"]*)?"`);
+        const match = regex.exec(indexHtml);
+        assert.ok(match !== null, `Script ${script} is missing from index.html`);
+        const idx = match.index;
         assert.ok(idx > lastIndex, `Script ${script} is loaded out of order in index.html`);
         lastIndex = idx;
     }
