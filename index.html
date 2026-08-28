@@ -852,8 +852,8 @@
         <div class="logo">יוצר מבחן אינטראקטיבי</div>
         <div class="navbar-center">
             <button id="full-guide-btn" type="button" class="guide-welcome-btn"
-                title="לחץ לצפייה במדריך המלא צעד אחר צעד">
-                ✨ 📖 איך זה עובד? מדריך מקיף למתחילים
+                title="לחץ לצפייה במדריך המהיר צעד אחר צעד">
+                ✨ 📖 איך זה עובד? מדריך מהיר
             </button>
         </div>
         <div class="controls">
@@ -1306,76 +1306,93 @@
 
     <div id="full-guide-popup" class="help-popup">
         <div class="help-popup-content guide-popup-content"
-            style="max-width: 660px; max-height: 85vh; overflow-y: auto;">
+            style="max-width: 680px; max-height: 88vh; overflow-y: auto; padding: 24px;">
             <div
-                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                <h2
-                    style="margin: 0; font-size: 1.25rem; color: var(--primary-color); display: flex; align-items: center; gap: 8px;">
-                    ✨ איך הופכים PDF למבחן אינטראקטיבי? (4 צעדים פשוטים)
-                </h2>
+                style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <div>
+                    <h2
+                        style="margin: 0; font-size: 1.25rem; color: var(--primary-color); display: flex; align-items: center; gap: 8px;">
+                        ✨ מדריך מהיר: הפיכת PDF למבחן אינטראקטיבי
+                    </h2>
+                    <span style="display: block; font-size: .84rem; color: var(--text-secondary); margin-top: 4px;">
+                        צרו מבחן תרגול דיגיטלי עצמאי (HTML) הפועל 100% אופליין בכל מכשיר — ב-4 צעדים פשוטים:
+                    </span>
+                </div>
                 <button id="full-guide-close-top" type="button"
-                    style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+                    style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); line-height: 1; padding: 2px 6px;">&times;</button>
             </div>
 
-            <div style="display: grid; gap: 14px;">
+            <div style="display: grid; gap: 12px;">
                 <!-- Step 1 -->
                 <div
                     style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 1: העלאת PDF וסינון
-                        עמודי שער 📄🧹</h4>
-                    <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
-                        • העלה את קובץ ה-PDF של המבחן בשדה <strong>קובץ מבחן (PDF)</strong>.<br>
-                        • 💡 <strong>מומלץ בחום למבחנים סרוקים:</strong> בסרגל העמודים מימין, לחץ על <strong>"🧹 ניקוי
-                            סטנדרטי"</strong> או בטל עמודי שער והוראות באופן ידני, ואז לחץ <strong>"📥 הורד PDF
-                            נקי"</strong>. קובץ ממוקד זה יעניק לך דיוק מקסימלי בחילוץ השאלות!
-                    </p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h4 style="margin: 0; font-size: .98rem; color: var(--primary-color); display: flex; align-items: center; gap: 6px;">
+                            <span>1️⃣</span> <span>העלאת קובץ PDF 📄</span>
+                        </h4>
+                        <span style="font-size: .75rem; background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 600; padding: 2px 8px; border-radius: 12px;">שלב 1</span>
+                    </div>
+                    <ul style="margin: 0; padding-right: 18px; font-size: .85rem; line-height: 1.6; color: var(--text-secondary);">
+                        <li><strong>PDF דיגיטלי (עם טקסט):</strong> המערכת תזהה מיד את הטקסט ותציג כפתור ירוק <strong>"⚡ חלץ שאלות מקומית כעת"</strong> — לחיצה אחת והשאלות נשלפות ישירות ללא צורך ב-AI!</li>
+                        <li><strong>PDF סרוק (תמונה):</strong> בסרגל העמודים מימין, לחצו על <strong>"🧹 ניקוי סטנדרטי"</strong> ואז <strong>"📥 הורד PDF נקי"</strong> לקבלת קובץ ממוקד ללא עמודי שער/הוראות.</li>
+                    </ul>
                 </div>
 
                 <!-- Step 2 -->
                 <div
                     style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 2: חילוץ השאלות בעזרת
-                        ChatGPT / Claude 🤖</h4>
-                    <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
-                        1. לחץ על הכפתור הכחול <strong>"📋 העתק ללוח"</strong> כדי להעתיק את ההוראות האוטומטיות.<br>
-                        2. פתח את ChatGPT או Claude, צרף את קובץ ה-<strong>PDF הנקי</strong> שהורדת, והדבק את ההוראות
-                        שהעתקת.<br>
-                        3. ה-AI יפיק עבורך קובץ שאלות מוכן בפורמט Markdown (<code>questions.md</code>) או
-                        <code>.json</code>. הורד או העתק אותו למחשב.
-                    </p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h4 style="margin: 0; font-size: .98rem; color: var(--primary-color); display: flex; align-items: center; gap: 6px;">
+                            <span>2️⃣</span> <span>חילוץ שאלות עם AI וזיהוי שאלון 🤖</span>
+                        </h4>
+                        <span style="font-size: .75rem; background: rgba(245, 158, 11, 0.1); color: #d97706; font-weight: 600; padding: 2px 8px; border-radius: 12px;">שלב 2</span>
+                    </div>
+                    <ul style="margin: 0; padding-right: 18px; font-size: .85rem; line-height: 1.6; color: var(--text-secondary);">
+                        <li>לחצו על <strong>"📋 העתק פרומפט ל-AI"</strong> או על כפתור <strong>"✨ Freebuff"</strong>.</li>
+                        <li>הדביקו ב-ChatGPT / Claude / Gemini / Freebuff יחד עם קובץ ה-PDF.</li>
+                        <li>הפרומפט מנחה את ה-AI <strong>לזהות אוטומטית את מספר השאלון</strong> (למשל <code>&lt;!-- Form: 063 --&gt;</code>) ולשמור על סדר השאלות, האפשרויות ועמודי המקור.</li>
+                        <li>העתיקו את קוד ה-Markdown או שמרו כקובץ <code>questions.md</code>.</li>
+                    </ul>
                 </div>
 
                 <!-- Step 3 -->
                 <div
                     style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 3: טעינת השאלות
-                        ומיזוג פתרון התשובות 🔗</h4>
-                    <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
-                        • העלה את קובץ השאלות בשדה <strong>קובץ שאלות (JSON / Markdown .md)</strong> (כל קובץ
-                        <code>questions.md</code> או JSON נתמך!).<br>
-                        • 🔑 <strong>מיזוג פתרון רשמי (חשוב מאוד!):</strong> אם העלית קובץ תשובות רשמי (CSV/XLS), הזן את <strong>מספר השאלון</strong> (למשל 111 או 76) ולחץ על הכפתור הכחול הבולט <strong>"🔗 מזג תשובות נכונות לשאלות"</strong> כדי להתאים את התשובות הרשמיות לשאלות.<br>
-                        • 🖼️ <strong>שאלות עם גרפים/תרשימים/טבלאות:</strong> לחץ על <strong>"🖼️ חבר עמודי תרשים/טבלה לשאלות מה-PDF"</strong> כדי להצמיד אוטומטית את תמונת עמוד ה-PDF הרלוונטי לכל שאלה הכוללת תרשים או טבלה!<br>
-                        • 💡 <strong>מה קורה אם לא לוחצים על מיזוג?</strong> המערכת מניחה שמדובר בטופס 000, מגדירה כברירת מחדל את תשובה <strong>א'</strong> כתשובה הנכונה, ומערבבת אוטומטית את סדר התשובות במבחן האינטראקטיבי!
-                    </p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h4 style="margin: 0; font-size: .98rem; color: var(--primary-color); display: flex; align-items: center; gap: 6px;">
+                            <span>3️⃣</span> <span>טעינת שאלות ומיזוג פתרון רשמי 🔗</span>
+                        </h4>
+                        <span style="font-size: .75rem; background: rgba(16, 185, 129, 0.1); color: #059669; font-weight: 600; padding: 2px 8px; border-radius: 12px;">שלב 3</span>
+                    </div>
+                    <ul style="margin: 0; padding-right: 18px; font-size: .85rem; line-height: 1.6; color: var(--text-secondary);">
+                        <li>העלו את קובץ השאלות (<code>questions.md</code> או <code>.json</code>).</li>
+                        <li><strong>מיזוג תשובות רשמי:</strong> אם יש לכם קובץ מפתח תשובות (CSV / Excel), העלו אותו. המערכת תתאים את מספר השאלון (למשל טופס <code>63</code> או טופס <code>0</code>) ותמזג את התשובות הנכונות מיד.</li>
+                        <li><strong>תרשימים וטבלאות:</strong> לחיצה על <strong>"🖼️ חבר עמודי תרשים"</strong> תצמיד את תמונת עמוד ה-PDF לשאלות חזותיות, או השתמשו בכפתור <strong>"✂️ גזור תמונה"</strong> לעריכה מדויקת.</li>
+                    </ul>
                 </div>
 
                 <!-- Step 4 -->
                 <div
                     style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
-                    <h4 style="margin: 0 0 6px; font-size: 1rem; color: var(--primary-color);">צעד 4: תרגול וייצוא מבחן
-                        עצמאי 🚀</h4>
-                    <p style="margin: 0; font-size: .88rem; line-height: 1.6; color: var(--text-secondary);">
-                        • תוכל לערוך כל שאלה או תשובה בתצוגה המקדימה שבתחתית העמוד.<br>
-                        • לחץ <strong>"▶ פתור מבחן כעת"</strong> לתרגול מיידי בדפדפן, או <strong>"📥 הורד מבחן עצמאי
-                            (HTML)"</strong> כדי לקבל מבחן אינטראקטיבי שעובד 100% אופליין בכל מכשיר וטלפון!
-                    </p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h4 style="margin: 0; font-size: .98rem; color: var(--primary-color); display: flex; align-items: center; gap: 6px;">
+                            <span>4️⃣</span> <span>תרגול מיידי וייצוא מבחן עצמאי 🚀</span>
+                        </h4>
+                        <span style="font-size: .75rem; background: rgba(139, 92, 246, 0.1); color: #7c3aed; font-weight: 600; padding: 2px 8px; border-radius: 12px;">שלב 4</span>
+                    </div>
+                    <ul style="margin: 0; padding-right: 18px; font-size: .85rem; line-height: 1.6; color: var(--text-secondary);">
+                        <li><strong>"▶ פתור מבחן כעת":</strong> פותח חלון תרגול אינטראקטיבי מיידי בדפדפן.</li>
+                        <li><strong>"📥 הורד מבחן עצמאי (HTML)":</strong> מפיק קובץ HTML יחיד שניתן לשלוח בוואטסאפ או במייל — עובד 100% ללא אינטרנט, שומר התקדמות מקומית, כולל שעון עצר, הסברים ומצב כהה.</li>
+                    </ul>
                 </div>
             </div>
 
-            <div style="margin-top: 18px; text-align: center;">
+            <div style="margin-top: 16px; display: flex; justify-content: center; gap: 10px;">
                 <button id="full-guide-close" class="primary-btn" type="button"
-                    style="padding: 10px 36px; font-weight: 700;">הבנתי, בוא נתחיל! 🚀</button>
+                    style="padding: 9px 32px; font-weight: 700; border-radius: 10px;">הבנתי, בוא נתחיל! 🚀</button>
             </div>
+        </div>
+    </div>
     <!-- Interactive Image Crop Modal -->
     <div id="crop-modal" class="popup-backdrop hidden" style="position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; padding: 20px;">
         <div style="background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #ccc); border-radius: 16px; width: 95%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
