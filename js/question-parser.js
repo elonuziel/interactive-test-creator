@@ -900,7 +900,12 @@
 
     async function tryMergeAnswersFromCsv({ explicit = false, elements, state, progressController, showToastFn, setStatusFn, renderPreviewFn } = {}) {
         const csv = elements?.csvFile?.files?.[0];
-        const formNumber = elements?.formNumber?.value?.trim();
+        let formNumber = elements?.formNumber?.value?.trim();
+        if (!formNumber && typeof window !== 'undefined' && window.QuizCore?.detectFormNumber) {
+            const detected = window.QuizCore.detectFormNumber(state?.examText || '', state?.pdfFileName || '');
+            formNumber = detected?.rawValue || '';
+            if (formNumber && elements?.formNumber) elements.formNumber.value = formNumber;
+        }
 
         if (explicit) {
             if (!state.questions || !state.questions.length) {

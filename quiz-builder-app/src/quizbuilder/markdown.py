@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .form_numbers import FormResolution, form_metadata_lines, metadata_from_markdown, resolve_form_number
+
 
 class MarkdownError(ValueError):
     pass
@@ -88,6 +90,7 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
     if not matches:
         raise MarkdownError("Questions Markdown must contain at least one question.")
 
+    metadata_resolution = metadata_from_markdown(text)
     for i, match in enumerate(matches):
         inline_header_text = match.group(1).strip()
         start = match.end()
@@ -136,6 +139,8 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
 
         if question and options:
             item = {"question": question, "options": options, "correctIndex": answer}
+            if metadata_resolution.is_form_zero:
+                item["shuffleOptions"] = True
             item.update(metadata)
             questions.append(item)
 
@@ -144,8 +149,15 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
     return questions
 
 
-def dump_questions(questions: list[dict[str, Any]]) -> str:
+def read_form_metadata(path: Path) -> FormResolution:
+    return metadata_from_markdown(path.read_text(encoding="utf-8"))
+
+
+def dump_questions(questions: list[dict[str, Any]], form_resolution: FormResolution | None = None) -> str:
     sections: list[str] = ["# Quiz Questions", ""]
+    if form_resolution and form_resolution.candidate:
+        sections.extend(form_metadata_lines(form_resolution))
+        sections.append("")
     for index, item in enumerate(questions, 1):
         sections.extend([f"## Question {index}", ""])
         img = item.get("image") or item.get("pageImage")
@@ -178,6 +190,6 @@ def validate_image_references(questions: list[dict[str, Any]], base_dir: Path) -
     return missing
 
 
-def write_questions(path: Path, questions: list[dict[str, Any]]) -> None:
+def write_questions(path: Path, questions: list[dict[str, Any]], form_resolution: FormResolution | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(dump_questions(questions), encoding="utf-8")
+    path.write_text(dump_questions(questions, form_resolution), encoding="utf-8")

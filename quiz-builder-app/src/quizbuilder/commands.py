@@ -11,6 +11,7 @@ from .prompts import generate_prompt
 from .validation import load_questions
 from .markdown import validate_image_references
 from .workspace import Workspace, clean_scratch, discover_sources
+from .form_numbers import resolve_form_number
 
 
 @dataclass(frozen=True)
@@ -45,10 +46,26 @@ def process_workspace(
     runner = PipelineRunner(scripts)
     artifacts = []
     selected_answer_key = answer_key or (sources.answer_keys[0] if sources.answer_keys else None)
+    selected_form = form
+    if selected_form is None:
+        try:
+            import fitz
+            pdf_text = "\n".join(page.get_text() for page in fitz.open(selected_pdf))
+        except Exception:
+            pdf_text = ""
+        resolution = resolve_form_number(pdf_text, selected_pdf.name)
+        if resolution.status == "ambiguous":
+            raise ValueError("Multiple possible form numbers detected; provide an explicit form override.")
+        selected_form = resolution.raw_value
     if selected_answer_key:
+        if not selected_form:
+            raise ValueError("Could not detect a form number from the PDF; provide an explicit form override.")
         answers = workspace.path / "answers.json"
-        runner.extract_answers(selected_answer_key, form or config.default_form, answers)
+        runner.extract_answers(selected_answer_key, selected_form, answers)
         artifacts.append(answers)
+    if selected_form and not selected_answer_key:
+        # Retain detected form metadata even when no official key is supplied.
+        pass
     if classify_pdf(selected_pdf, workspace=workspace.path):
         raw = workspace.path / "raw_text.md"
         images = workspace.path / "images"
@@ -56,6 +73,18 @@ def process_workspace(
         runner.extract_text(selected_pdf, raw, images, page_map)
         markdown = workspace.path / "questions.md"
         runner.parse_questions(raw, markdown, images, page_map)
+        if selected_form:
+            from .form_numbers import FormCandidate, FormResolution
+            from .markdown import dump_questions
+            questions = load_questions(markdown)
+            normalized = str(int(selected_form))
+            resolution = FormResolution(
+                FormCandidate(str(selected_form), normalized, "manual-override" if form else "pdf-content", 1.0, "PDF form metadata", normalized == "0"),
+                (),
+                "resolved",
+                bool(form),
+            )
+            markdown.write_text(dump_questions(questions, resolution), encoding="utf-8")
         artifacts.extend((raw, markdown))
     else:
         pages = workspace.path / "pages_output"
@@ -96,8 +125,18 @@ def process_workspaces(
 def generate_workspace_prompt(config: Config, workspace_path: Path, kind: str = "local", form: str | None = None) -> Path:
     workspace = Workspace(workspace_path.name, workspace_path.resolve())
     sources = discover_sources(workspace)
+    selected_form = form
+    if selected_form is None and sources.pdf:
+        try:
+            import fitz
+            text = "\n".join(page.get_text() for page in fitz.open(sources.pdf))
+        except Exception:
+            text = ""
+        resolution = resolve_form_number(text, sources.pdf.name)
+        selected_form = resolution.raw_value or config.default_form
+    selected_form = selected_form or config.default_form
     runner = PipelineRunner(config.scripts_root)
-    return generate_prompt(runner, workspace.path, workspace.name, form or config.default_form, bool(sources.answer_keys), kind)
+    return generate_prompt(runner, workspace.path, workspace.name, selected_form, bool(sources.answer_keys), kind)
 
 
 def validate_questions(path: Path) -> int:

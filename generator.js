@@ -172,11 +172,11 @@ STRICT EXTRACTION & FORMATTING RULES:
         if (elements.preview) elements.preview.innerHTML = '';
         state.proofPageImages = [];
         state.pdfBytes = null;
-        let apiKey = '';
-
-        const pdf = elements.pdfFile?.files?.[0];
+        let apiKey = '';        const pdf = elements.pdfFile?.files?.[0];
         const csv = elements.csvFile?.files?.[0];
-        const formNumber = elements.formNumber?.value?.trim();
+        state.pdfFileName = pdf?.name || '';
+            const formNumber = elements.formNumber?.value?.trim();
+
         const ocrEngine = (elements.ocrEngine?.value || 'gemini_chunked').trim();
         const llmPolicy = (elements.llmPolicy?.value || 'auto').trim();
 
@@ -238,7 +238,13 @@ STRICT EXTRACTION & FORMATTING RULES:
             const extracted = await PdfService.extractPdfText(pdfBufferForParse, QuestionParser.maybeFixHebrewWordOrder);
 
             let examText = extracted.text;
+            state.examText = examText;
             let sourcePages = extracted.rawPages;
+            const detectedForm = extracted.form || (window.QuizCore?.detectFormNumber ? window.QuizCore.detectFormNumber(examText, pdf.name) : null);
+            if (detectedForm && elements.formNumber && !elements.formNumber.value.trim()) {
+                elements.formNumber.value = detectedForm.rawValue;
+                EditorUi.showToast(`זוהה מספר שאלון ${detectedForm.rawValue} אוטומטית מקובץ ה-PDF.`, 'info', 4000);
+            }
             const useLlmExtraction = llmPolicy === 'force_llm' || (llmPolicy === 'auto' && extracted.isScanned && ocrEngine !== 'offline_local');
             const useOfflineOcr = extracted.isScanned && (llmPolicy === 'force_no_llm' || ocrEngine === 'offline_local');
 

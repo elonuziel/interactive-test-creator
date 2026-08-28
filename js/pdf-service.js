@@ -230,9 +230,14 @@
         }
 
         const fixFn = maybeFixHebrewWordOrderFn || (str => str);
+        const fullText = pages.join('\n');
+        const form = (typeof window !== 'undefined' && window.QuizCore?.detectFormNumber)
+            ? window.QuizCore.detectFormNumber(fullText)
+            : null;
         return {
             pdf,
             pageImages,
+            form,
             isScanned: nonWhitespaceChars < Math.max(pdf.numPages * 60, 120),
             text: fixFn(pages.join('\n')),
             rawPages: pages

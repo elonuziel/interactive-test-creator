@@ -36,6 +36,7 @@ from ...documents import (
 )
 from ...preview import render_pdf_page
 from ...providers import WEB_PROVIDERS, detect_providers, open_web_provider
+from ...form_numbers import resolve_form_number
 from ...prompts import send_to_provider
 from ..dialogs import (
     CliAgentGuideDialog,
@@ -142,8 +143,10 @@ class ExtractTabWidget(QWidget):
         self.answer_combo.addItem("No answer key", None)
         self.browse_answer_button = QPushButton("Choose file...")
         self.browse_answer_button.setToolTip("Select a custom CSV or Excel (XLS/XLSX) answer key")
-        self.form_edit = QLineEdit(self.config.default_form)
-        self.form_edit.setMaximumWidth(70)
+        self.form_edit = QLineEdit("")
+        self.form_edit.setPlaceholderText("Auto-detected")
+        self.form_edit.setMaximumWidth(90)
+        self.form_edit.setToolTip("Detected from the selected PDF. Edit only to override, with a warning.")
         self.preview = QLabel("No exam preview available")
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview.setMinimumSize(200, 150)
@@ -349,6 +352,22 @@ class ExtractTabWidget(QWidget):
         if not workspace or not selected_pdf or not Path(selected_pdf).is_file():
             self.update_clean_summary()
             return
+        pdf_path = Path(selected_pdf)
+        try:
+            import fitz
+            text = "\n".join(page.get_text() for page in fitz.open(pdf_path))
+        except Exception:
+            text = ""
+        detected = resolve_form_number(text, pdf_path.name)
+        if detected.status == "resolved" and detected.raw_value:
+            self.form_edit.setText(detected.raw_value)
+            self.form_edit.setToolTip(f"Auto-detected from {detected.candidate.source}; normalized lookup value: {detected.normalized_value}. Edit to override.")
+        elif detected.status == "ambiguous":
+            self.form_edit.clear()
+            self.form_edit.setToolTip("Multiple possible form numbers detected. Confirm one before using an answer key.")
+        else:
+            self.form_edit.clear()
+            self.form_edit.setToolTip("No form number detected. Enter one only as an explicit override.")
         self.main_window._set_status("Analyzing selected PDF...", "busy")
         pdf_path = Path(selected_pdf)
         def _classify():
@@ -497,11 +516,11 @@ class ExtractTabWidget(QWidget):
         self.extract_button.setEnabled(False)
         def run_extraction():
             return process_workspace(
-                workspace,
                 self.config,
-                pdf_path=self.pdf_combo.currentData(),
-                answers_path=self.answer_combo.currentData(),
-                form_value=self.form_edit.text(),
+                workspace.path,
+                answer_key=self.answer_combo.currentData(),
+                form=self.form_edit.text().strip() or None,
+                pdf=self.pdf_combo.currentData(),
             )
         def on_done(report):
             self.extract_button.setEnabled(True)
@@ -563,11 +582,10 @@ class ExtractTabWidget(QWidget):
         self.launch_ai_button.setEnabled(False)
         def make_prompt():
             return generate_workspace_prompt(
-                workspace,
                 self.config,
-                pdf_path=self.pdf_combo.currentData(),
-                answers_path=self.answer_combo.currentData(),
-                form_value=self.form_edit.text(),
+                workspace.path,
+                kind="web" if not custom_command else "local",
+                form=self.form_edit.text().strip() or None,
             )
         def on_done(prompt_text):
             self.launch_ai_button.setEnabled(True)

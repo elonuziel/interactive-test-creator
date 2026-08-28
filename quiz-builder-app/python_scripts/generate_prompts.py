@@ -64,7 +64,7 @@ Your Instructions:
         local_prompt = f"""[TASK: HEBREW MULTIPLE-CHOICE EXAM EXTRACTION]
 
 Context:
-You are processing test "{test_name}" (Form {form_number}). Rendered page images are saved in `{test_dir}/pages_output/` (e.g. `page_1.png`, `page_2.png`). Raw extracted text (if available) is in `{test_dir}/raw_text.md`.
+You are processing test "{test_name}" (Form {form_number}; use this exact value for answer-key lookup). If Form 0/000 is indicated, every correct answer is option 1 and the shared runtime must shuffle displayed options. Rendered page images are saved in `{test_dir}/pages_output/` (e.g. `page_1.png`, `page_2.png`). Raw extracted text (if available) is in `{test_dir}/raw_text.md`.
 
 Your Instructions:
 1. Inspect all rendered page images in `{test_dir}/pages_output/` sequentially.
@@ -86,7 +86,7 @@ Answer: A
         local_prompt_enhanced = f"""[TASK: HEBREW MULTIPLE-CHOICE EXTRACTION - IMAGE-OPTION SAFE MODE]
 
 Context:
-You are processing test "{test_name}" (Form {form_number}). Source page renders are in `{test_dir}/pages_output/`.
+You are processing test "{test_name}" (Form {form_number}; use this exact value for answer-key lookup). If Form 0/000 is indicated, every correct answer is option 1 and the shared runtime must shuffle displayed options. Source page renders are in `{test_dir}/pages_output/`.
 
 Extraction Rules:
 1. Extract every multiple-choice question in order.
@@ -117,7 +117,7 @@ Please proofread and return ONLY raw Markdown content for `questions.md`.
 {IMAGE_OPTION_RULES}
 """
     else:
-        web_prompt = f"""I am uploading the exam document for Hebrew test "{test_name}".
+        web_prompt = f"""I am uploading the exam document for Hebrew test "{test_name}" (Form {form_number}; use this value for answer-key lookup).
 
 Please extract all multiple-choice questions into a clean Markdown file (`questions.md`) for an interactive Hebrew quiz system.
 
@@ -133,7 +133,7 @@ Answer: A
 STRICT EXTRACTION & PROOFREADING RULES:
 {HEBREW_EXTRACTION_RULES}
 """
-        web_prompt_enhanced = f"""I am uploading a Hebrew exam for test "{test_name}".
+        web_prompt_enhanced = f"""I am uploading a Hebrew exam for test "{test_name}" (Form {form_number}; use this value for answer-key lookup).
 
 Please extract all multiple-choice questions and return ONLY raw Markdown content for `questions.md`.
 

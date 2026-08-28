@@ -93,6 +93,24 @@
         return rows;
     }
 
+    function normalizeFormNumber(value) {
+        const match = String(value == null ? '' : value).trim().match(/\d+/);
+        return match ? String(Number(match[0])) : null;
+    }
+
+    function detectFormNumber(text, filename = '') {
+        const source = `${String(text || '')}\n${String(filename || '')}`;
+        const re = /(?:מבחן\s*(?:מספר|מס['׳״\"]?|no\.?|number)?|מספר\s+מבחן|שאלון|טופס|form|test|exam\s*(?:no\.?|number)?)[^\d]{0,24}(\d{1,})/ig;
+        const candidates = [];
+        let match;
+        while ((match = re.exec(source))) {
+            const normalized = normalizeFormNumber(match[1]);
+            if (normalized !== null) candidates.push({ rawValue: match[1], normalizedValue: normalized, isFormZero: normalized === '0', confidence: match.index < String(text || '').length ? 1 : 0.65 });
+        }
+        candidates.sort((a, b) => b.confidence - a.confidence);
+        return candidates[0] || null;
+    }
+
     function parseAnswer(value) {
         const raw = String(value || '').trim().toUpperCase();
         const numeric = raw.match(/^(?:\((\d+)\)|\[?(\d+)\]?)/);
@@ -104,7 +122,7 @@
 
     function extractAnswersForForm(rows, formNumber) {
         if (!Array.isArray(rows) || !rows.length) return new Map();
-        const target = String(formNumber || '').trim().toLowerCase().replace(/\.0$/, '');
+        const target = normalizeFormNumber(formNumber);
         let headers = null;
         let selectedRow = null;
 
@@ -207,10 +225,9 @@
             if (index >= 0 && index < (questions || []).length) selected.add(index);
         });
         return Array.from(selected).sort((a, b) => a - b);
-    }
+    }        return {
+            normalizeWhitespace,
 
-    return {
-        normalizeWhitespace,
         stripExamFooterArtifacts,
         normalizeQuestionsJson,
         parseCsvRows,
@@ -218,6 +235,8 @@
         mergeAnswers,
         getStorageKey,
         getCustomSelectedIndices,
-        validateQuestions
+        validateQuestions,
+        normalizeFormNumber,
+        detectFormNumber
     };
 }));

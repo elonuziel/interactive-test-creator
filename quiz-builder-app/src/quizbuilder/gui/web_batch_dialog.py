@@ -49,6 +49,7 @@ from ..prompts import extract_markdown_from_response
 from ..providers import WEB_PROVIDERS, Provider, open_web_provider
 from ..validation import ValidationError, load_questions
 from ..workspace import Workspace, discover_sources
+from ..form_numbers import resolve_form_number
 from .workers import Worker
 
 LOGGER = logging.getLogger(__name__)
@@ -185,6 +186,8 @@ class BatchQueueItem:
         self.error: str | None = None
         self.pdf_path: Path | None = None
         self.answer_key_path: Path | None = None
+        self.form_number: str | None = None
+        self.form_lookup_number: str | None = None
         self.is_digital = False
 
 
@@ -441,6 +444,16 @@ class WebAIBatchDialog(QDialog):
             pdf = preferred_pdf(item.workspace.source_pdf or sources.pdf, item.workspace.path)
             item.pdf_path = pdf
             item.answer_key_path = sources.answer_keys[0] if sources.answer_keys else None
+            if pdf and pdf.is_file():
+                try:
+                    import fitz
+                    pdf_text = "\n".join(page.get_text() for page in fitz.open(pdf))
+                except Exception:
+                    pdf_text = ""
+                form = resolve_form_number(pdf_text, pdf.name)
+                if form.status == "resolved":
+                    item.form_number = form.raw_value
+                    item.form_lookup_number = form.normalized_value
             try:
                 item.is_digital = classify_pdf(pdf, workspace=item.workspace.path) if (pdf and pdf.is_file()) else False
             except Exception:
@@ -506,7 +519,8 @@ class WebAIBatchDialog(QDialog):
         # Update workspace header
         type_str = "📄 Digital PDF" if item.is_digital else "📷 Scanned PDF"
         ans_str = f" • Answer Key: {item.answer_key_path.name}" if item.answer_key_path else " • No Answer Key"
-        self.exam_title_banner.setText(f"Active Exam: {item.workspace.name} ({type_str}{ans_str})")
+        form_str = f" • Form: {item.form_number}" if item.form_number else " • Form: unresolved"
+        self.exam_title_banner.setText(f"Active Exam: {item.workspace.name} ({type_str}{ans_str}{form_str})")
         self.exam_path_label.setText(str(item.workspace.path))
 
         # Update single PDF widget
@@ -567,6 +581,7 @@ class WebAIBatchDialog(QDialog):
                 self.config,
                 item.workspace.path,
                 kind="web",
+                form=item.form_number,
             )
             # If enhanced prompt is selected and enhanced file exists, use it
             enhanced_file = item.workspace.path / "prompt_web_ai_enhanced.txt"
@@ -706,7 +721,9 @@ class WebAIBatchDialog(QDialog):
             selected_answer_key = sources.answer_keys[0] if sources.answer_keys else None
             if selected_answer_key:
                 answers_json = item.workspace.path / "answers.json"
-                runner.extract_answers(selected_answer_key, self.config.default_form, answers_json)
+                if not item.form_number:
+                    raise ValueError("Could not detect the PDF form number; choose an explicit override before merging answers.")
+                runner.extract_answers(selected_answer_key, item.form_number, answers_json)
                 runner.merge_answers(item.workspace.path)
             elif (item.workspace.path / "answers.json").is_file() or (item.workspace.path / "answers.md").is_file():
                 runner.merge_answers(item.workspace.path)

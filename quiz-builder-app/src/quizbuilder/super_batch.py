@@ -16,6 +16,7 @@ from .models import Workspace
 from .prompts import extract_markdown_from_response, send_to_provider
 from .config import Config
 from .workspace import discover_sources
+from .form_numbers import FormResolution, resolve_form_number
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,9 @@ class ExamOverview:
     test_number: str | None = None
     year: str | None = None
     variant: str | None = None
+    form_number: str | None = None
+    form_lookup_number: str | None = None
+    form_source: str | None = None
     confidence: float = 0.0
     warnings: tuple[str, ...] = ()
 
@@ -67,6 +71,7 @@ class SuperBatchResult:
 
 def extract_exam_metadata(text: str, filename: str = "") -> dict[str, str | None]:
     combined = f"{filename}\n{text}"
+    form = resolve_form_number(text, filename)
     number = None
     for pattern in (
         r"(?:test|exam|בחינה|מבחן)\s*(?:number|no\.?|מספר)?\s*[:#-]?\s*(\d{2,})",
@@ -77,7 +82,14 @@ def extract_exam_metadata(text: str, filename: str = "") -> dict[str, str | None
             number = match.group(1)
             break
     year_match = re.search(r"\b(19\d{2}|20\d{2})\b", combined)
-    return {"test_number": number, "year": year_match.group(1) if year_match else None, "variant": exam_variant(filename)}
+    return {
+        "test_number": number,
+        "year": year_match.group(1) if year_match else None,
+        "variant": exam_variant(filename),
+        "form_number": form.raw_value,
+        "form_lookup_number": form.normalized_value,
+        "form_source": form.candidate.source if form.candidate else None,
+    }
 
 
 def _parse_answer_text(text: str) -> dict[int, str]:
@@ -267,7 +279,11 @@ def build_plan(root: Path) -> SuperBatchPlan:
                 test_number=metadata["test_number"],
                 year=metadata["year"],
                 variant=metadata["variant"],
-                warnings=("PDF classification pending",),
+                form_number=metadata.get("form_number"),
+                form_lookup_number=metadata.get("form_lookup_number"),
+                form_source=metadata.get("form_source"),
+                confidence=1.0 if metadata.get("form_number") else 0.0,
+                warnings=("PDF classification pending",) if metadata.get("form_number") else ("Form number not detected", "PDF classification pending"),
             )
             
             # Auto-select the top matched answer key (if score > 0 or only 1 key available)
@@ -293,7 +309,7 @@ def classify_plan_item(item: SuperBatchItem) -> SuperBatchItem:
 
 
 def zero_test_questions(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [{**question, "correctIndex": 0} for question in questions]
+    return [{**question, "correctIndex": 0, "shuffleOptions": True} for question in questions]
 
 
 def strict_questions(path: Path, allow_unanswered: bool = False) -> list[dict[str, Any]]:
@@ -322,10 +338,11 @@ def generation_prompt(item: SuperBatchItem, context: str, mode: str = "two_phase
         key_summary = f"{len(normalized)} answers loaded from {item.selected_answer_key.name}" if normalized else item.selected_answer_key.name
         key_info = f"Use the normalized answer key ({key_summary}) at: {item.selected_answer_key.resolve()}; do not independently solve answers."
 
+    form_number = getattr(item.overview, "form_number", None) or "unknown"
     return f"""You are generating the final canonical questions.md for exam '{item.overview.name}'.
 Source PDF Path: {item.overview.pdf.resolve()}
 Workspace Directory: {item.overview.workspace.resolve()}
-Metadata: test number={item.overview.test_number or 'unknown'}, year={item.overview.year or 'unknown'}, variant={item.overview.variant or 'unknown'}.
+Metadata: test number={item.overview.test_number or 'unknown'}, year={item.overview.year or 'unknown'}, variant={item.overview.variant or 'unknown'}, form={form_number}, normalized form={item.overview.form_lookup_number or 'unknown'}, form source={item.overview.form_source or 'unknown'}.
 Mode: {mode}. Decision: {item.decision or 'use_answer_key'}.
 {key_info}
 Dedicated instructions: {item.dedicated_instructions or 'none'}.
@@ -341,6 +358,8 @@ Instructions:
    - Option D text
    Answer: A
 3. Do NOT include markdown code blocks (```markdown), conversational filler, or explanations.
+4. Preserve the visible `Form number: {form_number}` metadata line when a form was detected.
+5. If this is Form 0, do not solve answers: every source correct answer is option 1 and displayed choices must be shuffled by the shared runtime.
 
 Document Context Excerpt:
 {context}
@@ -419,6 +438,8 @@ def process_item(
             if progress:
                 progress(item)
         if item.overview.is_digital:
+            if item.overview.form_lookup_number == "0" and item.decision == "use_answer_key":
+                item.decision = "zero_test"
             if clean_digital and discard_pages and pdf == item.overview.pdf:
                 cleaned = item.overview.workspace / f"{pdf.stem}_clean.pdf"
                 clean_pdf(pdf, cleaned, discard_pages)
@@ -431,8 +452,14 @@ def process_item(
             config = Config.defaults(root=item.overview.workspace)
             config.scripts_root = scripts_root
             config.default_discard_pages = discard_pages or config.default_discard_pages
-            process_workspace(config, item.overview.workspace, item.selected_answer_key if item.decision == "use_answer_key" else None, "0", pdf)
-            if item.decision == "zero_test":
+            process_workspace(
+                config,
+                item.overview.workspace,
+                item.selected_answer_key if item.decision == "use_answer_key" else None,
+                item.overview.form_number,
+                pdf,
+            )
+            if item.decision == "zero_test" or item.overview.form_lookup_number == "0":
                 write_questions(output, zero_test_questions(load_questions(output)))
         else:
             # Every scanned PDF must go through the selected CLI AI for OCR/vision
