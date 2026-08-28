@@ -633,12 +633,19 @@ class ExtractTabWidget(QWidget):
             if guide.exec() == 0:
                 self.show_cli_agent_guide()
             return
+        checked_names = {
+            self.exam_list.item(i).data(Qt.ItemDataRole.UserRole).name
+            for i in range(self.exam_list.count())
+            if self.exam_list.item(i).checkState() == Qt.CheckState.Checked and self.exam_list.item(i).data(Qt.ItemDataRole.UserRole)
+        }
+
         dialog = SuperBatchDialog(
             self,
             root=self.main_window.state["root"],
             config=self.config,
             local_providers=local_providers,
             discard_rule=self.discard_range_edit.text().strip() or "std",
+            initially_checked_names=checked_names if checked_names else None,
         )
         if dialog.exec() == SuperBatchDialog.DialogCode.Accepted:
             exec_plan = dialog.get_execution_plan()
@@ -646,9 +653,11 @@ class ExtractTabWidget(QWidget):
                 QMessageBox.information(self, "Super Batch", "No exams selected for Super Batch.")
                 return
             provider_opt, command_opt = dialog.get_selected_provider()
-            self._start_super_batch_execution(exec_plan, provider_opt, command_opt, dialog.workers_spin.value())
+            params = dialog.get_execution_params()
+            self._start_super_batch_execution(exec_plan, provider_opt, command_opt, params["workers"], params)
 
-    def _start_super_batch_execution(self, exec_plan, provider_opt, command_opt: str, workers: int) -> None:
+    def _start_super_batch_execution(self, exec_plan, provider_opt, command_opt: str, workers: int, params: dict | None = None) -> None:
+        params = params or {}
         cancel_event = threading.Event()
         progress_dlg = SuperBatchProgressDialog(
             self,
@@ -661,11 +670,15 @@ class ExtractTabWidget(QWidget):
             from ...super_batch import process_plan
             return process_plan(
                 plan=exec_plan,
-                config=self.config,
-                provider_command=command_opt,
+                provider=provider_opt,
+                command=command_opt,
+                ai_mode=params.get("ai_mode", "two_phase"),
+                context_mode=params.get("context_mode", "path"),
+                discard_pages=params.get("discard_pages", ""),
+                clean_digital=params.get("clean_digital", False),
                 workers=workers,
                 cancel_event=cancel_event,
-                on_item_completed=progress_dlg.on_item_completed,
+                progress=progress_dlg.update_item_progress,
             )
         def _batch_done(results):
             progress_dlg.accept()
@@ -673,8 +686,8 @@ class ExtractTabWidget(QWidget):
             self.main_window.populate_tests()
             def _handle_retry_failed(failed_items):
                 retry_plan = type(exec_plan)(root=exec_plan.root, items=tuple(failed_items))
-                self._start_super_batch_execution(retry_plan, provider_opt, command_opt, workers)
-            summary_dlg = SuperBatchSummaryDialog(self, results, on_retry_failed=_handle_retry_failed)
+                self._start_super_batch_execution(retry_plan, provider_opt, command_opt, workers, params)
+            summary_dlg = SuperBatchSummaryDialog(self, list(results), self.config, on_retry_failed=_handle_retry_failed)
             summary_dlg.exec()
         def _batch_failed(err):
             progress_dlg.accept()

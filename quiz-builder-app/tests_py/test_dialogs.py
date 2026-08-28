@@ -95,3 +95,53 @@ def test_super_batch_summary_dialog(application, tmp_path):
     dialog.close()
     dialog.deleteLater()
 
+
+def test_super_batch_dialog_skip_and_select_all(application, tmp_path):
+    exam1 = tmp_path / "exam1"
+    exam1.mkdir()
+    (exam1 / "exam.pdf").write_bytes(b"%PDF")
+    exam2 = tmp_path / "exam2"
+    exam2.mkdir()
+    (exam2 / "exam.pdf").write_bytes(b"%PDF")
+
+    overview1 = ExamOverview(workspace=exam1, pdf=exam1 / "exam.pdf", name="exam1", is_digital=True)
+    overview2 = ExamOverview(workspace=exam2, pdf=exam2 / "exam.pdf", name="exam2", is_digital=False)
+
+    item1 = SuperBatchItem(overview=overview1)
+    item2 = SuperBatchItem(overview=overview2)
+
+    from quizbuilder.providers import Provider
+    providers = [(Provider("fake", "Fake Provider", "local"), "fake-cli")]
+
+    dialog = SuperBatchDialog(
+        None,
+        root=tmp_path,
+        config=Config.defaults(root=tmp_path),
+        local_providers=providers,
+        custom_items=[item1, item2],
+    )
+    assert dialog.table.rowCount() == 2
+    assert len(dialog.get_selected_items()) == 2
+    assert "Selected: 2 / 2" in dialog.selected_count_label.text()
+
+    # Toggle first item off
+    dialog.rows_data[0]["include_box"].setChecked(False)
+    assert len(dialog.get_selected_items()) == 1
+    assert dialog.rows_data[0]["decision_combo"].currentData() == "skip"
+    assert "1 / 2" in dialog.selected_count_label.text()
+
+    # Change second item to skip via decision dropdown
+    dialog.rows_data[1]["decision_combo"].setCurrentIndex(3)
+    assert len(dialog.get_selected_items()) == 0
+    assert not dialog.rows_data[1]["include_box"].isChecked()
+    assert "0 / 2" in dialog.selected_count_label.text()
+
+    # Use Select All
+    for it in dialog.rows_data:
+        it["include_box"].setChecked(True)
+    assert len(dialog.get_selected_items()) == 2
+
+    dialog.close()
+    dialog.deleteLater()
+
+

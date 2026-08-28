@@ -228,12 +228,14 @@ class SuperBatchDialog(QDialog):
         local_providers: list[tuple[Any, str]],
         custom_items: list[SuperBatchItem] | None = None,
         discard_rule: str = "std",
+        initially_checked_names: set[str] | None = None,
     ):
         super().__init__(parent)
         self.root = root
         self.config = config
         self.local_providers = local_providers
         self.discard_rule = discard_rule
+        self.initially_checked_names = initially_checked_names
 
         if custom_items is not None:
             self.plan = SuperBatchPlan(root=self.root, items=tuple(custom_items))
@@ -246,15 +248,16 @@ class SuperBatchDialog(QDialog):
                 item.decision = default_decision(item)
 
         self.setWindowTitle("Review Super Batch Exams")
-        self.resize(1050, 680)
+        self.resize(1150, 720)
+        self.setMinimumSize(850, 520)
 
-        self.rows_data: list[tuple[SuperBatchItem, QCheckBox, QComboBox, QComboBox, QCheckBox, QLineEdit]] = []
+        self.rows_data: list[dict[str, Any]] = []
         self._build_ui()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.addWidget(
-            QLabel("Review discovered exams below. Configure settings, uncheck unwanted items, and click <b>Start Super Batch</b>.")
+            QLabel("Review discovered exams below. Configure settings, uncheck or set <b>Skip</b> for unwanted items, and click <b>Start Super Batch</b>.")
         )
 
         form = QFormLayout()
@@ -294,50 +297,63 @@ class SuperBatchDialog(QDialog):
         # Bulk Actions Toolbar
         btn_bar = QHBoxLayout()
         btn_select_all = QPushButton("Select All")
-        btn_deselect_all = QPushButton("Deselect All")
+        btn_deselect_all = QPushButton("Deselect / Skip All")
         btn_set_zero_test = QPushButton("Set Digital to Zero-Test")
         btn_auto_match = QPushButton("Auto-Match Keys")
+        self.selected_count_label = QLabel()
+        self.selected_count_label.setStyleSheet("font-weight: bold; color: #38bdf8; margin-left: 10px;")
+
         btn_bar.addWidget(btn_select_all)
         btn_bar.addWidget(btn_deselect_all)
         btn_bar.addWidget(btn_set_zero_test)
         btn_bar.addWidget(btn_auto_match)
+        btn_bar.addWidget(self.selected_count_label)
         btn_bar.addStretch()
         layout.addLayout(btn_bar)
 
         # Review Table
-        table = QTableWidget(len(self.plan.items), 8, self)
-        table.setHorizontalHeaderLabels([
+        self.table = QTableWidget(len(self.plan.items), 8, self)
+        self.table.setHorizontalHeaderLabels([
             "Include", "Exam Name", "Type", "Metadata", "Answer Key", "Decision", "Overwrite?", "Dedicated Instructions"
         ])
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
-        table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeMode.Stretch)
+        self.table.setColumnWidth(0, 65)
+        self.table.setColumnWidth(1, 200)
 
         self.rows_data = []
         for row_idx, item in enumerate(self.plan.items):
+            init_checked = True
+            if self.initially_checked_names is not None:
+                init_checked = (item.overview.name in self.initially_checked_names)
+
             # 0: Include checkbox
             include_box = QCheckBox()
-            include_box.setChecked(True)
+            include_box.setChecked(init_checked)
+            include_box.setToolTip("Uncheck to skip this exam")
             include_widget = QWidget()
             include_layout = QHBoxLayout(include_widget)
             include_layout.addWidget(include_box)
             include_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             include_layout.setContentsMargins(0, 0, 0, 0)
-            table.setCellWidget(row_idx, 0, include_widget)
+            self.table.setCellWidget(row_idx, 0, include_widget)
 
             # 1: Exam Name
             name_item = QTableWidgetItem(item.overview.name)
             name_item.setToolTip(f"PDF: {item.overview.pdf}\nWorkspace: {item.overview.workspace}")
-            table.setItem(row_idx, 1, name_item)
+            self.table.setItem(row_idx, 1, name_item)
 
-            # 2: Type
-            type_str = "📄 Digital" if item.overview.is_digital else "📷 Scanned"
-            table.setItem(row_idx, 2, QTableWidgetItem(type_str))
+            # 2: Type (Use clear text badges without emojis that render as missing glyph boxes on Linux)
+            type_str = "Digital" if item.overview.is_digital else "Scanned"
+            type_item = QTableWidgetItem(type_str)
+            type_item.setToolTip("Digital = text PDF | Scanned = scanned/image PDF")
+            self.table.setItem(row_idx, 2, type_item)
 
             # 3: Metadata
             info_parts = []
@@ -347,7 +363,8 @@ class SuperBatchDialog(QDialog):
                 info_parts.append(item.overview.year)
             if item.overview.variant:
                 info_parts.append(f"Moed {item.overview.variant.upper()}")
-            table.setItem(row_idx, 3, QTableWidgetItem(" | ".join(info_parts) or "-"))
+            meta_item = QTableWidgetItem(" | ".join(info_parts) or "-")
+            self.table.setItem(row_idx, 3, meta_item)
 
             # 4: Answer Key
             key_combo = QComboBox()
@@ -366,30 +383,24 @@ class SuperBatchDialog(QDialog):
             elif item.answer_keys and item.answer_keys[0].score >= 0:
                 key_combo.setCurrentIndex(1)
                 item.selected_answer_key = item.answer_keys[0].path
-            table.setCellWidget(row_idx, 4, key_combo)
+            self.table.setCellWidget(row_idx, 4, key_combo)
 
             # 5: Decision
             decision_combo = QComboBox()
             decision_combo.addItem("Use answer key", "use_answer_key")
             decision_combo.addItem("Generate only (unanswered)", "generate_only")
             decision_combo.addItem("Zero test (all A)", "zero_test")
-            if key_combo.currentIndex() > 0 or item.selected_answer_key:
+            decision_combo.addItem("🚫 Skip (Do not run)", "skip")
+
+            if not init_checked:
+                decision_combo.setCurrentIndex(3)
+            elif key_combo.currentIndex() > 0 or item.selected_answer_key:
                 decision_combo.setCurrentIndex(0)
             elif item.overview.is_digital:
                 decision_combo.setCurrentIndex(2)
             else:
                 decision_combo.setCurrentIndex(1)
-            table.setCellWidget(row_idx, 5, decision_combo)
-
-            def make_on_key_changed(d_cb=decision_combo, itm=item):
-                def on_key_changed(idx: int):
-                    if idx > 0:
-                        d_cb.setCurrentIndex(0)
-                    else:
-                        d_cb.setCurrentIndex(2 if itm.overview.is_digital else 1)
-                return on_key_changed
-
-            key_combo.currentIndexChanged.connect(make_on_key_changed(decision_combo, item))
+            self.table.setCellWidget(row_idx, 5, decision_combo)
 
             # 6: Overwrite
             exists = (item.overview.workspace / "questions.md").exists()
@@ -402,35 +413,118 @@ class SuperBatchDialog(QDialog):
             overwrite_layout.addWidget(overwrite_box)
             overwrite_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             overwrite_layout.setContentsMargins(0, 0, 0, 0)
-            table.setCellWidget(row_idx, 6, overwrite_widget)
+            self.table.setCellWidget(row_idx, 6, overwrite_widget)
 
             # 7: Instructions
             instructions = QLineEdit()
             instructions.setPlaceholderText("Optional dedicated prompt instructions...")
-            table.setCellWidget(row_idx, 7, instructions)
+            self.table.setCellWidget(row_idx, 7, instructions)
 
-            self.rows_data.append((item, include_box, key_combo, decision_combo, overwrite_box, instructions))
+            row_entry = {
+                "item": item,
+                "include_box": include_box,
+                "key_combo": key_combo,
+                "decision_combo": decision_combo,
+                "overwrite_box": overwrite_box,
+                "instructions": instructions,
+                "row_idx": row_idx,
+            }
+            self.rows_data.append(row_entry)
+
+            # Wire signals for row
+            def _bind_row_signals(entry=row_entry, itm=item):
+                inc_b = entry["include_box"]
+                dec_c = entry["decision_combo"]
+                k_c = entry["key_combo"]
+
+                def on_key_changed(idx: int):
+                    if dec_c.currentData() == "skip":
+                        return
+                    if idx > 0:
+                        dec_c.setCurrentIndex(0)
+                    else:
+                        dec_c.setCurrentIndex(2 if itm.overview.is_digital else 1)
+
+                def on_decision_changed(idx: int):
+                    is_skip = (dec_c.itemData(idx) == "skip")
+                    inc_b.blockSignals(True)
+                    inc_b.setChecked(not is_skip)
+                    inc_b.blockSignals(False)
+                    self._update_row_state(entry)
+                    self._update_selected_count()
+
+                def on_include_toggled(checked: bool):
+                    dec_c.blockSignals(True)
+                    if not checked:
+                        dec_c.setCurrentIndex(3)  # Skip
+                    else:
+                        if k_c.currentIndex() > 0 or itm.selected_answer_key:
+                            dec_c.setCurrentIndex(0)
+                        elif itm.overview.is_digital:
+                            dec_c.setCurrentIndex(2)
+                        else:
+                            dec_c.setCurrentIndex(1)
+                    dec_c.blockSignals(False)
+                    self._update_row_state(entry)
+                    self._update_selected_count()
+
+                k_c.currentIndexChanged.connect(on_key_changed)
+                dec_c.currentIndexChanged.connect(on_decision_changed)
+                inc_b.toggled.connect(on_include_toggled)
+
+            _bind_row_signals()
+            self._update_row_state(row_entry)
 
         # Connect bulk actions
-        btn_select_all.clicked.connect(lambda: [inc.setChecked(True) for _, inc, _, _, _, _ in self.rows_data])
-        btn_deselect_all.clicked.connect(lambda: [inc.setChecked(False) for _, inc, _, _, _, _ in self.rows_data])
+        def select_all():
+            for entry in self.rows_data:
+                entry["include_box"].blockSignals(True)
+                entry["include_box"].setChecked(True)
+                entry["include_box"].blockSignals(False)
+                entry["decision_combo"].blockSignals(True)
+                itm = entry["item"]
+                if entry["key_combo"].currentIndex() > 0 or itm.selected_answer_key:
+                    entry["decision_combo"].setCurrentIndex(0)
+                elif itm.overview.is_digital:
+                    entry["decision_combo"].setCurrentIndex(2)
+                else:
+                    entry["decision_combo"].setCurrentIndex(1)
+                entry["decision_combo"].blockSignals(False)
+                self._update_row_state(entry)
+            self._update_selected_count()
+
+        def deselect_all():
+            for entry in self.rows_data:
+                entry["include_box"].blockSignals(True)
+                entry["include_box"].setChecked(False)
+                entry["include_box"].blockSignals(False)
+                entry["decision_combo"].blockSignals(True)
+                entry["decision_combo"].setCurrentIndex(3)  # Skip
+                entry["decision_combo"].blockSignals(False)
+                self._update_row_state(entry)
+            self._update_selected_count()
 
         def set_all_zero_test():
-            for itm, _, k_combo, dec, _, _ in self.rows_data:
-                if itm.overview.is_digital:
-                    k_combo.setCurrentIndex(0)
-                    dec.setCurrentIndex(2)
+            for entry in self.rows_data:
+                if entry["include_box"].isChecked() and entry["item"].overview.is_digital:
+                    entry["key_combo"].setCurrentIndex(0)
+                    entry["decision_combo"].setCurrentIndex(2)
+            self._update_selected_count()
 
         def auto_match_all():
-            for itm, _, k_combo, dec_combo, _, _ in self.rows_data:
-                if itm.answer_keys and itm.answer_keys[0].score >= 0:
-                    k_combo.setCurrentIndex(1)
-                    dec_combo.setCurrentIndex(0)
+            for entry in self.rows_data:
+                itm = entry["item"]
+                if entry["include_box"].isChecked() and itm.answer_keys and itm.answer_keys[0].score >= 0:
+                    entry["key_combo"].setCurrentIndex(1)
+                    entry["decision_combo"].setCurrentIndex(0)
+            self._update_selected_count()
 
+        btn_select_all.clicked.connect(select_all)
+        btn_deselect_all.clicked.connect(deselect_all)
         btn_set_zero_test.clicked.connect(set_all_zero_test)
         btn_auto_match.clicked.connect(auto_match_all)
 
-        layout.addWidget(table)
+        layout.addWidget(self.table)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Start Super Batch")
@@ -438,19 +532,50 @@ class SuperBatchDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        self._update_selected_count()
+        QTimer.singleShot(0, lambda: self.table.horizontalScrollBar().setValue(0))
+
+    def _update_row_state(self, entry: dict[str, Any]) -> None:
+        included = entry["include_box"].isChecked() and entry["decision_combo"].currentData() != "skip"
+        entry["key_combo"].setEnabled(included)
+        entry["overwrite_box"].setEnabled(included)
+        entry["instructions"].setEnabled(included)
+
+        r = entry["row_idx"]
+        for c in range(self.table.columnCount()):
+            item = self.table.item(r, c)
+            if item:
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEnabled if included else item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+
+    def _update_selected_count(self) -> None:
+        total = len(self.rows_data)
+        selected = sum(1 for e in self.rows_data if e["include_box"].isChecked() and e["decision_combo"].currentData() != "skip")
+        skipped = total - selected
+        if skipped > 0:
+            self.selected_count_label.setText(f"Selected: {selected} / {total} exams ({skipped} skipped)")
+        else:
+            self.selected_count_label.setText(f"Selected: {selected} / {total} exams (All included)")
+
     def get_selected_items(self) -> list[SuperBatchItem]:
         selected_items = []
-        for item, include_box, key_combo, decision_combo, overwrite_box, instructions in self.rows_data:
-            if not include_box.isChecked():
+        for entry in self.rows_data:
+            if not entry["include_box"].isChecked() or entry["decision_combo"].currentData() == "skip":
                 continue
-            item.selected_answer_key = key_combo.currentData()
-            item.decision = decision_combo.currentData()
-            item.overwrite = overwrite_box.isChecked()
-            item.dedicated_instructions = instructions.text().strip()
+            item = entry["item"]
+            item.selected_answer_key = entry["key_combo"].currentData()
+            item.decision = entry["decision_combo"].currentData()
+            item.overwrite = entry["overwrite_box"].isChecked()
+            item.dedicated_instructions = entry["instructions"].text().strip()
             if item.decision == "use_answer_key" and not item.selected_answer_key and not item.overview.is_digital:
                 item.decision = "generate_only"
             selected_items.append(item)
         return selected_items
+
+    def get_execution_plan(self) -> SuperBatchPlan:
+        return SuperBatchPlan(root=self.root, items=tuple(self.get_selected_items()))
+
+    def get_selected_provider(self) -> tuple[Any, str]:
+        return self.provider_combo.currentData()
 
     def get_execution_params(self) -> dict[str, Any]:
         provider, command = self.provider_combo.currentData()
