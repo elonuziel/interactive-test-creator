@@ -6,11 +6,29 @@ import argparse
 from glob import glob
 
 try:
-    from quizbuilder.markdown import dump_questions
+    from quizbuilder.markdown import (
+        clean_option_text,
+        clean_question_text,
+        dump_questions,
+        is_noise_line as is_noise,
+        normalize_whitespace,
+        reverse_words,
+        NOISE_RE,
+        NOISE_WORDS,
+    )
 except ModuleNotFoundError:
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
     sys.modules.pop('quizbuilder', None)
-    from quizbuilder.markdown import dump_questions
+    from quizbuilder.markdown import (
+        clean_option_text,
+        clean_question_text,
+        dump_questions,
+        is_noise_line as is_noise,
+        normalize_whitespace,
+        reverse_words,
+        NOISE_RE,
+        NOISE_WORDS,
+    )
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -46,13 +64,6 @@ ANS_MIDLINE_RE = re.compile(
     r'([א-ט1-9])\s*[\.\)]\s+'                  # א.  /  1)  with trailing space
 )
 
-# Step 2.3: noise filtering
-NOISE_RE = re.compile(
-    r'(?:^עמוד\s+\d+\s+מתוך\s+\d+$'            # עמוד 1 מתוך 5
-    r'|^\d+\s+מתוך\s*\d+\s+עמוד$)'             # 1 מתוך5 עמוד  (LTR-grouped)
-)
-NOISE_WORDS = ("קוד מבחן", "מבחן מס'", "מבחן מס")
-
 # Step 2.4: image keyword detection
 IMAGE_KEYWORDS = re.compile(
     r'לפניכם|גרף|תרשים|תמונה|איור|מפה|ציור|דיאגרמה|צילום|טבלה|בטבלה|תרשים|scheme'
@@ -70,74 +81,6 @@ ALPHA_REF_OPTION_RE = re.compile(r'^(?:[A-D]|[A-D]\s*ו-\s*[A-D])$')
 QUESTION_CUE_RE = re.compile(
     r'מהו|מהי|מה יהיה|מה יהיו|כמה|איזה|מי|למי|מתאר|נכונה|ספקטרום|קונפיגורציה|תוצר'
 )
-
-
-def is_noise(line):
-    """Return True if the line is a page-number marker or exam-header fluff."""
-    return NOISE_RE.match(line) or any(w in line for w in NOISE_WORDS)
-
-
-def normalize_whitespace(text):
-    """Replace non‑breaking spaces, collapse whitespace, strip. (L288–295)"""
-    return re.sub(r'\s+', ' ', text.replace('\u00A0', ' ')).strip()
-
-def clean_option_text(text):
-    """
-    Same cleanup as clean_question_text but applied to individual answer options.
-    """
-    text = normalize_whitespace(text)
-    # Strip leading stray dots
-    text = re.sub(r'^\.(?!\s*[א-ט1-9]\s)', '', text)
-    # Strip trailing hyphens
-    text = re.sub(r'-\s*$', '', text)
-    # Split merged Hebrew+digit / digit+Hebrew
-    text = re.sub(r'([א-ת])(\d)', r'\1 \2', text)
-    text = re.sub(r'(\d)([א-ת])', r'\1 \2', text)
-    return normalize_whitespace(text)
-
-
-def clean_question_text(text):
-    """
-    Fix LTR‑grouping artifacts that appear in smart‑extracted Hebrew text:
-    - Stray leading dots (e.g. '.(text' → '(text')
-    - Trailing hyphens from line‑breaks (e.g. 'text-' → 'text')
-    - Dot‑then‑letter merges (e.g. '.א' → 'א.')
-    - Misplaced ? and : at start of question → move to end
-    - Merged word+digit (e.g. 'הן6' → 'הן 6')
-    - Parenthesized content at line start → move to end
-    """
-    text = normalize_whitespace(text)
-    # Strip leading stray dots that aren't part of an answer marker
-    text = re.sub(r'^\.(?!\s*[א-ט1-9]\s)', '', text)
-    # Strip trailing hyphens (line‑break artifacts)
-    text = re.sub(r'-\s*$', '', text)
-    # Fix dot‑letter sequences: '.א ' → 'א. ' (LTR artifact)
-    text = re.sub(r'\.([א-ט1-9])\s', r'\1. ', text)
-    # Split merged Hebrew‑letter + digit: 'הן6' → 'הן 6'
-    text = re.sub(r'([א-ת])(\d)', r'\1 \2', text)
-    # Split merged digit + Hebrew: '6מיליון' → '6 מיליון'
-    text = re.sub(r'(\d)([א-ת])', r'\1 \2', text)
-
-    # Move misplaced ? from start to end: "?text" → "text?"
-    if text.startswith('?'):
-        text = text[1:] + '?'
-
-    # Move misplaced :( or : from start to end: ":(text" → "text:" / ":text" → "text:"
-    if text.startswith(':('):
-        text = text[2:] + ':'
-    elif text.startswith(':'):
-        text = text[1:] + ':'
-
-    return normalize_whitespace(text)
-
-def reverse_words(line):
-    """Return the line with word order reversed (for RTL edge‑case matching)."""
-    stripped = line.strip()
-    if not stripped:
-        return ""
-    words = stripped.split()
-    words.reverse()
-    return " ".join(words)
 
 
 def extract_header_question_text(line):

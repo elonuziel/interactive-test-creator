@@ -24,6 +24,7 @@ a = Analysis(
         "openpyxl",
         "runpy",
         "quizbuilder.markdown",
+        "quizbuilder.gui.dialogs",
         "PySide6",
         "PySide6.QtCore",
         "PySide6.QtGui",

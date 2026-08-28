@@ -9,6 +9,64 @@ class MarkdownError(ValueError):
     pass
 
 
+NOISE_RE = re.compile(
+    r'(?:^עמוד\s+\d+\s+מתוך\s+\d+$'
+    r'|^\d+\s+מתוך\s*\d+\s+עמוד$)'
+)
+NOISE_WORDS = ("קוד מבחן", "מבחן מס'", "מבחן מס")
+
+
+def normalize_whitespace(text: str) -> str:
+    """Replace non-breaking spaces, collapse whitespace, and strip."""
+    return re.sub(r"\s+", " ", str(text or "").replace("\u00A0", " ")).strip()
+
+
+def is_noise_line(line: str) -> bool:
+    """Return True if the line is a page-number marker or exam-header noise."""
+    line = line.strip()
+    return bool(NOISE_RE.match(line) or any(w in line for w in NOISE_WORDS))
+
+
+def reverse_words(line: str) -> str:
+    """Return the line with word order reversed (for RTL edge-case matching)."""
+    stripped = line.strip()
+    if not stripped:
+        return ""
+    words = stripped.split()
+    words.reverse()
+    return " ".join(words)
+
+
+def clean_option_text(text: str) -> str:
+    """Normalize and clean option text artifacts."""
+    text = normalize_whitespace(text)
+    text = re.sub(r"^\.(?!\s*[א-ט1-9]\s)", "", text)
+    text = re.sub(r"-\s*$", "", text)
+    text = re.sub(r"([א-ת])(\d)", r"\1 \2", text)
+    text = re.sub(r"(\d)([א-ת])", r"\1 \2", text)
+    return normalize_whitespace(text)
+
+
+def clean_question_text(text: str) -> str:
+    """Fix LTR-grouping artifacts that appear in extracted Hebrew text."""
+    text = normalize_whitespace(text)
+    text = re.sub(r"^\.(?!\s*[א-ט1-9]\s)", "", text)
+    text = re.sub(r"-\s*$", "", text)
+    text = re.sub(r"\.([א-ט1-9])\s", r"\1. ", text)
+    text = re.sub(r"([א-ת])(\d)", r"\1 \2", text)
+    text = re.sub(r"(\d)([א-ת])", r"\1 \2", text)
+
+    if text.startswith("?"):
+        text = text[1:] + "?"
+
+    if text.startswith(":("):
+        text = text[2:] + ":"
+    elif text.startswith(":"):
+        text = text[1:] + ":"
+
+    return normalize_whitespace(text)
+
+
 def _parse_answer(val: str) -> int:
     val = val.strip().upper()
     mapping = {
