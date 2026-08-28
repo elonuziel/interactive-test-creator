@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
         digitalLlmPromptBox: document.getElementById('digital-llm-prompt-box'),
         toggleProcessingSettingsBtn: document.getElementById('toggle-processing-settings-btn'),
         processingSettingsContainer: document.getElementById('processing-settings-container'),
+        toggleManualFilesBtn: document.getElementById('toggle-manual-files-btn'),
+        manualFilesContainer: document.getElementById('manual-files-container'),
+        manualFilesArrow: document.getElementById('manual-files-arrow'),
         copyPromptBtn: document.getElementById('copy-prompt-btn'),
         llmPromptBox: document.getElementById('llm-prompt-box'),
         freebuffButtons: [
@@ -690,6 +693,20 @@ STRICT EXTRACTION & FORMATTING RULES:
             renderPreviewFn: () => EditorUi.renderPreview(state, elements)
         });
     });
+
+    function toggleManualFiles(forceShow = null) {
+        if (!elements.manualFilesContainer) return;
+        const isHidden = elements.manualFilesContainer.classList.contains('hidden');
+        const shouldShow = forceShow !== null ? forceShow : isHidden;
+        elements.manualFilesContainer.classList.toggle('hidden', !shouldShow);
+        if (elements.manualFilesArrow) {
+            elements.manualFilesArrow.textContent = shouldShow ? '▲' : '▼';
+        }
+    }
+
+    elements.toggleManualFilesBtn?.addEventListener('click', () => toggleManualFiles());
+    elements.jsonFile?.addEventListener('change', () => toggleManualFiles(true));
+    elements.csvFile?.addEventListener('change', () => toggleManualFiles(true));
 
     function toggleProcessingSettings(showOnly = false) {
         if (!elements.processingSettingsContainer) return;

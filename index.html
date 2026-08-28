@@ -972,35 +972,52 @@
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label for="json-file">קובץ שאלות (JSON / Markdown .md) <span
-                                class="field-note-inline">אופציונלי / מ-LLM</span></label>
-                        <div class="file-wrap">
-                            <input id="json-file" type="file"
-                                accept=".json,.md,.txt,text/markdown,text/plain,application/json">
-                            <button class="file-clear hidden" data-target="json-file" type="button" title="הסר קובץ">✕
-                                הסר</button>
-                        </div>
-                    </div>
+                    <!-- Collapsible Advanced: External Questions File & Answer Key -->
+                    <div class="advanced-dropdown-box" style="margin-top: 14px; border: 1px dashed var(--border-color); border-radius: 12px; background: var(--card-bg); overflow: hidden;">
+                        <button id="toggle-manual-files-btn" type="button" class="advanced-toggle-btn"
+                            style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; background: none; border: none; font-size: .86rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; text-align: right; user-select: none;">
+                            <span style="display: flex; align-items: center; gap: 8px;">
+                                <span>📂</span>
+                                <span>טעינת קובץ שאלות חיצוני (questions.md) ומפתח תשובות</span>
+                                <span class="badge" style="font-size: .72rem; padding: 2px 6px; font-weight: 500;">אופציונלי</span>
+                            </span>
+                            <span id="manual-files-arrow" style="transition: transform 0.2s ease; font-size: .8rem; color: var(--text-secondary);">▼</span>
+                        </button>
 
-                    <div class="field">
-                        <label for="csv-file">קובץ תשובות <button id="answer-help-btn" class="help-btn" type="button"
-                                title="מה קורה בלי קובץ תשובות?">?</button> <span class="field-note-inline">CSV / XLS —
-                                אופציונלי</span></label>
-                        <div class="file-wrap">
-                            <input id="csv-file" type="file"
-                                accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-                            <button class="file-clear hidden" data-target="csv-file" type="button" title="הסר קובץ">✕
-                                הסר</button>
+                        <div id="manual-files-container" class="hidden" style="padding: 12px 14px 14px; border-top: 1px dashed var(--border-color); background: var(--input-bg);">
+                            <div class="field" style="margin-bottom: 12px;">
+                                <label for="json-file">קובץ שאלות (JSON / Markdown .md) <span
+                                        class="field-note-inline">מ-LLM או גיבוי</span></label>
+                                <div class="file-wrap">
+                                    <input id="json-file" type="file"
+                                        accept=".json,.md,.txt,text/markdown,text/plain,application/json">
+                                    <button class="file-clear hidden" data-target="json-file" type="button" title="הסר קובץ">✕
+                                        הסר</button>
+                                </div>
+                            </div>
+
+                            <div class="field" style="margin-bottom: 12px;">
+                                <label for="csv-file">קובץ תשובות <button id="answer-help-btn" class="help-btn" type="button"
+                                        title="מה קורה בלי קובץ תשובות?">?</button> <span class="field-note-inline">CSV / XLS —
+                                        אופציונלי</span></label>
+                                <div class="file-wrap">
+                                    <input id="csv-file" type="file"
+                                        accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                                    <button class="file-clear hidden" data-target="csv-file" type="button" title="הסר קובץ">✕
+                                        הסר</button>
+                                </div>
+                            </div>
+
+                            <div class="field" style="margin-bottom: 12px;">
+                                <label for="form-number">מספר שאלון / טופס <span class="field-note-inline">למשל 63 או 0</span></label>
+                                <input id="form-number" type="text" inputmode="numeric" placeholder="לדוגמה: 63">
+                            </div>
+
+                            <div style="margin-top: 10px;">
+                                <button id="merge-answers-btn" type="button" class="primary-btn"
+                                    style="width: 100%; padding: 10px 16px; font-weight: 700; font-size: .88rem; background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; box-shadow: 0 4px 14px rgba(37,99,235,0.25); border-radius: 10px; color: #ffffff; cursor: pointer; transition: all 0.2s ease;">🔗 מזג תשובות נכונות לשאלות (Merge Official Answers)</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="field">
-                        <label for="form-number">מספר שאלון <span class="field-note-inline">אופציונלי</span></label>
-                        <input id="form-number" type="text" inputmode="numeric" placeholder="לדוגמה: 76">
-                    </div>
-                    <div style="margin-top: 10px; margin-bottom: 10px;">
-                        <button id="merge-answers-btn" type="button" class="primary-btn"
-                            style="width: 100%; padding: 12px 18px; font-weight: 700; font-size: .95rem; background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; box-shadow: 0 4px 14px rgba(37,99,235,0.3); border-radius: 10px; color: #ffffff; cursor: pointer; transition: all 0.2s ease;">🔗 מזג תשובות נכונות לשאלות (Merge Official Answers)</button>
                     </div>
 
                     <div style="margin-top: 12px; text-align: center;">
