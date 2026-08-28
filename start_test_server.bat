@@ -23,11 +23,11 @@ if !SERVER_STARTED! equ 1 (
 )
 echo ===============================================================
 echo.
-echo   [1] Open In-Browser Component Test Runner (test_runner.html)
-echo   [2] Open Quiz Builder (index.html)
-echo   [3] Open Quiz Player (quiz_player.html)
+echo   [1] Launch Desktop GUI App (Recommended)
+echo   [2] Open Web Quiz Player (quiz_player.html)
+echo   [3] Open In-Browser Component Test Runner (test_runner.html)
 echo   [4] Run Local CLI Test Suite (run_local_tests.py)
-echo   [5] Launch Legacy Python CLI Quiz Builder (cli-legacy/start.bat)
+echo   [5] Open Web Quiz Builder (index.html)
 echo   [S] Start / Verify Local HTTP Server Status
 echo   [Q] Stop Server ^& Quit
 echo.
@@ -35,29 +35,46 @@ echo ===============================================================
 set /p CHOICE="Choose an option (1-5, S, Q): "
 
 if /i "%CHOICE%"=="1" (
-    call :ENSURE_SERVER
-    if !SERVER_STARTED! equ 1 (
-        start "" "http://localhost:%PORT%/test-suite/test_runner.html"
+    echo.
+    echo ---------------------------------------------------------------
+    echo Launching Desktop GUI Quiz Builder...
+    echo ---------------------------------------------------------------
+    set "RUN_PY="
+    if exist "%~dp0quiz-builder-app\.venv\Scripts\python.exe" set "RUN_PY=%~dp0quiz-builder-app\.venv\Scripts\python.exe"
+    if "!RUN_PY!"=="" if exist "%~dp0.venv\Scripts\python.exe" set "RUN_PY=%~dp0.venv\Scripts\python.exe"
+    if "!RUN_PY!"=="" if exist "%~dp0venv\Scripts\python.exe" set "RUN_PY=%~dp0venv\Scripts\python.exe"
+    if "!RUN_PY!"=="" (
+        where python >nul 2>nul
+        if !errorlevel! equ 0 set "RUN_PY=python"
+    )
+    if "!RUN_PY!"=="" (
+        where py >nul 2>nul
+        if !errorlevel! equ 0 set "RUN_PY=py"
+    )
+    if not "!RUN_PY!"=="" (
+        set "PYTHONPATH=%~dp0quiz-builder-app\src;!PYTHONPATH!"
+        start "" "!RUN_PY!" -m quizbuilder.gui
     ) else (
-        start "" "%~dp0test-suite\test_runner.html"
+        echo [X] Python runtime not found.
+        pause
     )
     goto MENU
 )
 if /i "%CHOICE%"=="2" (
     call :ENSURE_SERVER
     if !SERVER_STARTED! equ 1 (
-        start "" "http://localhost:%PORT%/index.html"
+        start "" "http://localhost:%PORT%/quiz_player.html"
     ) else (
-        start "" "%~dp0index.html"
+        start "" "%~dp0quiz_player.html"
     )
     goto MENU
 )
 if /i "%CHOICE%"=="3" (
     call :ENSURE_SERVER
     if !SERVER_STARTED! equ 1 (
-        start "" "http://localhost:%PORT%/quiz_player.html"
+        start "" "http://localhost:%PORT%/test-suite/test_runner.html"
     ) else (
-        start "" "%~dp0quiz_player.html"
+        start "" "%~dp0test-suite\test_runner.html"
     )
     goto MENU
 )
@@ -87,11 +104,12 @@ if /i "%CHOICE%"=="4" (
     goto MENU
 )
 if /i "%CHOICE%"=="5" (
-    echo.
-    echo ---------------------------------------------------------------
-    echo Launching Legacy Python CLI Builder...
-    echo ---------------------------------------------------------------
-    call cli-legacy\start.bat
+    call :ENSURE_SERVER
+    if !SERVER_STARTED! equ 1 (
+        start "" "http://localhost:%PORT%/index.html"
+    ) else (
+        start "" "%~dp0index.html"
+    )
     goto MENU
 )
 if /i "%CHOICE%"=="S" (
