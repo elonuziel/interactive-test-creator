@@ -393,51 +393,59 @@ class ExtractTabWidget(QWidget):
         self.update_clean_summary()
 
     def update_clean_summary(self) -> None:
-        rule = self.discard_range_edit.text().strip()
-        target = self.pdf_combo.currentData()
-        if not target or not Path(target).is_file():
-            self.clean_summary_label.setText("Select an exam to calculate kept pages.")
+        pdf = self.pdf_combo.currentData()
+        if not pdf or not Path(pdf).is_file() or Path(pdf).suffix.lower() != ".pdf":
+            self.clean_summary_label.setText("Select a PDF exam to calculate kept pages.")
             return
         try:
-            desc = describe_page_cleaning(Path(target), rule)
-            self.clean_summary_label.setText(f"📊 {desc}")
+            info = describe_page_cleaning(Path(pdf), self.discard_range_edit.text().strip())
+            if info["total"] == 0:
+                self.clean_summary_label.setText("Could not inspect PDF page count.")
+            else:
+                self.clean_summary_label.setText(
+                    f"Total {info['total']} page(s) → Keeping {info['kept_count']} page(s) ({info['discarded_count']} discarded)"
+                )
         except Exception:
             self.clean_summary_label.setText("⚠️ Invalid page range or rule.")
 
     def run_clean_pdf(self) -> None:
         workspace = self.main_window.state["workspace"]
-        target = self.pdf_combo.currentData()
-        if not workspace or not target or not Path(target).is_file():
-            QMessageBox.warning(self, "No PDF Selected", "Please select a valid PDF to clean.")
+        if not workspace:
+            QMessageBox.warning(self, "No exam selected", "Choose an exam from the list first.")
             return
-        rule = self.discard_range_edit.text().strip()
-        if not rule:
-            QMessageBox.warning(self, "No Pages Discarded", "Enter a discard rule or page range (e.g. 'std', '1-4, 6, 8').")
+        pdf = self.pdf_combo.currentData()
+        if not pdf or not Path(pdf).is_file():
+            QMessageBox.warning(self, "No PDF selected", "Choose a valid PDF file to clean.")
             return
-        self.main_window._set_status(f"Creating clean PDF for {workspace.name}...", "busy")
+        source_pdf = Path(pdf)
+        clean_name = f"{source_pdf.stem}_clean.pdf" if not source_pdf.stem.endswith("_clean") else source_pdf.name
+        clean_path = workspace.path / clean_name
+        discard_spec = self.discard_range_edit.text().strip() or "std"
         self.clean_pdf_button.setEnabled(False)
-        def _clean_worker():
-            return clean_pdf(Path(target), rule=rule)
-        def _clean_done(clean_path: Path):
+        self.main_window._set_status("Cleaning PDF pages...", "busy")
+
+        def _do_clean():
+            return clean_pdf(source_pdf, clean_path, discard_spec)
+
+        def _on_done(result):
             self.clean_pdf_button.setEnabled(True)
-            self.main_window._set_status(f"Created clean PDF: {clean_path.name}", "success")
+            total, kept = result
+            self.main_window._set_status(f"Created clean PDF with {kept}/{total} pages.", "success")
+            self._add_and_select_pdf(clean_path)
             QMessageBox.information(
                 self,
-                "Clean PDF Created",
-                f"Successfully created clean PDF without discarded pages:\n\n{clean_path.name}\n\nThis clean PDF is now selected for question extraction.",
+                "PDF Cleaned",
+                f"Cleaned PDF created successfully!\n\nKept {kept} of {total} pages.\nSaved as: {clean_name}",
             )
-            self.main_window.load_workspace(workspace)
-            for i in range(self.pdf_combo.count()):
-                if self.pdf_combo.itemData(i) == clean_path:
-                    self.pdf_combo.setCurrentIndex(i)
-                    break
-        def _clean_failed(err):
+
+        def _on_failed(err):
             self.clean_pdf_button.setEnabled(True)
-            self.main_window._set_status(f"PDF cleanup failed: {err}", "error")
-            QMessageBox.critical(self, "Cleanup Error", f"Could not create clean PDF:\n\n{err}")
-        worker = Worker(_clean_worker)
-        worker.signals.finished.connect(_clean_done)
-        worker.signals.failed.connect(_clean_failed)
+            self.main_window._set_status(f"Failed to clean PDF: {err}", "error")
+            QMessageBox.critical(self, "Clean PDF Failed", str(err))
+
+        worker = Worker(_do_clean)
+        worker.signals.finished.connect(_on_done)
+        worker.signals.failed.connect(_on_failed)
         self.main_window.start_worker(worker)
 
     def _on_ai_provider_changed(self) -> None:
