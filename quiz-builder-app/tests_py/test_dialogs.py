@@ -97,15 +97,16 @@ def test_super_batch_summary_dialog(application, tmp_path):
 
 
 def test_super_batch_dialog_skip_and_select_all(application, tmp_path):
+    from tests_py.test_clean_pdf import create_dummy_pdf
     exam1 = tmp_path / "exam1"
     exam1.mkdir()
-    (exam1 / "exam.pdf").write_bytes(b"%PDF")
+    pdf1 = create_dummy_pdf(exam1 / "exam.pdf", num_pages=2)
     exam2 = tmp_path / "exam2"
     exam2.mkdir()
-    (exam2 / "exam.pdf").write_bytes(b"%PDF")
+    pdf2 = create_dummy_pdf(exam2 / "exam.pdf", num_pages=2)
 
-    overview1 = ExamOverview(workspace=exam1, pdf=exam1 / "exam.pdf", name="exam1", is_digital=True)
-    overview2 = ExamOverview(workspace=exam2, pdf=exam2 / "exam.pdf", name="exam2", is_digital=False)
+    overview1 = ExamOverview(workspace=exam1, pdf=pdf1, name="exam1", is_digital=True)
+    overview2 = ExamOverview(workspace=exam2, pdf=pdf2, name="exam2", is_digital=False)
 
     item1 = SuperBatchItem(overview=overview1)
     item2 = SuperBatchItem(overview=overview2)

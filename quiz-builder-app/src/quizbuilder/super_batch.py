@@ -244,7 +244,10 @@ def build_plan(root: Path) -> SuperBatchPlan:
 
 
 def classify_plan_item(item: SuperBatchItem) -> SuperBatchItem:
-    digital = classify_pdf(item.overview.pdf, workspace=item.overview.workspace)
+    try:
+        digital = classify_pdf(item.overview.pdf, workspace=item.overview.workspace)
+    except Exception:
+        digital = False
     warnings = tuple(w for w in item.overview.warnings if w != "PDF classification pending")
     item.overview = replace(item.overview, is_digital=digital, warnings=warnings)
     if not item.selected_answer_key and item.answer_keys:
