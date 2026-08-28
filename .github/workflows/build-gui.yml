@@ -69,9 +69,11 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          # Get the last release tag (excluding current tag if this run is a tag push)
-          LAST_TAG=$(git tag --sort=-version:refname | grep -v "^${{ steps.tag_name.outputs.TAG_NAME }}$" | head -n 1)
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
 
           if [ -z "$LAST_TAG" ]; then
             COMMITS=$(git log -n 25 --pretty=format:"- %s" HEAD)
@@ -83,37 +85,57 @@ jobs:
             COMMITS=$(git log -n 10 --pretty=format:"- %s" HEAD)
           fi
 
-          # Build prompt file
-          PROMPT_FILE=".changelog-prompt.txt"
-          cat > "$PROMPT_FILE" << 'PROMPTEOF'
-          You are a helpful assistant that generates clean release notes for Interactive Quiz Builder.
-          Summarize the following git commits into a clean, readable changelog
-          (3-5 bullet points) focusing on user-facing features and bug fixes.
-          Ignore version bumps and obscure chore commits.
-          Do not add top-level markdown headers like # Changelog.
+          PROMPT="Summarize the following git commits into a clean, readable release changelog (2-5 bullet points) focusing on user-facing features and bug fixes. Do not include top-level markdown headers or version bump chore commits:\n\n$COMMITS"
 
-          PROMPTEOF
-          echo "$COMMITS" >> "$PROMPT_FILE"
+          SUMMARY=""
 
-          # Build JSON payload safely using jq
-          jq -Rs --arg model "openai/gpt-4o-mini" \
-            '{model: $model, messages: [{role: "user", content: .}]}' \
-            "$PROMPT_FILE" > .changelog-payload.json
+          # 1. Try Groq API
+          if [ -z "$SUMMARY" ] && [ -n "$GROQ_API_KEY" ]; then
+            echo "Requesting AI summary from Groq API..."
+            jq -n --arg model "openai/gpt-oss-120b" --arg sys "You generate concise, readable release notes for an interactive quiz builder. Summarize git commits into 2-5 clean bullet points (Improvements, Fixes). Do not include raw commit hashes, version bump chore commits, or markdown title headers." --arg user "$COMMITS" \
+              '{model: $model, messages: [{role: "system", content: $sys}, {role: "user", content: $user}]}' > .changelog-payload.json
 
-          # Call GitHub Models API
-          echo "Requesting AI summary from GitHub Models..."
-          curl -sS "https://models.github.ai/inference/chat/completions" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -d @.changelog-payload.json > .changelog-response.json || true
+            curl -sS "https://api.groq.com/openai/v1/chat/completions" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $GROQ_API_KEY" \
+              -d @.changelog-payload.json > .changelog-response.json || true
 
-          # Extract summary from response
-          SUMMARY=$(jq -r '.choices[0].message.content // empty' .changelog-response.json 2>/dev/null || true)
+            SUMMARY=$(jq -r '.choices[0].message.content // empty' .changelog-response.json 2>/dev/null || true)
+          fi
 
+          # 2. Try Gemini API
+          if [ -z "$SUMMARY" ] && [ -n "$GEMINI_API_KEY" ]; then
+            echo "Requesting AI summary from Gemini API..."
+            jq -n --arg text "$PROMPT" \
+              '{contents: [{parts: [{text: $text}]}]}' > .changelog-payload.json
+
+            curl -sS "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$GEMINI_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d @.changelog-payload.json > .changelog-response.json || true
+
+            SUMMARY=$(jq -r '.candidates[0].content.parts[0].text // empty' .changelog-response.json 2>/dev/null || true)
+          fi
+
+          # 3. Try OpenAI API
+          if [ -z "$SUMMARY" ] && [ -n "$OPENAI_API_KEY" ]; then
+            echo "Requesting AI summary from OpenAI API..."
+            jq -n --arg model "gpt-4o-mini" --arg user "$PROMPT" \
+              '{model: $model, messages: [{role: "user", content: $user}]}' > .changelog-payload.json
+
+            curl -sS "https://api.openai.com/v1/chat/completions" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $OPENAI_API_KEY" \
+              -d @.changelog-payload.json > .changelog-response.json || true
+
+            SUMMARY=$(jq -r '.choices[0].message.content // empty' .changelog-response.json 2>/dev/null || true)
+          fi
+
+          # 4. Output summary or smart grouping fallback
           if [ -n "$SUMMARY" ] && [ "$SUMMARY" != "null" ]; then
+              echo "AI Summary generated successfully!"
               echo "$SUMMARY" > changelog.txt
           else
-              echo "AI Summary failed or unavailable, falling back to smart keyword grouping..."
+              echo "AI Summary unavailable or failed, falling back to smart keyword grouping..."
               [ -f .changelog-response.json ] && cat .changelog-response.json || true
 
               FEATURES=""
