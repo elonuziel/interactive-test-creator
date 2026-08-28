@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..batch import discover_batch
 from ..config import Config
 from ..models import Workspace
 from ..validation import ValidationError, load_questions
@@ -409,20 +410,31 @@ class MainWindow(QWidget):
     def populate_tests(self) -> None:
         if not self.state["root"]:
             return
-        workspaces = discover_sources(self.state["root"], self.config)
+        try:
+            candidates = discover_batch(self.state["root"])
+        except (FileNotFoundError, OSError) as exc:
+            self.status_label.setText(str(exc))
+            return
+        self.state["batch_candidates"] = candidates
         self.exam_list.clear()
         self.play_list.clear()
-        for workspace in workspaces:
-            item = QListWidgetItem(workspace.name)
-            item.setData(Qt.ItemDataRole.UserRole, workspace)
+        for candidate in candidates:
+            label = candidate.workspace.name
+            if candidate.issues:
+                label += f" ({'; '.join(candidate.issues)})"
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.exam_list.addItem(item)
 
-            play_item = QListWidgetItem(workspace.name)
-            play_item.setData(Qt.ItemDataRole.UserRole, workspace)
-            play_item.setCheckState(Qt.CheckState.Unchecked)
+            play_item = QListWidgetItem(label)
+            play_item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
+            play_item.setFlags(play_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            play_item.setCheckState(Qt.CheckState.Checked if candidate.ready_to_run else Qt.CheckState.Unchecked)
             self.play_list.addItem(play_item)
 
+        self.root_label.setText(f"Exam folder: {self.state['root']}")
         if self.exam_list.count() > 0:
             self.exam_list.setCurrentRow(0)
         self.update_summary()
@@ -466,26 +478,40 @@ class MainWindow(QWidget):
             self.load_workspace(workspace)
 
     def load_workspace(self, workspace: Workspace) -> None:
+        if workspace != self.state["workspace"] and not self.confirm_discard_changes():
+            return
         self.state["workspace"] = workspace
+        self.state["questions"] = []
+        self.state["index"] = -1
+        self.state["loading"] = True
         self.settings.setValue("last_workspace", workspace.name)
         self.current_exam_title.setText(f"Exam: {workspace.name}")
 
         self.pdf_combo.blockSignals(True)
         self.pdf_combo.clear()
-        if workspace.pdf_candidates:
-            for pdf_candidate in workspace.pdf_candidates:
-                self.pdf_combo.addItem(f"{pdf_candidate.name} ({pdf_candidate.parent.name})", pdf_candidate)
-        else:
-            self.pdf_combo.addItem("No exam file found (use Choose file…)", None)
+        sources = discover_sources(workspace)
+        if getattr(workspace, "source_pdf", None):
+            self.pdf_combo.addItem(workspace.source_pdf.name, workspace.source_pdf)
+        elif sources.pdf:
+            self.pdf_combo.addItem(sources.pdf.name, sources.pdf)
+        for doc in sorted(list(workspace.path.glob("*.pdf")) + list(workspace.path.glob("*.docx")), key=lambda item: item.name.casefold()):
+            if self.pdf_combo.findData(doc) < 0:
+                self.pdf_combo.addItem(doc.name, doc)
+        if not self.pdf_combo.count():
+            self.pdf_combo.addItem("No exam file selected", None)
         self.pdf_combo.blockSignals(False)
 
         self.answer_combo.clear()
         self.answer_combo.addItem("No answer key", None)
-        for answer_candidate in workspace.answer_candidates:
-            self.answer_combo.addItem(f"{answer_candidate.name} ({answer_candidate.parent.name})", answer_candidate)
+        for answer in sources.answer_keys:
+            self.answer_combo.addItem(answer.name, answer)
+        for ans in sorted(list(workspace.path.glob("*.csv")) + list(workspace.path.glob("*.xlsx")) + list(workspace.path.glob("*.xls")), key=lambda item: item.name.casefold()):
+            if self.answer_combo.findData(ans) < 0:
+                self.answer_combo.addItem(ans.name, ans)
 
         self.preview.setText("No exam preview loaded.")
 
+        self.state["loading"] = False
         try:
             self.state["questions"] = load_questions(workspace.questions_path)
             self.state["dirty"] = False
@@ -498,6 +524,7 @@ class MainWindow(QWidget):
         self.state["index"] = 0 if self.state["questions"] else -1
         self.refresh_question_list()
         self._update_tab_labels()
+        self.update_summary()
         self.extract_tab._on_pdf_selection_changed()
 
     def confirm_discard_changes(self) -> bool:
@@ -529,9 +556,10 @@ class MainWindow(QWidget):
             self.settings.setValue("welcome_seen", True)
 
     def _restore_session(self) -> None:
-        last_root = self.settings.value("last_root")
-        if last_root and Path(last_root).is_dir():
-            self.state["root"] = Path(last_root)
+        saved = self.settings.value("last_exam_folder", "") or self.settings.value("last_root", "")
+        configured = self.config.workspace_root
+        self.state["root"] = configured if configured.is_dir() else Path(saved) if (saved and Path(saved).is_dir()) else configured
+        if self.state["root"] and self.state["root"].is_dir():
             self.root_label.setText(f"Exam folder: {self.state['root']}")
             self.populate_tests()
             last_workspace = self.settings.value("last_workspace")

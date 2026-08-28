@@ -190,62 +190,48 @@ class ReviewTabWidget(QWidget):
             "Each question uses this format:\n\n## Question 1\n\nQuestion text\n\n- First choice\n- Second choice\n- Third choice\n- Fourth choice\n\nAnswer: A\n\nUse pageImage: path/to/page.png on its own line when a question references a diagram or table.",
         )
 
-    def is_question_incomplete(self, q: dict) -> bool:
-        if not q.get("question", "").strip():
-            return True
-        opts = [opt.strip() for opt in q.get("options", []) if opt.strip()]
-        if len(opts) < 2:
-            return True
-        idx = q.get("correctIndex")
-        if idx is None or idx < 0 or idx >= len(opts):
-            return True
-        return False
-
     def refresh_question_list(self) -> None:
-        questions = self.main_window.state["questions"]
-        filter_text = self.question_filter_edit.text().strip().casefold()
-        only_incomplete = self.filter_incomplete_checkbox.isChecked()
-
-        self._update_drag_drop_mode()
         self.question_list.blockSignals(True)
         self.question_list.clear()
+        filter_text = self.question_filter_edit.text().strip().lower()
+        incomplete_only = self.filter_incomplete_checkbox.isChecked()
+        self._update_drag_drop_mode()
 
-        incomplete_count = 0
+        valid = 0
+        total = len(self.main_window.state["questions"])
         visible_indices = []
 
-        for index, item in enumerate(questions):
-            is_inc = self.is_question_incomplete(item)
-            if is_inc:
-                incomplete_count += 1
+        for index, question in enumerate(self.main_window.state["questions"]):
+            text = (question.get("question", "") or "").strip()
+            options = question.get("options", [])
+            has_ans = isinstance(question.get("correctIndex"), int) and 0 <= question.get("correctIndex", -1) < len(options)
+            ready = bool(text and len(options) >= 2 and has_ans)
+            if ready:
+                valid += 1
 
-            if only_incomplete and not is_inc:
+            if incomplete_only and ready:
+                continue
+            if filter_text and filter_text not in text.lower():
                 continue
 
-            text = item.get("question", "").strip() or f"Question {index + 1}"
-            first_line = text.split("\n", 1)[0][:60]
-
-            if filter_text and filter_text not in text.casefold():
-                continue
-
-            icon_badge = "⚠️ " if is_inc else ""
-            list_item = QListWidgetItem(f"{icon_badge}{index + 1}. {first_line}")
-            list_item.setData(Qt.ItemDataRole.UserRole, index)
-            self.question_list.addItem(list_item)
+            prefix = "✅" if ready else "⚠️"
+            display_text = f"{prefix} {index + 1}. {text[:55] + '...' if len(text) > 55 else (text or 'Empty question')}"
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.ItemDataRole.UserRole, index)
+            self.question_list.addItem(item)
             visible_indices.append(index)
 
         self.question_list.blockSignals(False)
 
-        # Update status header
-        workspace = self.main_window.state["workspace"]
-        if workspace:
-            status_text = f"{workspace.name}: {len(questions)} question(s)"
-            if incomplete_count > 0:
-                status_text += f" | <span style='color: #f59e0b;'>⚠️ {incomplete_count} incomplete</span>"
-            else:
-                status_text += " | <span style='color: #10b981;'>✓ All complete</span>"
-            self.question_status.setText(status_text)
+        if total == 0:
+            self.question_status.setText("No questions in this exam")
+            self.question_status.setStyleSheet("color: var(--muted-color); font-weight: bold;")
+        elif valid == total:
+            self.question_status.setText(f"📊 {total} Questions — All {valid} Complete ✅")
+            self.question_status.setStyleSheet("color: #4ade80; font-weight: bold;")
         else:
-            self.question_status.setText("No exam selected")
+            self.question_status.setText(f"📊 {total} Questions (✅ {valid} Complete | ⚠️ {total - valid} Incomplete)")
+            self.question_status.setStyleSheet("color: #facc15; font-weight: bold;")
 
         # Reselect current question if visible
         current_idx = self.main_window.state["index"]

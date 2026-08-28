@@ -453,17 +453,17 @@ class ExtractTabWidget(QWidget):
 
     def reload_ai_providers(self) -> None:
         current_data = self.ai_provider_combo.currentData()
-        current_key = (current_data[0].key, current_data[1]) if current_data else None
+        current_id = (current_data[0].id, current_data[1]) if current_data else None
         self.ai_provider_combo.clear()
         local_items = detect_providers(self.config.provider.freebuff_commands)
         for provider, command in local_items:
             self.ai_provider_combo.addItem(f"Local: {provider.label} ({command})", (provider, command))
         for provider in WEB_PROVIDERS:
             self.ai_provider_combo.addItem(f"Web: {provider.label}", (provider, None))
-        if current_key:
+        if current_id:
             for idx in range(self.ai_provider_combo.count()):
                 p, cmd = self.ai_provider_combo.itemData(idx)
-                if (p.key, cmd) == current_key:
+                if (p.id, cmd) == current_id:
                     self.ai_provider_combo.setCurrentIndex(idx)
                     break
         self._on_ai_provider_changed()
