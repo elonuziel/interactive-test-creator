@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  models: read
 
 jobs:
   test:
@@ -43,6 +44,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -60,6 +63,95 @@ jobs:
             TAG="v2.1.${{ github.run_number }}"
           fi
           echo "TAG_NAME=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate AI Release Notes
+        id: changelog
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the last release tag (excluding current tag if this run is a tag push)
+          LAST_TAG=$(git tag --sort=-version:refname | grep -v "^${{ steps.tag_name.outputs.TAG_NAME }}$" | head -n 1)
+
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log -n 25 --pretty=format:"- %s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" "${LAST_TAG}..HEAD")
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            COMMITS=$(git log -n 10 --pretty=format:"- %s" HEAD)
+          fi
+
+          # Build prompt file
+          PROMPT_FILE=".changelog-prompt.txt"
+          cat > "$PROMPT_FILE" << 'PROMPTEOF'
+          You are a helpful assistant that generates clean release notes for Interactive Quiz Builder.
+          Summarize the following git commits into a clean, readable changelog
+          (3-5 bullet points) focusing on user-facing features and bug fixes.
+          Ignore version bumps and obscure chore commits.
+          Do not add top-level markdown headers like # Changelog.
+
+          PROMPTEOF
+          echo "$COMMITS" >> "$PROMPT_FILE"
+
+          # Build JSON payload safely using jq
+          jq -Rs --arg model "openai/gpt-4o-mini" \
+            '{model: $model, messages: [{role: "user", content: .}]}' \
+            "$PROMPT_FILE" > .changelog-payload.json
+
+          # Call GitHub Models API
+          echo "Requesting AI summary from GitHub Models..."
+          curl -sS "https://models.github.ai/inference/chat/completions" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -d @.changelog-payload.json > .changelog-response.json || true
+
+          # Extract summary from response
+          SUMMARY=$(jq -r '.choices[0].message.content // empty' .changelog-response.json 2>/dev/null || true)
+
+          if [ -n "$SUMMARY" ] && [ "$SUMMARY" != "null" ]; then
+              echo "$SUMMARY" > changelog.txt
+          else
+              echo "AI Summary failed or unavailable, falling back to smart keyword grouping..."
+              [ -f .changelog-response.json ] && cat .changelog-response.json || true
+
+              FEATURES=""
+              FIXES=""
+              OTHER=""
+
+              while IFS= read -r line; do
+                [ -z "$line" ] && continue
+                lower=$(echo "$line" | tr '[:upper:]' '[:lower:]')
+                if echo "$lower" | grep -qE "^- (feat|add|new|improv|updat|enhanc)"; then
+                  FEATURES="${FEATURES}\n${line}"
+                elif echo "$lower" | grep -qE "^- (fix|bug|patch|resolv|correct|revert)"; then
+                  FIXES="${FIXES}\n${line}"
+                else
+                  OTHER="${OTHER}\n${line}"
+                fi
+              done <<< "$COMMITS"
+
+              BODY=""
+              if [ -n "$FEATURES" ]; then
+                BODY="${BODY}\n### ⚡ Improvements${FEATURES}\n"
+              fi
+              if [ -n "$FIXES" ]; then
+                BODY="${BODY}\n### 🐛 Fixes${FIXES}\n"
+              fi
+              if [ -n "$OTHER" ]; then
+                BODY="${BODY}\n### 🔧 Other Changes${OTHER}\n"
+              fi
+
+              if [ -z "$BODY" ] || [ "$BODY" = "\n" ]; then
+                BODY="- General updates and improvements"
+              fi
+
+              printf "%b\n" "$BODY" > changelog.txt
+          fi
+
+          echo "Generated changelog:"
+          cat changelog.txt
 
       - name: Build Linux GUI bundle
         if: runner.os == 'Linux'
@@ -93,17 +185,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
-          name: Interactive Quiz Builder GUI ${{ steps.tag_name.outputs.TAG_NAME }}
+          name: ${{ steps.tag_name.outputs.TAG_NAME }}
+          body_path: changelog.txt
           files: interactive-quiz-builder-gui-linux-x86_64.tar.gz
-          generate_release_notes: true
 
       - name: Attach Windows bundle to GitHub Release
         if: runner.os == 'Windows'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
-          name: Interactive Quiz Builder GUI ${{ steps.tag_name.outputs.TAG_NAME }}
+          name: ${{ steps.tag_name.outputs.TAG_NAME }}
+          body_path: changelog.txt
           files: |
             interactive-quiz-builder-gui-windows-x64.zip
             quiz-builder-app/dist/quiz_builder_gui.exe
-          generate_release_notes: true
