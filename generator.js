@@ -41,9 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
         digitalLlmPromptBox: document.getElementById('digital-llm-prompt-box'),
         toggleProcessingSettingsBtn: document.getElementById('toggle-processing-settings-btn'),
         processingSettingsContainer: document.getElementById('processing-settings-container'),
-        toggleManualFilesBtn: document.getElementById('toggle-manual-files-btn'),
-        manualFilesContainer: document.getElementById('manual-files-container'),
-        manualFilesArrow: document.getElementById('manual-files-arrow'),
+        toggleManualFormBtn: document.getElementById('toggle-manual-form-btn'),
+        manualFormContainer: document.getElementById('manual-form-container'),
+        manualFormArrow: document.getElementById('manual-form-arrow'),
         copyPromptBtn: document.getElementById('copy-prompt-btn'),
         llmPromptBox: document.getElementById('llm-prompt-box'),
         freebuffButtons: [
@@ -694,18 +694,17 @@ STRICT EXTRACTION & FORMATTING RULES:
         });
     });
 
-    function toggleManualFiles(forceShow = null) {
-        if (!elements.manualFilesContainer) return;
-        const isHidden = elements.manualFilesContainer.classList.contains('hidden');
+    function toggleManualForm(forceShow = null) {
+        if (!elements.manualFormContainer) return;
+        const isHidden = elements.manualFormContainer.classList.contains('hidden');
         const shouldShow = forceShow !== null ? forceShow : isHidden;
-        elements.manualFilesContainer.classList.toggle('hidden', !shouldShow);
-        if (elements.manualFilesArrow) {
-            elements.manualFilesArrow.textContent = shouldShow ? '▲' : '▼';
+        elements.manualFormContainer.classList.toggle('hidden', !shouldShow);
+        if (elements.manualFormArrow) {
+            elements.manualFormArrow.textContent = shouldShow ? '▲' : '▼';
         }
     }
 
-    elements.toggleManualFilesBtn?.addEventListener('click', () => toggleManualFiles());
-    elements.jsonFile?.addEventListener('change', () => toggleManualFiles(true));
+    elements.toggleManualFormBtn?.addEventListener('click', () => toggleManualForm());
 
     function toggleProcessingSettings(showOnly = false) {
         if (!elements.processingSettingsContainer) return;
