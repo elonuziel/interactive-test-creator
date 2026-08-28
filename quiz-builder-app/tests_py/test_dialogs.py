@@ -29,13 +29,14 @@ def test_welcome_dialog(application):
     dialog.close()
 
 
-def test_cli_guide_dialog(application):
+def test_cli_guide_dialog(application, monkeypatch):
     reloaded = [0]
 
     def on_reload():
         reloaded[0] += 1
         return 2
 
+    monkeypatch.setattr("quizbuilder.gui.dialogs.cli_guide.QMessageBox.information", lambda *args, **kwargs: None)
     dialog = CliAgentGuideDialog(on_reload_providers=on_reload)
     assert "CLI AI Agents" in dialog.windowTitle()
     dialog._handle_reload()
