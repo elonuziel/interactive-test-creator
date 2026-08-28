@@ -8,7 +8,7 @@ import webbrowser
 import threading
 
 from PySide6.QtCore import QPoint, QSettings, QThreadPool, Qt, QTimer
-from PySide6.QtGui import QCursor, QGuiApplication, QImage, QKeySequence, QPixmap, QShortcut, QAction
+from PySide6.QtGui import QAction, QCursor, QGuiApplication, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -89,12 +89,38 @@ class MainWindow(QWidget):
         self.setWindowTitle("Interactive Quiz Builder")
         self.setMinimumSize(780, 520)
         self.resize(1120, 780)
+        self._setup_window_icon()
         self.dark_mode = self.settings.value("dark_mode", False, type=bool)
         self.setStyleSheet(DARK_STYLESHEET if self.dark_mode else LITE_STYLESHEET)
         self._build_ui()
         self._show_welcome_if_needed()
         self._connect_signals()
         self._restore_session()
+
+    def _setup_window_icon(self) -> None:
+        """Configure desktop taskbar and window icons."""
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("elonuziel.interactivequizbuilder.gui")
+            except Exception:
+                pass
+
+        icon_paths = [
+            Path(__file__).resolve().parents[3] / "assets" / "app_icon.png",
+            Path(__file__).resolve().parents[1] / "assets" / "app_icon.png",
+            Path(__file__).resolve().parent / "assets" / "app_icon.png",
+            Path(__file__).resolve().parents[3] / "favicon.svg",
+            Path(getattr(sys, "_MEIPASS", "")) / "assets" / "app_icon.png" if hasattr(sys, "_MEIPASS") else None,
+        ]
+        for p in icon_paths:
+            if p and p.is_file():
+                icon = QIcon(str(p))
+                self.setWindowIcon(icon)
+                app = QApplication.instance()
+                if app:
+                    app.setWindowIcon(icon)
+                break
 
     def start_worker(self, worker: Worker) -> None:
         self._active_workers.add(worker)

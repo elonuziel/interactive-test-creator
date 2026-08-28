@@ -6,11 +6,14 @@ block_cipher = None
 spec_dir = SPECPATH
 scripts_dir = os.path.join(spec_dir, "python_scripts")
 web_dir = os.path.join(spec_dir, "web")
+assets_dir = os.path.join(spec_dir, "assets")
 src_dir = os.path.join(spec_dir, "src")
+icon_file = os.path.join(assets_dir, "app_icon.ico")
 
 datas = [
     (scripts_dir, "python_scripts"),
     (web_dir, "web"),
+    (assets_dir, "assets"),
 ]
 
 a = Analysis(
@@ -54,4 +57,5 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
+    icon=icon_file if os.path.exists(icon_file) else None,
 )
