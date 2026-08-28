@@ -28,6 +28,7 @@ a = Analysis(
         "runpy",
         "quizbuilder.markdown",
         "quizbuilder.gui.dialogs",
+        "quizbuilder.gui.tabs",
         "PySide6",
         "PySide6.QtCore",
         "PySide6.QtGui",
