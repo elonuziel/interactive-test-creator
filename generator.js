@@ -706,7 +706,6 @@ STRICT EXTRACTION & FORMATTING RULES:
 
     elements.toggleManualFilesBtn?.addEventListener('click', () => toggleManualFiles());
     elements.jsonFile?.addEventListener('change', () => toggleManualFiles(true));
-    elements.csvFile?.addEventListener('change', () => toggleManualFiles(true));
 
     function toggleProcessingSettings(showOnly = false) {
         if (!elements.processingSettingsContainer) return;
