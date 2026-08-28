@@ -521,6 +521,8 @@ class MainWindow(QWidget):
         return False
 
     def _show_welcome_if_needed(self) -> None:
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen" or "pytest" in sys.modules:
+            return
         if not self.settings.value("welcome_seen", False, type=bool):
             dialog = WelcomeDialog(self)
             dialog.exec()
