@@ -4,6 +4,8 @@
 
 - [Hebrew PDF conversion guide](guides/hebrew_pdf_conversion_guide.md): historical extraction and transcription guidance.
 - [LLM CSV extraction guide](guides/llm_csv_extraction_guide.md): answer-key format and edge cases.
+- [Super Batch Specification](guides/super_batch_spec.md): multi-exam batch architecture and processing spec.
+- [Windows Antivirus & SmartScreen Guide](guides/windows_antivirus_smartscreen_guide.md): Windows code signing and reputation troubleshooting.
 
 ## Future Work
 

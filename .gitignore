@@ -43,6 +43,8 @@ blob-report/
 .DS_Store
 Thumbs.db
 desktop.ini
+*.ini
+!pytest.ini
 .vscode/
 .idea/
 .antigravity/

@@ -73,6 +73,9 @@ jobs:
           if [ -d test-suite ]; then
             cp -R test-suite site/test-suite
           fi
+          if [ -f favicon.svg ]; then
+            cp favicon.svg site/favicon.svg
+          fi
           if [ -f questions.json ]; then
             cp questions.json site/questions.json
           fi
