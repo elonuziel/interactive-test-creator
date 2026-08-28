@@ -168,7 +168,7 @@ class QuestionEditorWidget(QWidget):
     def _add_option_row(self) -> None:
         """Reveal the next hidden option row (up to 8 options)."""
         for i, row in enumerate(self.option_rows):
-            if not row.isVisible():
+            if row.isHidden():
                 row.setVisible(True)
                 self.option_edits[i].setFocus()
                 self.changed.emit()
@@ -176,7 +176,7 @@ class QuestionEditorWidget(QWidget):
 
     def _remove_option_row(self) -> None:
         """Hide the last visible option row (minimum 2 options kept)."""
-        visible_indices = [i for i, row in enumerate(self.option_rows) if row.isVisible()]
+        visible_indices = [i for i, row in enumerate(self.option_rows) if not row.isHidden()]
         if len(visible_indices) > 2:
             last_idx = visible_indices[-1]
             self.option_rows[last_idx].setVisible(False)
