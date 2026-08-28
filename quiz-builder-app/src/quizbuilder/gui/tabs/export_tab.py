@@ -245,3 +245,4 @@ class ExportTabWidget(QWidget):
         runs = self.main_window.state["root"] / "runs"
         runs.mkdir(parents=True, exist_ok=True)
         webbrowser.open(runs.as_uri())
+

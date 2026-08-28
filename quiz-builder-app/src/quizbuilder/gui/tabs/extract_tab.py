@@ -702,3 +702,4 @@ class ExtractTabWidget(QWidget):
         self.main_window.populate_tests()
         if self.main_window.state["workspace"]:
             self.main_window.load_workspace(self.main_window.state["workspace"])
+
