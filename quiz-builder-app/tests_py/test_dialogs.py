@@ -15,7 +15,6 @@ from quizbuilder.gui.dialogs import (
     SuperBatchSummaryDialog,
     WelcomeDialog,
 )
-from quizbuilder.providers import ProviderOption
 from quizbuilder.super_batch import SuperBatchResult, SuperBatchItem
 from quizbuilder.workspace import ExamOverview
 
