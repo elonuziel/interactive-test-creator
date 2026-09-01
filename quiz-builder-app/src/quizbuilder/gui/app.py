@@ -101,47 +101,74 @@ class MainWindow(QWidget):
         top_bar = QFrame()
         top_bar.setObjectName("topBar")
         top_layout = QHBoxLayout(top_bar)
-        self.root_label = QLabel("Exam folder: (not selected)")
+        top_layout.setSpacing(6)
+
+        # Folder icon + compact path label
+        folder_icon = QLabel("📂")
+        folder_icon.setFixedWidth(22)
+        self.root_label = QLabel("No exam folder selected")
+        self.root_label.setObjectName("pathLabel")
         self.root_label.setToolTip("Choose the parent folder containing your exam folders.")
-        self.choose_root_btn = QPushButton("Choose exam folder…")
+
+        # Folder action buttons (clustered)
+        self.choose_root_btn = QPushButton("Choose folder…")
         self.choose_root_btn.setToolTip("Select the parent folder that contains your exam projects.")
         self.recent_btn = QPushButton("▼ Recent")
         self.recent_btn.setToolTip("Open a recently used exam folder.")
-        self.recent_btn.setMaximumWidth(82)
-        self.refresh_root_btn = QPushButton("⟳ Reload")
-        self.refresh_root_btn.setToolTip("Scan the selected folder again for exam projects.")
+        self.recent_btn.setObjectName("secondary")
+        self.recent_btn.setMaximumWidth(80)
+        self.refresh_root_btn = QPushButton("⟳")
+        self.refresh_root_btn.setObjectName("secondary")
+        self.refresh_root_btn.setToolTip("Reload: scan the selected folder again for exam projects.")
+        self.refresh_root_btn.setMaximumWidth(34)
+        self.refresh_root_btn.setMinimumWidth(34)
+
+        # Visual separator before theme button
+        v_sep = QFrame()
+        v_sep.setFrameShape(QFrame.Shape.VLine)
+        v_sep.setFixedWidth(1)
+
         self.theme_button = QPushButton("☀️ Light" if self.dark_mode else "🌙 Dark")
+        self.theme_button.setObjectName("secondary")
         self.theme_button.setToolTip("Toggle between dark and light theme.")
         self.theme_button.setMaximumWidth(88)
+
+        top_layout.addWidget(folder_icon)
         top_layout.addWidget(self.root_label, 1)
         top_layout.addWidget(self.choose_root_btn)
         top_layout.addWidget(self.recent_btn)
         top_layout.addWidget(self.refresh_root_btn)
+        top_layout.addWidget(v_sep)
         top_layout.addWidget(self.theme_button)
         root_layout.addWidget(top_bar)
 
-        # Tabs
+        # Tabs — step-numbered to reinforce the workflow
         self.tabs = QTabWidget()
         self.extract_tab = ExtractTabWidget(self)
         self.review_tab = ReviewTabWidget(self)
         self.export_tab = ExportTabWidget(self)
-        self.tabs.addTab(self.extract_tab, "Choose & extract")
-        self.tabs.addTab(self.review_tab, "Review questions")
-        self.tabs.addTab(self.export_tab, "Play or export")
+        self.tabs.addTab(self.extract_tab, "1 · Extract")
+        self.tabs.addTab(self.review_tab, "2 · Review")
+        self.tabs.addTab(self.export_tab, "3 · Play & Export")
         root_layout.addWidget(self.tabs, 1)
 
-        # Status Bar
+        # Status Bar — icon + message + spinner
         status_bar = QFrame()
         status_bar.setObjectName("statusBar")
         status_layout = QHBoxLayout(status_bar)
-        self.status_label = QLabel("Welcome! Choose an exam folder to begin. Each exam folder should contain a PDF and questions.md.")
+        status_layout.setSpacing(6)
+        self.status_icon = QLabel("ℹ️")
+        self.status_icon.setFixedWidth(20)
+        self.status_label = QLabel("Welcome! Choose an exam folder to begin.")
+        self.status_label.setObjectName("statusInfo")
         self.status_label.setWordWrap(True)
         self.status_progress = QProgressBar()
         self.status_progress.setRange(0, 0)
-        self.status_progress.setMaximumWidth(130)
-        self.status_progress.setMaximumHeight(14)
+        self.status_progress.setMaximumWidth(120)
+        self.status_progress.setMaximumHeight(12)
         self.status_progress.setTextVisible(False)
         self.status_progress.setVisible(False)
+        status_layout.addWidget(self.status_icon)
         status_layout.addWidget(self.status_label, 1)
         status_layout.addWidget(self.status_progress)
         root_layout.addWidget(status_bar)
@@ -345,14 +372,25 @@ class MainWindow(QWidget):
 
     def _set_status(self, message: str, status_type: str = "info") -> None:
         self.status_label.setText(message)
-        if status_type == "error":
-            self.status_label.setStyleSheet("color: var(--danger-color);")
-        elif status_type == "success":
-            self.status_label.setStyleSheet("color: var(--success-color);")
-        elif status_type == "busy":
-            self.status_label.setStyleSheet("color: var(--accent-color);")
-        else:
-            self.status_label.setStyleSheet("")
+        _icons = {
+            "error": "❌",
+            "success": "✅",
+            "busy": "⏳",
+            "ready": "✅",
+        }
+        _names = {
+            "error": "statusError",
+            "success": "statusSuccess",
+            "busy": "statusBusy",
+            "ready": "statusSuccess",
+        }
+        icon = _icons.get(status_type, "ℹ️")
+        name = _names.get(status_type, "statusInfo")
+        self.status_icon.setText(icon)
+        # Dynamically update the objectName so the stylesheet selector re-applies
+        self.status_label.setObjectName(name)
+        self.status_label.style().unpolish(self.status_label)
+        self.status_label.style().polish(self.status_label)
 
     def _set_worker_busy(self, busy: bool) -> None:
         self.status_progress.setVisible(busy)
@@ -361,9 +399,10 @@ class MainWindow(QWidget):
 
     def _update_tab_labels(self) -> None:
         dirty_badge = " *" if self.state["dirty"] else ""
-        self.tabs.setTabText(1, f"Review questions{dirty_badge}")
+        self.tabs.setTabText(1, f"2 · Review{dirty_badge}")
         selected_count = len(self.export_tab.checked_play_workspaces())
-        self.tabs.setTabText(2, f"Play or export ({selected_count})")
+        count_badge = f" ({selected_count})" if selected_count else ""
+        self.tabs.setTabText(2, f"3 · Play & Export{count_badge}")
 
     def _recent_folders(self) -> list[str]:
         raw = self.settings.value("recent_folders", [])
@@ -391,6 +430,11 @@ class MainWindow(QWidget):
             clear_action.triggered.connect(lambda: self.settings.setValue("recent_folders", []))
         menu.exec(self.recent_btn.mapToGlobal(QPoint(0, self.recent_btn.height())))
 
+    def _set_root_label(self, path: Path) -> None:
+        """Show folder name in label; full absolute path in tooltip."""
+        self.root_label.setText(f"📁 {path.name}")
+        self.root_label.setToolTip(str(path))
+
     def _open_recent(self, path_str: str) -> None:
         target = Path(path_str)
         if not target.is_dir():
@@ -403,7 +447,7 @@ class MainWindow(QWidget):
         self.state["root"] = target
         self.settings.setValue("last_root", str(target))
         self._add_recent_folder(str(target))
-        self.root_label.setText(f"Exam folder: {target}")
+        self._set_root_label(target) if False else self._set_root_label(target)
         self.populate_tests()
         self._set_status(f"Loaded exam folder: {target}", "success")
 
@@ -434,7 +478,7 @@ class MainWindow(QWidget):
             play_item.setCheckState(Qt.CheckState.Checked if candidate.ready_to_run else Qt.CheckState.Unchecked)
             self.play_list.addItem(play_item)
 
-        self.root_label.setText(f"Exam folder: {self.state['root']}")
+        self._set_root_label(self.state['root'])
         if self.exam_list.count() > 0:
             self.exam_list.setCurrentRow(0)
         self.update_summary()
@@ -460,7 +504,7 @@ class MainWindow(QWidget):
             self.state["root"] = Path(folder)
             self.settings.setValue("last_root", folder)
             self._add_recent_folder(folder)
-            self.root_label.setText(f"Exam folder: {self.state['root']}")
+            self._set_root_label(self.state['root'])
             self.populate_tests()
             self._set_status(f"Selected exam folder: {self.state['root']}", "success")
 
@@ -560,7 +604,7 @@ class MainWindow(QWidget):
         configured = self.config.workspace_root
         self.state["root"] = configured if configured.is_dir() else Path(saved) if (saved and Path(saved).is_dir()) else configured
         if self.state["root"] and self.state["root"].is_dir():
-            self.root_label.setText(f"Exam folder: {self.state['root']}")
+            self._set_root_label(self.state['root'])
             self.populate_tests()
             last_workspace = self.settings.value("last_workspace")
             if last_workspace:

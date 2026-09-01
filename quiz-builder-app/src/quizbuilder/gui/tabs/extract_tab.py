@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -68,115 +69,116 @@ class ExtractTabWidget(QWidget):
         self.extract_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.extract_splitter.setChildrenCollapsible(False)
 
-        # Left panel: Choose an exam
+        # ── LEFT panel: Choose an exam ──────────────────────────────────
         self.exam_group = QGroupBox("1. Choose an exam")
         left = QVBoxLayout(self.exam_group)
         self.exam_search = QLineEdit()
-        self.exam_search.setPlaceholderText("Search exams...")
+        self.exam_search.setPlaceholderText("🔍 Search exams…")
+
         self.exam_list = QListWidget()
         self.exam_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         exam_sel_row = QHBoxLayout()
         self.exam_select_all_btn = QPushButton("Select all")
+        self.exam_select_all_btn.setObjectName("secondary")
         self.exam_select_all_btn.setToolTip("Check all visible exams in the list")
         self.exam_deselect_all_btn = QPushButton("Deselect all")
+        self.exam_deselect_all_btn.setObjectName("secondary")
         self.exam_deselect_all_btn.setToolTip("Uncheck all exams in the list")
         exam_sel_row.addWidget(self.exam_select_all_btn)
         exam_sel_row.addWidget(self.exam_deselect_all_btn)
 
-        self.batch_button = QPushButton("Process selected exams")
+        # Separator before batch actions
+        batch_sep = QFrame()
+        batch_sep.setObjectName("separator")
+        batch_sep.setFrameShape(QFrame.Shape.HLine)
+        batch_sep.setFixedHeight(1)
+
+        batch_label = QLabel("Batch actions")
+        batch_label.setObjectName("sectionHeader")
+
+        self.batch_button = QPushButton("⚙️ Extract checked exams")
+        self.batch_button.setToolTip("Extract questions from all checked exams at once (digital PDFs only)")
+
+        self.web_batch_button = QPushButton("🌐 Web AI Batch…")
+        self.web_batch_button.setToolTip(
+            "Step-by-step batch assistant for ChatGPT, Claude, Gemini Web, and Google AI Studio "
+            "(1 PDF at a time with auto prompt copying and answer merging)."
+        )
 
         super_batch_row = QHBoxLayout()
-        self.super_batch_button = QPushButton("Super Batch (local AI)")
-        self.super_batch_button.setToolTip("Review and generate questions.md for multiple exams automatically using a detected local CLI AI.")
+        self.super_batch_button = QPushButton("🤖 Super Batch (Local AI)…")
+        self.super_batch_button.setToolTip(
+            "Run a local CLI AI agent on multiple exams automatically."
+        )
         self.super_batch_info_btn = QPushButton("ℹ️")
+        self.super_batch_info_btn.setObjectName("secondary")
         self.super_batch_info_btn.setMaximumWidth(32)
-        self.super_batch_info_btn.setToolTip("Why use a local CLI AI agent? Click to learn the advantages and see how to install one.")
+        self.super_batch_info_btn.setToolTip("Learn about local CLI AI agents and how to install one.")
         super_batch_row.addWidget(self.super_batch_button, 1)
         super_batch_row.addWidget(self.super_batch_info_btn)
 
         left.addWidget(self.exam_search)
         left.addWidget(self.exam_list, 1)
         left.addLayout(exam_sel_row)
+        left.addWidget(batch_sep)
+        left.addWidget(batch_label)
         left.addWidget(self.batch_button)
-
-        self.web_batch_button = QPushButton("🌐 Web AI Batch")
-        self.web_batch_button.setToolTip("Step-by-step batch assistant for ChatGPT, Claude, Gemini Web, and Google AI Studio (1 PDF at a time with auto prompt copying and answer merging).")
         left.addWidget(self.web_batch_button)
         left.addLayout(super_batch_row)
         self.extract_splitter.addWidget(self.exam_group)
 
-        # Right panel: Prepare questions
+        # ── RIGHT panel: Prepare questions ──────────────────────────────
         self.extract_group = QGroupBox("2. Prepare questions (saved as questions.md)")
         right = QVBoxLayout(self.extract_group)
+        right.setSpacing(8)
+
+        # Current exam title
         self.current_exam_title = QLabel("Choose an exam from the list")
+        self.current_exam_title.setObjectName("sectionHeader")
+
+        # — File selection row —
         self.pdf_combo = QComboBox()
         self.pdf_combo.addItem("No exam file selected", None)
-        self.browse_pdf_button = QPushButton("Choose file...")
+        self.browse_pdf_button = QPushButton("Browse…")
+        self.browse_pdf_button.setObjectName("secondary")
         self.browse_pdf_button.setToolTip("Select a custom PDF or Word (DOCX) exam file")
         pdf_row = QHBoxLayout()
         pdf_row.addWidget(QLabel("Exam file:"))
         pdf_row.addWidget(self.pdf_combo, 1)
         pdf_row.addWidget(self.browse_pdf_button)
-        self.detection_title = QLabel("PDF type: waiting for an exam")
-        self.detection_description = QLabel("Choose an exam to check whether its text can be extracted automatically.")
+
+        # — Detection badge (compact single line) —
+        detection_row = QHBoxLayout()
+        self.detection_title = QLabel("◦ PDF type: awaiting selection")
+        self.detection_title.setObjectName("sectionHint")
+        self.detection_description = QLabel("")
+        self.detection_description.setObjectName("sectionHint")
         self.detection_description.setWordWrap(True)
-        self.extract_button = QPushButton("Extract questions from PDF")
-        self.extract_button.setObjectName("primary")
-        self.ai_hint = QLabel("Digital PDFs can be extracted automatically. Scanned PDFs need an AI prompt. Results are saved as questions.md.")
-        self.ai_hint.setWordWrap(True)
-        self.ai_provider_combo = QComboBox()
-        local_items = detect_providers(self.config.provider.freebuff_commands)
-        for provider, command in local_items:
-            self.ai_provider_combo.addItem(f"Local: {provider.label} ({command})", (provider, command))
-        for provider in WEB_PROVIDERS:
-            self.ai_provider_combo.addItem(f"Web: {provider.label}", (provider, None))
-        self.launch_ai_button = QPushButton("Create AI prompt")
-        self._on_ai_provider_changed()
-        self.launch_ai_button.setToolTip("Create a prompt for extracting questions into questions.md.")
+        detection_row.addWidget(self.detection_title)
+        detection_row.addStretch()
 
-        self.ai_info_btn = QPushButton("ℹ️")
-        self.ai_info_btn.setMaximumWidth(32)
-        self.ai_info_btn.setToolTip("What is a CLI AI agent? Click to learn the advantages and how to install one.")
-
-        self.answer_combo = QComboBox()
-        self.answer_combo.addItem("No answer key", None)
-        self.browse_answer_button = QPushButton("Choose file...")
-        self.browse_answer_button.setToolTip("Select a custom CSV or Excel (XLS/XLSX) answer key")
-        self.form_edit = QLineEdit("")
-        self.form_edit.setPlaceholderText("Auto-detected")
-        self.form_edit.setMaximumWidth(90)
-        self.form_edit.setToolTip("Detected from the selected PDF. Edit only to override, with a warning.")
-        self.preview = QLabel("No exam preview available")
-        self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setMinimumSize(200, 150)
-        self.preview_button = QPushButton("Preview first page")
-        self.next_review_button = QPushButton("Next: review questions")
-        right.addWidget(self.current_exam_title)
-        right.addLayout(pdf_row)
-        right.addWidget(self.detection_title)
-        right.addWidget(self.detection_description)
-        right.addWidget(self.extract_button)
-        right.addWidget(self.ai_hint)
-        ai_row = QHBoxLayout()
-        ai_row.addWidget(self.ai_provider_combo, 2)
-        ai_row.addWidget(self.launch_ai_button, 3)
-        ai_row.addWidget(self.ai_info_btn)
-        right.addLayout(ai_row)
-
-        # Clean PDF section for scanned exams
-        self.clean_group = QGroupBox("Clean PDF (Discard blank & cover pages)")
+        # — Clean PDF group (moved up: logically follows file selection) —
+        self.clean_group = QGroupBox("Clean PDF  —  discard blank & cover pages")
         clean_layout = QVBoxLayout(self.clean_group)
-        self.clean_hint = QLabel("Discard blank/cover pages for clean AI prompts & accurate OCR.")
+        clean_layout.setSpacing(6)
+        self.clean_hint = QLabel(
+            "Remove blank/cover pages before AI extraction or OCR to reduce noise."
+        )
+        self.clean_hint.setObjectName("sectionHint")
         self.clean_hint.setWordWrap(True)
         clean_layout.addWidget(self.clean_hint)
 
         preset_row = QHBoxLayout()
-        self.preset_std_button = QPushButton("🧹 Standard clean (std)")
-        self.preset_std_button.setToolTip("Discards cover pages 1-4 and even pages (6, 8, 10...)")
-        self.preset_even_button = QPushButton("📄 Even pages")
-        self.preset_odd_button = QPushButton("📄 Odd pages")
-        self.preset_clear_button = QPushButton("☐ Reset")
+        self.preset_std_button = QPushButton("🧹 Standard (std)")
+        self.preset_std_button.setObjectName("secondary")
+        self.preset_std_button.setToolTip("Discards cover pages 1-4 and even pages (6, 8, 10…)")
+        self.preset_even_button = QPushButton("Even pages")
+        self.preset_even_button.setObjectName("secondary")
+        self.preset_odd_button = QPushButton("Odd pages")
+        self.preset_odd_button.setObjectName("secondary")
+        self.preset_clear_button = QPushButton("↺ Reset")
+        self.preset_clear_button.setObjectName("secondary")
         preset_row.addWidget(self.preset_std_button)
         preset_row.addWidget(self.preset_even_button)
         preset_row.addWidget(self.preset_odd_button)
@@ -189,27 +191,131 @@ class ExtractTabWidget(QWidget):
         self.discard_range_edit.setPlaceholderText("e.g. std, 1-4, 6, 8")
         range_row.addWidget(self.discard_range_edit, 1)
         self.clean_pdf_button = QPushButton("🧹 Create clean PDF")
-        self.clean_pdf_button.setToolTip("Creates <name>_clean.pdf without discarded pages")
+        self.clean_pdf_button.setToolTip("Creates <name>_clean.pdf without the discarded pages")
         range_row.addWidget(self.clean_pdf_button)
         clean_layout.addLayout(range_row)
 
         self.clean_summary_label = QLabel("Select an exam to calculate kept pages.")
-        self.clean_summary_label.setStyleSheet("color: var(--muted-color); font-size: 11px;")
+        self.clean_summary_label.setObjectName("sectionHint")
         clean_layout.addWidget(self.clean_summary_label)
-        right.addWidget(self.clean_group)
+
+        # — Answer key + form number (below Clean PDF) —
         answer_row = QHBoxLayout()
-        answer_row.addWidget(QLabel("Answer key (optional):"))
+        self.answer_combo = QComboBox()
+        self.answer_combo.addItem("No answer key", None)
+        self.browse_answer_button = QPushButton("Browse…")
+        self.browse_answer_button.setObjectName("secondary")
+        self.browse_answer_button.setToolTip("Select a custom CSV or Excel (XLS/XLSX) answer key")
+        self.form_edit = QLineEdit("")
+        self.form_edit.setPlaceholderText("Auto")
+        self.form_edit.setMaximumWidth(72)
+        self.form_edit.setToolTip(
+            "Detected from the selected PDF. Edit only to override."
+        )
+        answer_row.addWidget(QLabel("Answer key:"))
         answer_row.addWidget(self.answer_combo, 1)
         answer_row.addWidget(self.browse_answer_button)
-        answer_row.addWidget(QLabel("Form number:"))
+        answer_row.addWidget(QLabel("Form:"))
         answer_row.addWidget(self.form_edit)
+
+        # — Separator before extraction actions —
+        extract_sep = QFrame()
+        extract_sep.setObjectName("separator")
+        extract_sep.setFrameShape(QFrame.Shape.HLine)
+        extract_sep.setFixedHeight(1)
+
+        extract_label = QLabel("Extract questions")
+        extract_label.setObjectName("sectionHeader")
+
+        # — Extract button (digital PDFs) —
+        self.extract_button = QPushButton("⚙️ Extract questions from PDF")
+        self.extract_button.setObjectName("primary")
+        self.extract_button.setToolTip(
+            "Automatically extract questions from this digital PDF. "
+            "Results are saved as questions.md."
+        )
+
+        # — AI row (scanned / manual path) —
+        ai_row = QHBoxLayout()
+        self.ai_provider_combo = QComboBox()
+        local_items = detect_providers(self.config.provider.freebuff_commands)
+        for provider, command in local_items:
+            self.ai_provider_combo.addItem(f"Local: {provider.label} ({command})", (provider, command))
+        for provider in WEB_PROVIDERS:
+            self.ai_provider_combo.addItem(f"Web: {provider.label}", (provider, None))
+        self.launch_ai_button = QPushButton("Create AI prompt")
+        self._on_ai_provider_changed()
+        self.launch_ai_button.setToolTip("Generate a prompt for extracting questions into questions.md.")
+        self.ai_info_btn = QPushButton("ℹ️")
+        self.ai_info_btn.setObjectName("secondary")
+        self.ai_info_btn.setMaximumWidth(32)
+        self.ai_info_btn.setToolTip("What is a CLI AI agent? Click to learn how to install one.")
+        ai_row.addWidget(self.ai_provider_combo, 2)
+        ai_row.addWidget(self.launch_ai_button, 3)
+        ai_row.addWidget(self.ai_info_btn)
+
+        # — Description under detection (word-wrapped, shown below AI row) —
+        self.detection_description.setVisible(False)  # hidden until PDF is selected
+
+        # — Collapsible PDF Preview —
+        self.preview_toggle_btn = QPushButton("▶  PDF Preview  (collapsed)")
+        self.preview_toggle_btn.setObjectName("secondary")
+        self.preview_toggle_btn.setToolTip("Click to expand / collapse the PDF preview panel")
+        self.preview_toggle_btn.setCheckable(True)
+
+        self.preview_container = QWidget()
+        self.preview_container.setVisible(False)
+        preview_inner = QVBoxLayout(self.preview_container)
+        preview_inner.setContentsMargins(0, 4, 0, 4)
+        preview_inner.setSpacing(4)
+
+        # Page navigation
+        page_nav_row = QHBoxLayout()
+        page_nav_row.addWidget(QLabel("Page:"))
+        self.preview_page_spin = QSpinBox()
+        self.preview_page_spin.setRange(1, 9999)
+        self.preview_page_spin.setValue(1)
+        self.preview_page_spin.setMaximumWidth(70)
+        self.preview_page_spin.setToolTip("Jump to any page in the PDF")
+        self.preview_button = QPushButton("⟳ Load page")
+        self.preview_button.setObjectName("secondary")
+        page_nav_row.addWidget(self.preview_page_spin)
+        page_nav_row.addWidget(self.preview_button)
+        page_nav_row.addStretch()
+        preview_inner.addLayout(page_nav_row)
+
+        self.preview = QLabel("No preview loaded")
+        self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview.setMinimumSize(200, 180)
+        preview_inner.addWidget(self.preview, 1)
+
+        # — Navigation (bottom) —
+        self.next_review_button = QPushButton("Next: Review →")
+        self.next_review_button.setObjectName("primary")
+
+        # Assemble right panel
+        right.addWidget(self.current_exam_title)
+        right.addLayout(pdf_row)
+        right.addLayout(detection_row)
+        right.addWidget(self.detection_description)
+        right.addWidget(self.clean_group)
         right.addLayout(answer_row)
-        right.addWidget(self.preview, 1)
-        actions = QHBoxLayout()
-        actions.addWidget(self.preview_button)
-        actions.addStretch()
-        actions.addWidget(self.next_review_button)
-        right.addLayout(actions)
+        right.addWidget(extract_sep)
+        right.addWidget(extract_label)
+        right.addWidget(self.extract_button)
+        right.addLayout(ai_row)
+        right.addWidget(self.preview_toggle_btn)
+        right.addWidget(self.preview_container)
+        right.addStretch()
+
+        nav_row = QHBoxLayout()
+        nav_row.addStretch()
+        nav_row.addWidget(self.next_review_button)
+        right.addLayout(nav_row)
+
+        # Stub for removed ai_hint (kept as a QLabel property for any backward refs)
+        self.ai_hint = QLabel()
+        self.ai_hint.setVisible(False)
 
         extract_scroll = QScrollArea()
         extract_scroll.setWidgetResizable(True)
@@ -244,7 +350,9 @@ class ExtractTabWidget(QWidget):
         self.ai_info_btn.clicked.connect(self.show_cli_agent_guide)
         self.ai_provider_combo.currentIndexChanged.connect(self._on_ai_provider_changed)
         self.launch_ai_button.clicked.connect(self.launch_ai)
-        self.preview_button.clicked.connect(self.preview_first_page)
+        self.preview_button.clicked.connect(self.preview_current_page)
+        self.preview_page_spin.valueChanged.connect(self.preview_current_page)
+        self.preview_toggle_btn.toggled.connect(self._on_preview_toggled)
         self.next_review_button.clicked.connect(lambda: self.main_window.tabs.setCurrentIndex(1))
 
     def _show_exam_list_context_menu(self, pos: QPoint) -> None:
@@ -372,45 +480,96 @@ class ExtractTabWidget(QWidget):
         pdf_path = Path(selected_pdf)
         def _classify():
             return classify_pdf(pdf_path)
+        worker = Worker(_classify)
+
         def _classified(is_digital):
             self.main_window._set_status("")
             if is_digital:
-                self.detection_title.setText("Digital PDF detected")
-                self.detection_description.setText("This PDF contains selectable text. Extract the questions automatically.")
+                self.detection_title.setText("◦ Digital PDF — extract automatically")
+                self.detection_description.setText(
+                    "This PDF contains selectable text. Use the Extract button below."
+                )
                 self.extract_button.setEnabled(True)
             else:
-                self.detection_title.setText("Scanned PDF detected")
-                self.detection_description.setText("Create an AI prompt below to extract questions from this image-based PDF.")
+                self.detection_title.setText("◦ Scanned PDF — use AI prompt")
+                self.detection_description.setText(
+                    "This is an image-based PDF. Use the AI provider below to generate a prompt."
+                )
                 self.extract_button.setEnabled(False)
+            self.detection_description.setVisible(True)
             self.update_clean_summary()
+
         def _classify_failed(err):
             self.main_window._set_status("")
-            self.detection_title.setText("PDF analysis unavailable")
-            self.detection_description.setText(f"{err} You can still create an AI prompt or check the PDF manually.")
+            self.detection_title.setText("◦ PDF analysis unavailable")
+            self.detection_description.setText(
+                f"{err}\nYou can still create an AI prompt or check the PDF manually."
+            )
+            self.detection_description.setVisible(True)
             self.extract_button.setEnabled(True)
             self.update_clean_summary()
-        worker = Worker(_classify)
+
         worker.signals.finished.connect(_classified)
         worker.signals.failed.connect(_classify_failed)
         self.main_window.start_worker(worker)
 
+    def _on_preview_toggled(self, checked: bool) -> None:
+        """Expand or collapse the preview panel."""
+        self.preview_container.setVisible(checked)
+        if checked:
+            self.preview_toggle_btn.setText("▼  PDF Preview  (expanded)")
+            self.preview_current_page()
+        else:
+            self.preview_toggle_btn.setText("▶  PDF Preview  (collapsed)")
+
     def preview_first_page(self) -> None:
+        """Kept for backward compatibility — open preview at page 1."""
+        self.preview_page_spin.setValue(1)
+        self.preview_current_page()
+
+    def preview_current_page(self) -> None:
+        """Load the page currently selected in preview_page_spin."""
         target = self.pdf_combo.currentData()
         if not target or not Path(target).is_file():
             self.preview.setText("No valid exam file selected.")
             return
-        self.preview.setText("Loading preview...")
-        worker = Worker(lambda: render_pdf_page(Path(target)))
+        if not self.preview_container.isVisible():
+            return  # don't load if preview is collapsed
+        page_num = self.preview_page_spin.value() - 1  # 0-indexed
+        self.preview.setText("Loading preview…")
+
+        # Update max page count (try to open PDF to read page count)
+        pdf_path = Path(target)
+        try:
+            import fitz
+            doc = fitz.open(pdf_path)
+            page_count = len(doc)
+            doc.close()
+            self.preview_page_spin.setRange(1, max(1, page_count))
+            self.preview_page_spin.setToolTip(f"Page (1–{page_count})")
+        except Exception:
+            pass
+
+        worker = Worker(lambda: render_pdf_page(pdf_path, page_number=page_num))
         worker.signals.finished.connect(self._apply_preview)
-        worker.signals.failed.connect(lambda error: self.preview.setText(f"Preview error:\n{error}"))
+        worker.signals.failed.connect(
+            lambda error: self.preview.setText(f"Preview error:\n{error}")
+        )
         self.main_window.start_worker(worker)
 
-    def _apply_preview(self, image_path: Path) -> None:
-        pixmap = QPixmap(str(image_path))
-        if pixmap.isNull():
+    def _apply_preview(self, png_bytes: bytes) -> None:
+        """Render PNG bytes returned by render_pdf_page into the preview label."""
+        from PySide6.QtGui import QImage
+        image = QImage.fromData(png_bytes, "PNG")
+        if image.isNull():
             self.preview.setText("Preview could not be displayed.")
             return
-        scaled = pixmap.scaled(self.preview.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        pixmap = QPixmap.fromImage(image)
+        scaled = pixmap.scaled(
+            self.preview.width() or 400, 600,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
         self.preview.setPixmap(scaled)
 
     def set_discard_preset(self, rule: str) -> None:

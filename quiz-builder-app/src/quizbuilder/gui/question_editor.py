@@ -39,10 +39,7 @@ class QuestionEditorWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        intro = QLabel("Edit the question and answer choices below. Changes are marked unsaved until you save questions.md.")
-        intro.setWordWrap(True)
-        layout.addWidget(intro)
-        layout.addWidget(QLabel("Question text (נוסח השאלה):"))
+        layout.addWidget(QLabel("Question text:"))
         self.text_edit = QPlainTextEdit()
         self.text_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.text_edit.setPlaceholderText("הקלד את נוסח השאלה בעברית...")
@@ -91,7 +88,7 @@ class QuestionEditorWidget(QWidget):
         img_layout.addLayout(img_btn_row)
         layout.addWidget(self.image_container)
 
-        layout.addWidget(QLabel("Answer choices — select the correct answer (בחר את התשובה הנכונה):"))
+        layout.addWidget(QLabel("Answer choices — select the correct one:"))
 
         self.option_edits: list[QLineEdit] = []
         self.option_radios: list[QRadioButton] = []
@@ -148,7 +145,7 @@ class QuestionEditorWidget(QWidget):
         opt_mgmt_row.addStretch()
         layout.addLayout(opt_mgmt_row)
 
-        layout.addWidget(QLabel("Explanation / Solution note (הסבר לתשובה - אופציונלי):"))
+        layout.addWidget(QLabel("Explanation (optional):"))
         self.explanation_edit = QPlainTextEdit()
         self.explanation_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.explanation_edit.setPlaceholderText("הקלד הסבר או נימוק לתשובה הנכונה (יוצג לתלמיד במשוב)...")

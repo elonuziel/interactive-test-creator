@@ -11,6 +11,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -53,45 +54,61 @@ class ReviewTabWidget(QWidget):
         list_group = QGroupBox("Questions in this exam")
         list_layout = QVBoxLayout(list_group)
         self.question_status = QLabel("No exam selected")
-        self.question_status.setStyleSheet("font-weight: bold;")
+        self.question_status.setObjectName("statusInfo")
 
         filter_row = QHBoxLayout()
         self.question_filter_edit = QLineEdit()
-        self.question_filter_edit.setPlaceholderText("Filter questions...")
+        self.question_filter_edit.setPlaceholderText("🔍 Filter questions…")
         self.filter_incomplete_checkbox = QCheckBox("⚠️ Incomplete only")
         self.filter_incomplete_checkbox.setToolTip("Show only questions missing options, text, or a valid answer.")
         filter_row.addWidget(self.question_filter_edit, 1)
         filter_row.addWidget(self.filter_incomplete_checkbox)
 
+        # Thin separator
+        list_sep = QFrame()
+        list_sep.setObjectName("separator")
+        list_sep.setFrameShape(QFrame.Shape.HLine)
+        list_sep.setFixedHeight(1)
+
         self.question_list = QListWidget()
         self.question_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
         self.question_list.setDefaultDropAction(Qt.DropAction.MoveAction)
 
+        # Row 1: reorder buttons (secondary style — less prominent)
         reorder_row = QHBoxLayout()
-        self.move_up_button = QPushButton("⬆️ Up")
+        self.move_up_button = QPushButton("↑ Up")
+        self.move_up_button.setObjectName("secondary")
         self.move_up_button.setToolTip("Move selected question up (Alt+↑) — or drag to reorder")
-        self.move_down_button = QPushButton("⬇️ Down")
+        self.move_down_button = QPushButton("↓ Down")
+        self.move_down_button.setObjectName("secondary")
         self.move_down_button.setToolTip("Move selected question down (Alt+↓) — or drag to reorder")
-        self.duplicate_button = QPushButton("📋 Duplicate")
+        self.duplicate_button = QPushButton("⧉ Duplicate")
+        self.duplicate_button.setObjectName("secondary")
         self.duplicate_button.setToolTip("Duplicate selected question (Ctrl+D)")
         reorder_row.addWidget(self.move_up_button)
         reorder_row.addWidget(self.move_down_button)
         reorder_row.addWidget(self.duplicate_button)
 
+        # Row 2: CRUD actions (add = normal, delete = danger, matrix = normal)
         action_row = QHBoxLayout()
         self.add_question_button = QPushButton("➕ Add")
-        self.delete_question_button = QPushButton("🗑️ Delete")
-        self.matrix_button = QPushButton("🔢 Answer Matrix")
+        self.add_question_button.setToolTip("Add a new empty question")
+        self.delete_question_button = QPushButton("🗑 Delete")
+        self.delete_question_button.setObjectName("danger")
+        self.delete_question_button.setToolTip("Delete the selected question (irreversible)")
+        self.matrix_button = QPushButton("⊞ Answer Matrix")
         self.matrix_button.setToolTip("Open quick grid to view and edit all answers at once")
         action_row.addWidget(self.add_question_button)
         action_row.addWidget(self.delete_question_button)
         action_row.addWidget(self.matrix_button)
 
-        self.open_questions_button = QPushButton("Open questions file...")
+        self.open_questions_button = QPushButton("Open questions file…")
+        self.open_questions_button.setObjectName("secondary")
         self.open_questions_button.setToolTip("Load questions from any questions.md or questions.json file")
 
         list_layout.addWidget(self.question_status)
         list_layout.addLayout(filter_row)
+        list_layout.addWidget(list_sep)
         list_layout.addWidget(self.question_list, 1)
         list_layout.addLayout(reorder_row)
         list_layout.addLayout(action_row)
@@ -102,14 +119,17 @@ class ReviewTabWidget(QWidget):
         edit_group = QGroupBox("Review and edit questions")
         edit_layout = QVBoxLayout(edit_group)
         self.question_editor = QuestionEditorWidget()
-        self.save_button = QPushButton("Save questions.md")
+        self.save_button = QPushButton("💾 Save questions.md")
         self.save_button.setObjectName("primary")
-        self.save_as_button = QPushButton("Save as...")
-        self.save_as_button.setToolTip("Save questions to a custom .md or .json file")
-        self.help_button = QPushButton("Markdown format help")
-        self.help_button.setToolTip("Show the questions.md format used by this project.")
         self.save_button.setToolTip("Save the current questions to questions.md. Shortcut: Ctrl+S")
-        self.next_export_button = QPushButton("Next: play or export")
+        self.save_as_button = QPushButton("Save as…")
+        self.save_as_button.setObjectName("secondary")
+        self.save_as_button.setToolTip("Save questions to a custom .md or .json file")
+        self.help_button = QPushButton("? Format help")
+        self.help_button.setObjectName("secondary")
+        self.help_button.setToolTip("Show the questions.md format used by this project.")
+        self.next_export_button = QPushButton("Next: Play & Export →")
+        self.next_export_button.setObjectName("primary")
         edit_layout.addWidget(self.question_editor, 1)
         edit_actions = QHBoxLayout()
         edit_actions.addWidget(self.save_button)
@@ -190,6 +210,12 @@ class ReviewTabWidget(QWidget):
             "Each question uses this format:\n\n## Question 1\n\nQuestion text\n\n- First choice\n- Second choice\n- Third choice\n- Fourth choice\n\nAnswer: A\n\nUse pageImage: path/to/page.png on its own line when a question references a diagram or table.",
         )
 
+    def _set_status_objectname(self, name: str) -> None:
+        """Change the objectName of question_status and re-polish so the stylesheet updates."""
+        self.question_status.setObjectName(name)
+        self.question_status.style().unpolish(self.question_status)
+        self.question_status.style().polish(self.question_status)
+
     def refresh_question_list(self) -> None:
         self.question_list.blockSignals(True)
         self.question_list.clear()
@@ -225,13 +251,15 @@ class ReviewTabWidget(QWidget):
 
         if total == 0:
             self.question_status.setText("No questions in this exam")
-            self.question_status.setStyleSheet("color: var(--muted-color); font-weight: bold;")
+            self._set_status_objectname("statusInfo")
         elif valid == total:
-            self.question_status.setText(f"📊 {total} Questions — All {valid} Complete ✅")
-            self.question_status.setStyleSheet("color: #4ade80; font-weight: bold;")
+            self.question_status.setText(f"📊 {total} questions — all {valid} Complete ✅")
+            self._set_status_objectname("statusSuccess")
         else:
-            self.question_status.setText(f"📊 {total} Questions (✅ {valid} Complete | ⚠️ {total - valid} Incomplete)")
-            self.question_status.setStyleSheet("color: #facc15; font-weight: bold;")
+            self.question_status.setText(
+                f"📊 {total} questions — {valid} Complete, {total - valid} Incomplete ⚠️"
+            )
+            self._set_status_objectname("statusBusy")
 
         # Reselect current question if visible
         current_idx = self.main_window.state["index"]

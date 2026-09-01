@@ -53,7 +53,7 @@ class ExportTabWidget(QWidget):
         self.export_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.export_splitter.setChildrenCollapsible(False)
 
-        # Left panel: Choose exams to include
+        # ── LEFT panel: Choose exams to include ─────────────────────────
         selection_group = QGroupBox("Choose exams to include")
         selection_layout = QVBoxLayout(selection_group)
         self.play_list = QListWidget()
@@ -61,59 +61,90 @@ class ExportTabWidget(QWidget):
 
         play_sel_row = QHBoxLayout()
         self.select_all_button = QPushButton("Select all")
+        self.select_all_button.setObjectName("secondary")
         self.select_all_button.setToolTip("Check all exams to include in the quiz")
         self.clear_all_button = QPushButton("Deselect all")
+        self.clear_all_button.setObjectName("secondary")
         self.clear_all_button.setToolTip("Uncheck all exams")
         play_sel_row.addWidget(self.select_all_button)
         play_sel_row.addWidget(self.clear_all_button)
 
-        self.mix_checkbox = QCheckBox("Mix and shuffle questions (mixed mode)")
+        self.mix_checkbox = QCheckBox("🔀 Mix and shuffle questions")
         self.mix_checkbox.setToolTip("Combine the checked exams into one shuffled quiz.")
 
-        pool_size_row = QHBoxLayout()
+        self.pool_size_widget = QWidget()
+        pool_size_row = QHBoxLayout(self.pool_size_widget)
+        pool_size_row.setContentsMargins(0, 0, 0, 0)
         pool_size_row.addWidget(QLabel("Question pool size:"))
         self.pool_size_spin = QSpinBox()
         self.pool_size_spin.setRange(1, 1000)
         self.pool_size_spin.setValue(30)
-        self.pool_size_spin.setToolTip("Number of questions in mixed mode (default 30)")
+        self.pool_size_spin.setToolTip("Number of questions drawn in mixed mode (default 30)")
         pool_size_row.addWidget(self.pool_size_spin)
-
-        self.all_pool_check = QCheckBox("All questions")
+        self.all_pool_check = QCheckBox("All")
         self.all_pool_check.setToolTip("Include all available questions without limit")
         pool_size_row.addWidget(self.all_pool_check)
         pool_size_row.addStretch()
+        self.pool_size_widget.setVisible(False)  # hidden until mix mode is on
 
         selection_layout.addWidget(self.play_list, 1)
         selection_layout.addLayout(play_sel_row)
         selection_layout.addWidget(self.mix_checkbox)
-        selection_layout.addLayout(pool_size_row)
+        selection_layout.addWidget(self.pool_size_widget)
         self.export_splitter.addWidget(selection_group)
 
-        # Right panel: Play or export your quiz
-        action_group = QGroupBox("Play or export your quiz")
-        action_layout = QVBoxLayout(action_group)
+        # ── RIGHT panel ──────────────────────────────────────────────────
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setSpacing(10)
+
+        # Summary
         self.summary = QLabel("No exams selected. Check one or more exams to continue.")
+        self.summary.setObjectName("sectionHint")
         self.summary.setWordWrap(True)
+        right_layout.addWidget(self.summary)
+
+        # — Group 1: Build HTML files —
+        build_group = QGroupBox("🏗 Build HTML files")
+        build_layout = QVBoxLayout(build_group)
+        build_hint = QLabel("Compile standalone quiz.html files that can be shared or opened offline.")
+        build_hint.setObjectName("sectionHint")
+        build_hint.setWordWrap(True)
+        build_layout.addWidget(build_hint)
 
         self.build_hub_button = QPushButton("🌐 Build Centralized Hub (quiz_hub.html)")
         self.build_hub_button.setObjectName("primary")
-        self.build_hub_button.setToolTip("Compile master quiz hub with exam picker, mixed practice, and progress tracking.")
-
+        self.build_hub_button.setToolTip(
+            "Compile master quiz hub with exam picker, mixed practice, and progress tracking."
+        )
         self.build_all_button = QPushButton("⚡ Build All Standalone HTMLs")
-        self.build_all_button.setToolTip("Compile standalone quiz.html in each ready exam folder.")
+        self.build_all_button.setToolTip(
+            "Compile standalone quiz.html inside each ready exam folder."
+        )
+        build_layout.addWidget(self.build_hub_button)
+        build_layout.addWidget(self.build_all_button)
+        right_layout.addWidget(build_group)
 
-        self.play_button = QPushButton("Play selected quiz in browser")
-        self.export_button = QPushButton("Export selected quiz as HTML...")
-        self.open_runs_button = QPushButton("Open saved quizzes folder")
+        # — Group 2: Play or export this session —
+        play_group = QGroupBox("▶ Play or export")
+        play_layout = QVBoxLayout(play_group)
+        play_hint = QLabel("Generate a temporary quiz for the selected exams and open it in the browser, or save it as an HTML file.")
+        play_hint.setObjectName("sectionHint")
+        play_hint.setWordWrap(True)
+        play_layout.addWidget(play_hint)
 
-        action_layout.addWidget(self.summary)
-        action_layout.addWidget(self.build_hub_button)
-        action_layout.addWidget(self.build_all_button)
-        action_layout.addWidget(self.play_button)
-        action_layout.addWidget(self.export_button)
-        action_layout.addWidget(self.open_runs_button)
-        action_layout.addStretch()
-        self.export_splitter.addWidget(action_group)
+        self.play_button = QPushButton("▶  Play selected quiz in browser")
+        self.play_button.setObjectName("primary")
+        self.export_button = QPushButton("💾 Export as HTML…")
+        self.open_runs_button = QPushButton("📁 Open saved quizzes folder")
+        self.open_runs_button.setObjectName("secondary")
+        play_layout.addWidget(self.play_button)
+        play_layout.addWidget(self.export_button)
+        play_layout.addWidget(self.open_runs_button)
+        right_layout.addWidget(play_group)
+
+        right_layout.addStretch()
+        self.export_splitter.addWidget(right_widget)
 
         self.export_splitter.setStretchFactor(0, 4)
         self.export_splitter.setStretchFactor(1, 6)
@@ -124,13 +155,18 @@ class ExportTabWidget(QWidget):
         self.select_all_button.clicked.connect(self.select_all_play_exams)
         self.clear_all_button.clicked.connect(self.clear_all_play_exams)
         self.play_list.itemChanged.connect(lambda: self.update_summary())
-        self.mix_checkbox.toggled.connect(lambda: self.update_summary())
+        self.mix_checkbox.toggled.connect(self._on_mix_toggled)
         self.all_pool_check.toggled.connect(lambda checked: self.pool_size_spin.setEnabled(not checked))
         self.build_hub_button.clicked.connect(self.build_central_hub_action)
         self.build_all_button.clicked.connect(self.build_all_standalone_action)
         self.play_button.clicked.connect(self.prepare_and_play_quiz)
         self.export_button.clicked.connect(self.export_quiz)
         self.open_runs_button.clicked.connect(self.open_runs_folder)
+
+    def _on_mix_toggled(self, checked: bool) -> None:
+        """Show pool size controls only when mix mode is active."""
+        self.pool_size_widget.setVisible(checked)
+        self.update_summary()
 
     def _show_play_list_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
