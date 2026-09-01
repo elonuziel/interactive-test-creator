@@ -166,8 +166,7 @@ class SuperBatchSummaryDialog(QDialog):
 
         btn_box = QHBoxLayout()
         if succeeded:
-            build_html_btn = QPushButton("⚡ Build HTML Quizzes for Successful Items")
-            btn_box.addWidget(build_html_btn)
+            build_shareable_btn = QPushButton("📦 Build Shareable Quiz (shareable_quiz.html)")
 
             def build_htmls():
                 build_html_btn.setEnabled(False)

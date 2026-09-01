@@ -866,8 +866,7 @@ class ExtractTabWidget(QWidget):
             def _handle_retry_failed(failed_items):
                 retry_plan = type(exec_plan)(root=exec_plan.root, items=tuple(failed_items))
                 self._start_super_batch_execution(retry_plan, provider_opt, command_opt, workers, params)
-            summary_dlg = SuperBatchSummaryDialog(self, list(results), self.config, on_retry_failed=_handle_retry_failed)
-            summary_dlg.exec()
+            summary_dlg = SuperBatchSummaryDialog(
         def _batch_failed(err):
             progress_dlg.accept()
             self.main_window._set_status(f"Super Batch failed: {err}", "error")
