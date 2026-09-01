@@ -228,8 +228,8 @@ def build_plan(root: Path) -> SuperBatchPlan:
     items: list[SuperBatchItem] = []
     # Discover all PDFs
     all_pdfs = [
-        p for p in sorted(root.rglob("*.pdf"), key=lambda p: str(p).casefold())
-        if ".quizbuilder" not in p.parts and not p.name.casefold().endswith("_clean.pdf")
+        p for p in sorted(root.rglob("*"), key=lambda p: str(p).casefold())
+        if p.is_file() and p.suffix.lower() == ".pdf" and ".quizbuilder" not in p.parts and not p.stem.casefold().endswith("_clean")
     ]
     # Group by parent folder to detect multiple PDFs sharing a folder
     by_folder: dict[Path, list[Path]] = {}

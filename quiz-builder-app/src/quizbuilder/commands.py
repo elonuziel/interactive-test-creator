@@ -59,7 +59,7 @@ def process_workspace(
         selected_form = resolution.raw_value
     if selected_answer_key:
         if not selected_form:
-            raise ValueError("Could not detect a form number from the PDF; provide an explicit form override.")
+            selected_form = config.default_form or "0"
         answers = workspace.path / "answers.json"
         runner.extract_answers(selected_answer_key, selected_form, answers)
         artifacts.append(answers)
