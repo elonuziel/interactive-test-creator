@@ -132,11 +132,13 @@ class SuperBatchSummaryDialog(QDialog):
         results: list[Any],
         config: Config,
         on_retry_failed: Callable[[list[SuperBatchItem]], None] | None = None,
+        root: Path | None = None,
     ):
         super().__init__(parent)
         self.results = results
         self.config = config
         self.on_retry_failed = on_retry_failed
+        self.root = root
 
         succeeded = [r for r in results if r.success]
         failed = [r for r in results if not r.success]
@@ -161,12 +163,75 @@ class SuperBatchSummaryDialog(QDialog):
             res_table.setItem(idx, 0, QTableWidgetItem(res.item.overview.name))
             res_table.setItem(idx, 1, QTableWidgetItem("✅ Succeeded" if res.success else "❌ Failed"))
             detail_text = str(res.output) if res.success else str(res.error)
-            res_table.setItem(idx, 2, QTableWidgetItem(detail_text))
         s_layout.addWidget(res_table)
 
         btn_box = QHBoxLayout()
         if succeeded:
-            build_shareable_btn = QPushButton("📦 Build Shareable Quiz (shareable_quiz.html)")
+            build_hub_btn = QPushButton("🌐 Build Shareable Master Quiz (quiz_hub.html)")
+            build_hub_btn.setObjectName("primary")
+            btn_box.addWidget(build_hub_btn)
+
+            def build_hub():
+                build_hub_btn.setEnabled(False)
+                build_hub_btn.setText("Building Master Quiz Hub...")
+                try:
+                    import webbrowser
+                    from ...hub import build_central_hub
+                    from ...models import Workspace
+                    ready_workspaces = [
+                        Workspace(
+                            name=res.item.overview.name,
+                            path=res.item.overview.workspace,
+                            source_pdf=res.item.overview.pdf,
+                        )
+                        for res in succeeded
+                        if (res.item.overview.workspace / "questions.md").is_file()
+                    ]
+                    if not ready_workspaces:
+                        QMessageBox.warning(self, "No questions found", "No workspaces containing questions.md were found.")
+                        build_hub_btn.setEnabled(True)
+                        build_hub_btn.setText("🌐 Build Shareable Master Quiz (quiz_hub.html)")
+                        return
+
+                    target_root = self.root
+                    if not target_root:
+                        target_root = ready_workspaces[0].path.parent
+                        if target_root.name == ".quizbuilder":
+                            target_root = target_root.parent
+                        while target_root.parent and (target_root.name == ".quizbuilder" or any(p.name == ".quizbuilder" for p in target_root.parents)):
+                            target_root = target_root.parent
+
+                    out_path = target_root / "quiz_hub.html"
+                    title = f"מרכז מבחנים אינטראקטיבי - {target_root.name}"
+                    hub_file = build_central_hub(target_root, ready_workspaces, output=out_path, title=title)
+
+                    build_hub_btn.setText("Master Quiz Ready! ✅")
+                    box = QMessageBox(self)
+                    box.setWindowTitle("Shareable Master Quiz Ready")
+                    box.setIcon(QMessageBox.Icon.Information)
+                    box.setText(
+                        f"Shareable Master Quiz Hub generated successfully!\n"
+                        f"Embedded {len(ready_workspaces)} exam(s) into a single, offline-ready file.\n\n"
+                        f"Location:\n{hub_file}"
+                    )
+                    open_btn = box.addButton("🌐 Open Quiz in Browser", QMessageBox.ButtonRole.ActionRole)
+                    folder_btn = box.addButton("📁 Open Folder", QMessageBox.ButtonRole.ActionRole)
+                    box.addButton(QMessageBox.StandardButton.Ok)
+                    box.exec()
+
+                    if box.clickedButton() == open_btn:
+                        webbrowser.open(hub_file.as_uri())
+                    elif box.clickedButton() == folder_btn:
+                        webbrowser.open(hub_file.parent.as_uri())
+                except Exception as exc:
+                    build_hub_btn.setEnabled(True)
+                    build_hub_btn.setText("🌐 Build Shareable Master Quiz (quiz_hub.html)")
+                    QMessageBox.critical(self, "Error Building Master Quiz", str(exc))
+
+            build_hub_btn.clicked.connect(build_hub)
+
+            build_html_btn = QPushButton("⚡ Build Individual HTML Quizzes")
+            btn_box.addWidget(build_html_btn)
 
             def build_htmls():
                 build_html_btn.setEnabled(False)

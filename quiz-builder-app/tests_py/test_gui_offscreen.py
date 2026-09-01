@@ -253,3 +253,21 @@ def test_main_window_has_matrix_button_and_explanation(application, tmp_path):
     window.state["dirty"] = False
     window.close()
 
+
+def test_main_window_has_shareable_master_quiz_button(application, tmp_path):
+    window = MainWindow(Config.defaults(root=tmp_path))
+
+    # Test presence on Tab 1 (Extract)
+    assert hasattr(window, "build_hub_button")
+    assert "Shareable Master Quiz" in window.build_hub_button.text()
+
+    # Test presence on Tab 3 (Export)
+    assert hasattr(window, "build_hub_button")
+    assert "Shareable Master Quiz" in window.export_tab.build_hub_button.text()
+    assert hasattr(window, "export_hub_as_button")
+    assert "Export Master Quiz As" in window.export_hub_as_button.text()
+
+    window.state["dirty"] = False
+    window.close()
+
+

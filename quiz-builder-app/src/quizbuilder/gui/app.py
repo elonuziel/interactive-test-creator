@@ -201,6 +201,10 @@ class MainWindow(QWidget):
     @property
     def web_batch_button(self): return self.extract_tab.web_batch_button
     @property
+    def build_hub_button(self): return self.extract_tab.build_hub_button
+    @property
+    def build_shareable_btn(self): return self.extract_tab.build_hub_button
+    @property
     def extract_group(self): return self.extract_tab.extract_group
     @property
     def current_exam_title(self): return self.extract_tab.current_exam_title
@@ -304,6 +308,10 @@ class MainWindow(QWidget):
     def export_button(self): return self.export_tab.export_button
     @property
     def open_runs_button(self): return self.export_tab.open_runs_button
+    @property
+    def export_hub_as_button(self): return self.export_tab.export_hub_as_button
+    @property
+    def build_all_button(self): return self.export_tab.build_all_button
 
     # ==================== Delegated Tab Methods ====================
     def select_all_extract_exams(self) -> None: self.extract_tab.select_all_extract_exams()

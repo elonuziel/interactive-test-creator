@@ -118,6 +118,10 @@ class ExtractTabWidget(QWidget):
         super_batch_row.addWidget(self.super_batch_button, 1)
         super_batch_row.addWidget(self.super_batch_info_btn)
 
+        self.build_hub_button = QPushButton("🌐 Build Shareable Master Quiz (quiz_hub.html)")
+        self.build_hub_button.setToolTip("Compile all ready exams in this folder into a single standalone quiz_hub.html.")
+        self.build_shareable_btn = self.build_hub_button
+
         left.addWidget(self.exam_search)
         left.addWidget(self.exam_list, 1)
         left.addLayout(exam_sel_row)
@@ -126,6 +130,7 @@ class ExtractTabWidget(QWidget):
         left.addWidget(self.batch_button)
         left.addWidget(self.web_batch_button)
         left.addLayout(super_batch_row)
+        left.addWidget(self.build_hub_button)
         self.extract_splitter.addWidget(self.exam_group)
 
         # ── RIGHT panel: Prepare questions ──────────────────────────────
@@ -353,7 +358,12 @@ class ExtractTabWidget(QWidget):
         self.preview_button.clicked.connect(self.preview_current_page)
         self.preview_page_spin.valueChanged.connect(self.preview_current_page)
         self.preview_toggle_btn.toggled.connect(self._on_preview_toggled)
+        self.build_hub_button.clicked.connect(self._build_shareable_quiz)
         self.next_review_button.clicked.connect(lambda: self.main_window.tabs.setCurrentIndex(1))
+
+    def _build_shareable_quiz(self) -> None:
+        """Trigger compilation of the all-in-one shareable quiz hub from Tab 1."""
+        self.main_window.export_tab.build_central_hub_action()
 
     def _show_exam_list_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
@@ -867,6 +877,13 @@ class ExtractTabWidget(QWidget):
                 retry_plan = type(exec_plan)(root=exec_plan.root, items=tuple(failed_items))
                 self._start_super_batch_execution(retry_plan, provider_opt, command_opt, workers, params)
             summary_dlg = SuperBatchSummaryDialog(
+                self,
+                list(results),
+                self.config,
+                on_retry_failed=_handle_retry_failed,
+                root=self.main_window.state.get("root"),
+            )
+            summary_dlg.exec()
         def _batch_failed(err):
             progress_dlg.accept()
             self.main_window._set_status(f"Super Batch failed: {err}", "error")

@@ -111,16 +111,30 @@ class ExportTabWidget(QWidget):
         build_hint.setWordWrap(True)
         build_layout.addWidget(build_hint)
 
-        self.build_shareable_button = QPushButton("📦 Build Shareable Quiz (shareable_quiz.html)")
+        self.build_hub_button = QPushButton("🌐 Build Shareable Master Quiz (quiz_hub.html)")
+        self.build_hub_button.setObjectName("primary")
         self.build_hub_button.setToolTip(
-            "Compile master quiz hub (quiz_hub.html) with exam picker, mixed practice, and progress tracking."
+            "Compile master quiz hub (quiz_hub.html) embedding all exams, exam picker, mixed practice, and progress tracking."
         )
 
+        self.export_hub_as_button = QPushButton("💾 Export Master Quiz As…")
         self.export_hub_as_button.setObjectName("secondary")
+        self.export_hub_as_button.setToolTip(
+            "Choose a custom filename or destination folder (e.g. shareable_quiz.html) to export the master all-in-one quiz."
+        )
+
+        self.build_all_button = QPushButton("⚡ Build All Standalone HTMLs")
+        self.build_all_button.setObjectName("secondary")
+        self.build_all_button.setToolTip(
             "Compile standalone quiz.html inside each ready exam folder."
-        build_layout.addWidget(self.build_shareable_button)
+        )
+
+        # Alias for backward compatibility
+        self.build_shareable_button = self.build_hub_button
+
         build_layout.addWidget(self.build_hub_button)
         build_layout.addWidget(self.export_hub_as_button)
+        build_layout.addWidget(self.build_all_button)
         right_layout.addWidget(build_group)
         # — Group 2: Play or export this session —
         play_group = QGroupBox("▶ Play or export")
@@ -154,7 +168,6 @@ class ExportTabWidget(QWidget):
         self.play_list.itemChanged.connect(lambda: self.update_summary())
         self.mix_checkbox.toggled.connect(self._on_mix_toggled)
         self.all_pool_check.toggled.connect(lambda checked: self.pool_size_spin.setEnabled(not checked))
-        self.build_shareable_button.clicked.connect(lambda: self.build_shareable_quiz_action(target_filename="shareable_quiz.html", ask_path=False))
         self.build_hub_button.clicked.connect(self.build_central_hub_action)
         self.export_hub_as_button.clicked.connect(lambda: self.build_shareable_quiz_action(target_filename="shareable_quiz.html", ask_path=True))
         self.play_button.clicked.connect(self.prepare_and_play_quiz)
@@ -241,6 +254,13 @@ class ExportTabWidget(QWidget):
         self.build_shareable_quiz_action(target_filename="quiz_hub.html", ask_path=False)
 
     def build_shareable_quiz_action(
+        self,
+        target_filename: str = "quiz_hub.html",
+        ask_path: bool = False,
+    ) -> None:
+        root = self.main_window.state.get("root")
+        if not root:
+            QMessageBox.warning(self, "No exam folder", "Choose an exam folder first.")
             return
 
         selected = self.checked_play_workspaces()
@@ -252,16 +272,70 @@ class ExportTabWidget(QWidget):
                 plan = build_plan(root)
                 selected = [
                     Workspace(
+                        name=item.overview.name,
+                        path=item.overview.workspace,
+                        source_pdf=item.overview.pdf,
+                    )
+                    for item in plan.items
+                    if (item.overview.workspace / "questions.md").is_file()
+                    or (item.overview.workspace / "questions.json").is_file()
+                ]
+            except Exception:
+                selected = []
+
+            if not selected:
+                from ...workspace import discover_batch
+                candidates = discover_batch(root)
+                selected = [c.workspace for c in candidates if c.workspace.questions_path.is_file()]
+
+        if not selected:
             QMessageBox.warning(
+                self,
+                "No questions found",
+                "No workspaces containing questions.md were found to build the master quiz.",
+            )
+            return
 
         out_path = root / target_filename
+        if ask_path:
+            filename, _ = QFileDialog.getSaveFileName(
+                self,
+                "Export Shareable Master Quiz",
+                str(out_path),
                 "HTML files (*.html)",
             )
             if not filename:
                 return
+            out_path = Path(filename)
+
+        buttons_to_toggle = [
+            getattr(self, "build_hub_button", None),
+            getattr(self, "export_hub_as_button", None),
+        ]
+        for btn in buttons_to_toggle:
+            if btn:
+                btn.setEnabled(False)
+
         self.main_window._set_status(
+            f"Building Shareable Master Quiz ({out_path.name}) from {len(selected)} exams...",
+            "busy",
+        )
+
+        title = self.main_window.state.get("hub_title") or f"מרכז מבחנים אינטראקטיבי - {root.name}"
+
+        def build():
+            hub_path = build_central_hub(root, selected, output=out_path, title=title)
+            return hub_path
+
+        worker = Worker(build)
+
+        def done(hub_path: Path):
+            for btn in buttons_to_toggle:
+                if btn:
+                    btn.setEnabled(True)
             self.main_window._set_status(f"{hub_path.name} built successfully", "ready")
 
+            box = QMessageBox(self)
             box.setWindowTitle("Shareable Quiz Ready")
             box.setIcon(QMessageBox.Icon.Information)
             box.setText(
@@ -269,12 +343,23 @@ class ExportTabWidget(QWidget):
                 f"Embedded {len(selected)} exam(s) into a single, 100% self-contained file.\n\n"
                 f"Location:\n{hub_path}"
             )
+            open_btn = box.addButton("🌐 Open Quiz in Browser", QMessageBox.ButtonRole.ActionRole)
+            folder_btn = box.addButton("📁 Open Folder", QMessageBox.ButtonRole.ActionRole)
+            box.addButton(QMessageBox.StandardButton.Ok)
+            box.exec()
 
             if box.clickedButton() == open_btn:
                 webbrowser.open(hub_path.as_uri())
+            elif box.clickedButton() == folder_btn:
                 webbrowser.open(hub_path.parent.as_uri())
 
         def failed(error):
+            for btn in buttons_to_toggle:
+                if btn:
+                    btn.setEnabled(True)
+            self.main_window._set_status("Could not build Shareable Quiz", "error")
+            QMessageBox.critical(
+                self,
                 "Could not build Shareable Quiz",
                 f"{error}\n\nMake sure at least one exam folder contains a valid questions.md file.",
             )
@@ -288,9 +373,16 @@ class ExportTabWidget(QWidget):
         if not root:
             QMessageBox.warning(self, "No exam folder", "Choose an exam folder first.")
             return
-            return
 
-        self.build_all_button.setEnabled(False)
+        selected = self.checked_play_workspaces()
+        if not selected:
+            from ...workspace import discover_batch
+            candidates = discover_batch(root)
+            selected = [c.workspace for c in candidates if c.workspace.questions_path.is_file()]
+
+        if not selected:
+            QMessageBox.warning(self, "No questions found", "No workspaces containing questions.md were found.")
+            return
         self.main_window._set_status(f"Compiling standalone quiz.html for {len(selected)} exams...", "busy")
 
         def build():
