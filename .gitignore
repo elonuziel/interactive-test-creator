@@ -1,6 +1,7 @@
 # Sample test files & test runs
 tests/
 runs/
+test/
 
 # Python & Pytest Caches
 __pycache__/
