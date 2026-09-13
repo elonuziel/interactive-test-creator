@@ -691,11 +691,15 @@ class ExtractTabWidget(QWidget):
                 form=self.form_edit.text().strip() or None,
                 pdf=self.pdf_combo.currentData(),
             )
-        def on_done(report):
+        def on_done(artifacts: list) -> None:
             self.extract_button.setEnabled(True)
-            self.main_window._set_status(report.message, "success")
+            n = len([a for a in artifacts if str(a).endswith("questions.md")])
+            self.main_window._set_status(
+                f"Extracted questions from {workspace.name} — {len(artifacts)} artifact(s) created.", "success"
+            )
             self.main_window.populate_tests()
             self.main_window.load_workspace(workspace)
+            self.main_window.update_summary()   # refresh Tab 3 badge immediately
             self.main_window.tabs.setCurrentIndex(1)
         def on_failed(error):
             self.extract_button.setEnabled(True)
@@ -720,7 +724,7 @@ class ExtractTabWidget(QWidget):
         self.main_window._set_status(f"Extracting questions for {len(selected)} exam(s)...", "busy")
         self.batch_button.setEnabled(False)
         def run_batch():
-            return process_workspaces(selected, self.config)
+            return process_workspaces(self.config, selected)
         def on_done(reports):
             self.batch_button.setEnabled(True)
             self.main_window.populate_tests()

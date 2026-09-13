@@ -338,10 +338,13 @@ class ReviewTabWidget(QWidget):
         index = self.main_window.state["index"]
         if index < 0 or index >= len(self.main_window.state["questions"]):
             return
+        question = self.main_window.state["questions"][index]
+        preview = (question.get("question") or "").strip()
+        preview_text = f'"{preview[:80]}{"…" if len(preview) > 80 else ""}"' if preview else "(empty question)"
         confirm = QMessageBox.question(
             self,
             "Delete Question",
-            f"Are you sure you want to delete Question {index + 1}?",
+            f"Delete Question {index + 1}?\n\n{preview_text}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if confirm == QMessageBox.StandardButton.Yes:

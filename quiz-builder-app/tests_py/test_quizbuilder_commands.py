@@ -61,3 +61,21 @@ def test_process_workspaces_continues_after_one_failure(tmp_path, monkeypatch):
     assert results[0].success is True
     assert results[1].success is False
     assert results[1].error == "broken PDF"
+
+
+def test_process_workspaces_rejects_swapped_args(tmp_path):
+    """Guard against process_workspaces(workspaces, config) arg-order regression.
+
+    The real signature is process_workspaces(config, workspaces).
+    Passing a list as config must raise TypeError immediately so the mistake
+    is caught at call-time, not silently hidden in a worker thread.
+    """
+    import pytest
+    workspaces = [tmp_path / "exam"]
+    config = Config.defaults(root=tmp_path)
+    # Correct order must not raise
+    results = process_workspaces(config, workspaces)
+    assert isinstance(results, tuple)
+    # Swapped order: list in place of Config → TypeError
+    with pytest.raises((TypeError, AttributeError)):
+        process_workspaces(workspaces, config)  # type: ignore[arg-type]

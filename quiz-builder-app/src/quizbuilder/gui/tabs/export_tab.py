@@ -170,7 +170,9 @@ class ExportTabWidget(QWidget):
         self.all_pool_check.toggled.connect(lambda checked: self.pool_size_spin.setEnabled(not checked))
         self.build_hub_button.clicked.connect(self.build_central_hub_action)
         self.export_hub_as_button.clicked.connect(lambda: self.build_shareable_quiz_action(target_filename="shareable_quiz.html", ask_path=True))
+        self.build_all_button.clicked.connect(self.build_all_standalone_action)
         self.play_button.clicked.connect(self.prepare_and_play_quiz)
+        self.export_button.clicked.connect(self.export_quiz)
         self.open_runs_button.clicked.connect(self.open_runs_folder)
 
     def _on_mix_toggled(self, checked: bool) -> None:
