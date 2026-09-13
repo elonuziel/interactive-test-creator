@@ -7,6 +7,7 @@ from quizbuilder.commands import process_workspace
 from quizbuilder.config import Config
 from quizbuilder.exporter import build_standalone_quiz
 from quizbuilder.form_numbers import resolve_form_number
+from quizbuilder.markdown import load_questions
 import pytest
 try:
     import pymupdf as fitz
