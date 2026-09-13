@@ -251,7 +251,7 @@
     async function detectPdfType(inputBuffer) {
         const pdfjs = (typeof window !== 'undefined' ? (window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs) : null);
         if (!pdfjs?.getDocument) {
-            throw new Error('PDF.js לא נטען. אם העמוד נפתח ישירות מהדיסק (file://), יש להשתמש בשרת מקומי (start_test_server.bat) או לוודא חי[...]
+            throw new Error('PDF.js לא נטען. אם העמוד נפתח ישירות מהדיסק (file://), יש להשתמש בשרת מקומי (start_test_server.bat) או לוודא חיבור לרשת.');
         }
 
         const freshData = new Uint8Array(inputBuffer);
