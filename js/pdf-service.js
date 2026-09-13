@@ -205,17 +205,21 @@
         const freshData = new Uint8Array(inputBuffer);
         const loadingTask = pdfjs.getDocument({ data: freshData });
         const pdf = await loadingTask.promise;
-        const pages = [];
+        const pages = await Promise.all(
+            Array.from({ length: pdf.numPages }, (_, i) => i + 1).map(async (pageNumber) => {
+                const page = await pdf.getPage(pageNumber);
+                const textContent = await page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: false });
+                const geoLines = groupPdfTextItemsToLines(textContent.items);
+                const streamLines = buildLinesFromStreamOrder(textContent.items);
+                return chooseBestPageText(geoLines, streamLines);
+            })
+        );
         const pageImages = [];
         let nonWhitespaceChars = 0;
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
             const page = await pdf.getPage(pageNumber);
-            const textContent = await page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: false });
-            const geoLines = groupPdfTextItemsToLines(textContent.items);
-            const streamLines = buildLinesFromStreamOrder(textContent.items);
-            const lineText = chooseBestPageText(geoLines, streamLines);
-            pages.push(lineText);
+            const lineText = pages[pageNumber - 1];
             nonWhitespaceChars += lineText.replace(/\s/g, '').length;
 
             try {
@@ -247,7 +251,7 @@
     async function detectPdfType(inputBuffer) {
         const pdfjs = (typeof window !== 'undefined' ? (window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs) : null);
         if (!pdfjs?.getDocument) {
-            throw new Error('PDF.js לא נטען. אם העמוד נפתח ישירות מהדיסק (file://), יש להשתמש בשרת מקומי (start_test_server.bat) או לוודא חיבור לרשת.');
+            throw new Error('PDF.js לא נטען. אם העמוד נפתח ישירות מהדיסק (file://), יש להשתמש בשרת מקומי (start_test_server.bat) או לוודא חי[...]
         }
 
         const freshData = new Uint8Array(inputBuffer);
@@ -629,4 +633,3 @@
         downloadCleanPdf
     };
 }));
-
