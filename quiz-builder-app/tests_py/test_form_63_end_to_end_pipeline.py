@@ -7,8 +7,11 @@ from quizbuilder.commands import process_workspace
 from quizbuilder.config import Config
 from quizbuilder.exporter import build_standalone_quiz
 from quizbuilder.form_numbers import resolve_form_number
-from quizbuilder.markdown import load_questions
-import pymupdf as fitz
+import pytest
+try:
+    import pymupdf as fitz
+except ImportError:
+    fitz = pytest.importorskip("fitz")
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "form_pipeline"
