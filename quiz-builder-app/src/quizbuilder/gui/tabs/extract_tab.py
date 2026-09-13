@@ -723,12 +723,42 @@ class ExtractTabWidget(QWidget):
             return process_workspaces(selected, self.config)
         def on_done(reports):
             self.batch_button.setEnabled(True)
-            successes = sum(1 for r in reports if r.success)
-            self.main_window._set_status(f"Batch complete: {successes}/{len(reports)} exams processed successfully.", "success")
             self.main_window.populate_tests()
             if selected:
                 self.main_window.load_workspace(selected[0])
-            self.main_window.tabs.setCurrentIndex(1)
+
+            successes = [r for r in reports if r.success]
+            failures  = [r for r in reports if not r.success]
+
+            lines: list[str] = []
+            if successes:
+                lines.append(f"<b>✅ Succeeded ({len(successes)}):</b>")
+                for r in successes:
+                    lines.append(f"&nbsp;&nbsp;• {r.workspace.name}")
+            if failures:
+                lines.append(f"<b>❌ Failed ({len(failures)}):</b>")
+                for r in failures:
+                    detail = f": {r.error}" if r.error else ""
+                    lines.append(f"&nbsp;&nbsp;• {r.workspace.name}{detail}")
+
+            summary_html = "<br>".join(lines)
+            status_type = "success" if not failures else ("error" if not successes else "info")
+            status_msg = f"Batch complete: {len(successes)}/{len(reports)} succeeded."
+            self.main_window._set_status(status_msg, status_type)
+
+            dlg = QMessageBox(self)
+            dlg.setWindowTitle("Batch Extraction Results")
+            dlg.setIcon(
+                QMessageBox.Icon.Information if not failures
+                else QMessageBox.Icon.Warning
+            )
+            dlg.setText(f"Processed <b>{len(reports)}</b> exam(s).")
+            dlg.setInformativeText(summary_html)
+            if failures:
+                self.main_window.tabs.setCurrentIndex(0)  # stay on extract tab
+            else:
+                self.main_window.tabs.setCurrentIndex(1)  # go to review tab
+            dlg.exec()
         def on_failed(error):
             self.batch_button.setEnabled(True)
             self.main_window._set_status(f"Batch failed: {error}", "error")

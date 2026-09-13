@@ -9,7 +9,7 @@ import sys
 from typing import Any
 
 from PySide6.QtCore import QPoint, QSettings, QThreadPool, Qt, QTimer
-from PySide6.QtGui import QAction, QCursor, QGuiApplication, QIcon, QImage, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QAction, QBrush, QColor, QCursor, QGuiApplication, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -470,20 +470,47 @@ class MainWindow(QWidget):
         self.state["batch_candidates"] = candidates
         self.exam_list.clear()
         self.play_list.clear()
+
+        # Colors for dark/light mode — picked to be readable on both backgrounds
+        _CLR_READY   = QColor("#2ea043")   # green  — extracted, no issues
+        _CLR_WARN    = QColor("#d29922")   # amber  — has issues
+        _CLR_PENDING = QColor("#8b8b8b")   # grey   — not extracted yet (no issues)
+
         for candidate in candidates:
+            has_issues = bool(candidate.issues)
+            is_ready   = candidate.ready_to_run  # questions.md exists AND no issues
+            is_pending = not is_ready and not has_issues  # no questions.md, but also no blocking issue
+
             label = candidate.workspace.name
-            if candidate.issues:
+            if has_issues:
                 label += f" ({'; '.join(candidate.issues)})"
+
+            if is_ready:
+                color = _CLR_READY
+                tooltip = "Ready — questions extracted and no issues."
+            elif has_issues:
+                color = _CLR_WARN
+                tooltip = "Issues:\n• " + "\n• ".join(candidate.issues)
+            else:
+                color = _CLR_PENDING
+                tooltip = "Not extracted yet. Select this exam and run extraction."
+
+            brush = QBrush(color)
+
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
+            item.setForeground(brush)
+            item.setToolTip(tooltip)
             self.exam_list.addItem(item)
 
             play_item = QListWidgetItem(label)
             play_item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
             play_item.setFlags(play_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            play_item.setCheckState(Qt.CheckState.Checked if candidate.ready_to_run else Qt.CheckState.Unchecked)
+            play_item.setCheckState(Qt.CheckState.Checked if is_ready else Qt.CheckState.Unchecked)
+            play_item.setForeground(brush)
+            play_item.setToolTip(tooltip)
             self.play_list.addItem(play_item)
 
         self._set_root_label(self.state['root'])
@@ -546,7 +573,11 @@ class MainWindow(QWidget):
             self.pdf_combo.addItem(workspace.source_pdf.name, workspace.source_pdf)
         elif sources.pdf:
             self.pdf_combo.addItem(sources.pdf.name, sources.pdf)
-        for doc in sorted(list(workspace.path.glob("*.pdf")) + list(workspace.path.glob("*.docx")), key=lambda item: item.name.casefold()):
+        _pdf_exts = {".pdf", ".docx"}
+        for doc in sorted(
+            (p for p in workspace.path.iterdir() if p.is_file() and p.suffix.lower() in _pdf_exts),
+            key=lambda item: item.name.casefold(),
+        ):
             if self.pdf_combo.findData(doc) < 0:
                 self.pdf_combo.addItem(doc.name, doc)
         if not self.pdf_combo.count():
@@ -557,7 +588,11 @@ class MainWindow(QWidget):
         self.answer_combo.addItem("No answer key", None)
         for answer in sources.answer_keys:
             self.answer_combo.addItem(answer.name, answer)
-        for ans in sorted(list(workspace.path.glob("*.csv")) + list(workspace.path.glob("*.xlsx")) + list(workspace.path.glob("*.xls")), key=lambda item: item.name.casefold()):
+        _ans_exts = {".csv", ".xlsx", ".xls"}
+        for ans in sorted(
+            (p for p in workspace.path.iterdir() if p.is_file() and p.suffix.lower() in _ans_exts),
+            key=lambda item: item.name.casefold(),
+        ):
             if self.answer_combo.findData(ans) < 0:
                 self.answer_combo.addItem(ans.name, ans)
 
