@@ -183,11 +183,12 @@ class MainWindow(QWidget):
     # ==================== Dynamic Tab Delegation ====================
     def __getattr__(self, name: str) -> Any:
         """Forward unmatched attribute/method lookups to child tabs for backward compatibility."""
-        for tab in (
-            getattr(self, "extract_tab", None),
-            getattr(self, "review_tab", None),
-            getattr(self, "export_tab", None),
-        ):
+        tabs = [
+            self.__dict__.get("extract_tab"),
+            self.__dict__.get("review_tab"),
+            self.__dict__.get("export_tab"),
+        ]
+        for tab in tabs:
             if tab is not None and hasattr(tab, name):
                 return getattr(tab, name)
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
@@ -196,9 +197,9 @@ class MainWindow(QWidget):
         """Include child tab attributes in introspection and autocompletion."""
         attrs = set(super().__dir__())
         for tab in (
-            getattr(self, "extract_tab", None),
-            getattr(self, "review_tab", None),
-            getattr(self, "export_tab", None),
+            self.__dict__.get("extract_tab"),
+            self.__dict__.get("review_tab"),
+            self.__dict__.get("export_tab"),
         ):
             if tab is not None:
                 attrs.update(dir(tab))

@@ -55,9 +55,9 @@ def test_question_editor_image_preview_with_workspace_path(tmp_path):
         "image": "images/diagram.png",
     }
 
-    # Pass relative workspace_path
     editor.set_question(question, workspace_path=tmp_path)
-    assert editor.image_preview.isVisible()
+    assert not editor.image_preview.isHidden()
+    assert editor.image_preview.pixmap() is not None and not editor.image_preview.pixmap().isNull()
     assert "Attached Graph/Diagram" in editor.image_info_label.text()
     assert "not found on disk" not in editor.image_info_label.text()
 

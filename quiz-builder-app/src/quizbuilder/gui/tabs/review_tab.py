@@ -151,7 +151,7 @@ class ReviewTabWidget(QWidget):
         self.question_list.model().rowsMoved.connect(lambda *_: self._on_questions_reordered())
         self.help_button.clicked.connect(self.show_markdown_help)
         self.question_editor.changed.connect(self.mark_dirty)
-        self.question_editor.crop_requested.connect(self.main_window.open_image_cropper)
+        self.question_editor.crop_requested.connect(lambda: self.main_window.open_image_cropper())
         self.move_up_button.clicked.connect(self.move_question_up)
         self.move_down_button.clicked.connect(self.move_question_down)
         self.duplicate_button.clicked.connect(self.duplicate_question)
