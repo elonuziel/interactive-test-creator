@@ -178,186 +178,31 @@ class MainWindow(QWidget):
         self.refresh_root_btn.clicked.connect(self.reload_folder)
         self.recent_btn.clicked.connect(self._show_recent_menu)
         self.theme_button.clicked.connect(self.toggle_theme)
-        QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(lambda: (self.exam_search.setFocus(), self.exam_search.selectAll()))
+        QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(lambda: (self.extract_tab.exam_search.setFocus(), self.extract_tab.exam_search.selectAll()))
 
-    # ==================== Delegated Tab Attributes ====================
-    # Tab 1: Extract Tab Properties
-    @property
-    def exam_group(self): return self.extract_tab.exam_group
-    @property
-    def exam_search(self): return self.extract_tab.exam_search
-    @property
-    def exam_list(self): return self.extract_tab.exam_list
-    @property
-    def exam_select_all_btn(self): return self.extract_tab.exam_select_all_btn
-    @property
-    def exam_deselect_all_btn(self): return self.extract_tab.exam_deselect_all_btn
-    @property
-    def batch_button(self): return self.extract_tab.batch_button
-    @property
-    def super_batch_button(self): return self.extract_tab.super_batch_button
-    @property
-    def super_batch_info_btn(self): return self.extract_tab.super_batch_info_btn
-    @property
-    def web_batch_button(self): return self.extract_tab.web_batch_button
-    @property
-    def build_hub_button(self): return self.extract_tab.build_hub_button
-    @property
-    def build_shareable_btn(self): return self.extract_tab.build_hub_button
-    @property
-    def extract_group(self): return self.extract_tab.extract_group
-    @property
-    def current_exam_title(self): return self.extract_tab.current_exam_title
-    @property
-    def pdf_combo(self): return self.extract_tab.pdf_combo
-    @property
-    def browse_pdf_button(self): return self.extract_tab.browse_pdf_button
-    @property
-    def detection_title(self): return self.extract_tab.detection_title
-    @property
-    def detection_description(self): return self.extract_tab.detection_description
-    @property
-    def extract_button(self): return self.extract_tab.extract_button
-    @property
-    def ai_hint(self): return self.extract_tab.ai_hint
-    @property
-    def ai_provider_combo(self): return self.extract_tab.ai_provider_combo
-    @property
-    def launch_ai_button(self): return self.extract_tab.launch_ai_button
-    @property
-    def ai_info_btn(self): return self.extract_tab.ai_info_btn
-    @property
-    def answer_combo(self): return self.extract_tab.answer_combo
-    @property
-    def browse_answer_button(self): return self.extract_tab.browse_answer_button
-    @property
-    def form_edit(self): return self.extract_tab.form_edit
-    @property
-    def clean_group(self): return self.extract_tab.clean_group
-    @property
-    def clean_hint(self): return self.extract_tab.clean_hint
-    @property
-    def preset_std_button(self): return self.extract_tab.preset_std_button
-    @property
-    def preset_even_button(self): return self.extract_tab.preset_even_button
-    @property
-    def preset_odd_button(self): return self.extract_tab.preset_odd_button
-    @property
-    def preset_clear_button(self): return self.extract_tab.preset_clear_button
-    @property
-    def discard_range_edit(self): return self.extract_tab.discard_range_edit
-    @property
-    def clean_pdf_button(self): return self.extract_tab.clean_pdf_button
-    @property
-    def clean_summary_label(self): return self.extract_tab.clean_summary_label
-    @property
-    def preview(self): return self.extract_tab.preview
-    @property
-    def preview_button(self): return self.extract_tab.preview_button
-    @property
-    def next_review_button(self): return self.extract_tab.next_review_button
+    # ==================== Dynamic Tab Delegation ====================
+    def __getattr__(self, name: str) -> Any:
+        """Forward unmatched attribute/method lookups to child tabs for backward compatibility."""
+        for tab in (
+            getattr(self, "extract_tab", None),
+            getattr(self, "review_tab", None),
+            getattr(self, "export_tab", None),
+        ):
+            if tab is not None and hasattr(tab, name):
+                return getattr(tab, name)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
-    # Tab 2: Review Tab Properties
-    @property
-    def question_status(self): return self.review_tab.question_status
-    @property
-    def question_filter_edit(self): return self.review_tab.question_filter_edit
-    @property
-    def filter_incomplete_checkbox(self): return self.review_tab.filter_incomplete_checkbox
-    @property
-    def question_list(self): return self.review_tab.question_list
-    @property
-    def move_up_button(self): return self.review_tab.move_up_button
-    @property
-    def move_down_button(self): return self.review_tab.move_down_button
-    @property
-    def duplicate_button(self): return self.review_tab.duplicate_button
-    @property
-    def add_question_button(self): return self.review_tab.add_question_button
-    @property
-    def delete_question_button(self): return self.review_tab.delete_question_button
-    @property
-    def matrix_button(self): return self.review_tab.matrix_button
-    @property
-    def open_questions_button(self): return self.review_tab.open_questions_button
-    @property
-    def question_editor(self): return self.review_tab.question_editor
-    @property
-    def save_button(self): return self.review_tab.save_button
-    @property
-    def save_as_button(self): return self.review_tab.save_as_button
-    @property
-    def help_button(self): return self.review_tab.help_button
-    @property
-    def next_export_button(self): return self.review_tab.next_export_button
-
-    # Tab 3: Export Tab Properties
-    @property
-    def play_list(self): return self.export_tab.play_list
-    @property
-    def select_all_button(self): return self.export_tab.select_all_button
-    @property
-    def clear_all_button(self): return self.export_tab.clear_all_button
-    @property
-    def mix_checkbox(self): return self.export_tab.mix_checkbox
-    @property
-    def summary(self): return self.export_tab.summary
-    @property
-    def play_button(self): return self.export_tab.play_button
-    @property
-    def export_button(self): return self.export_tab.export_button
-    @property
-    def open_runs_button(self): return self.export_tab.open_runs_button
-    @property
-    def export_hub_as_button(self): return self.export_tab.export_hub_as_button
-    @property
-    def build_all_button(self): return self.export_tab.build_all_button
-
-    # ==================== Delegated Tab Methods ====================
-    def select_all_extract_exams(self) -> None: self.extract_tab.select_all_extract_exams()
-    def deselect_all_extract_exams(self) -> None: self.extract_tab.deselect_all_extract_exams()
-    def invert_extract_exams_selection(self) -> None: self.extract_tab.invert_extract_exams_selection()
-    def filter_exams(self, query: str) -> None: self.extract_tab.filter_exams(query)
-    def choose_custom_exam_file(self) -> None: self.extract_tab.choose_custom_exam_file()
-    def choose_custom_answer_key(self) -> None: self.extract_tab.choose_custom_answer_key()
-    def preview_first_page(self) -> None: self.extract_tab.preview_first_page()
-    def set_discard_preset(self, rule: str) -> None: self.extract_tab.set_discard_preset(rule)
-    def update_clean_summary(self) -> None: self.extract_tab.update_clean_summary()
-    def run_clean_pdf(self) -> None: self.extract_tab.run_clean_pdf()
-    def reload_ai_providers(self) -> None: self.extract_tab.reload_ai_providers()
-    def show_cli_agent_guide(self) -> None: self.extract_tab.show_cli_agent_guide()
-    def process_selected_exam(self) -> None: self.extract_tab.process_selected_exam()
-    def process_batch_checked(self) -> None: self.extract_tab.process_batch_checked()
-    def launch_ai(self) -> None: self.extract_tab.launch_ai()
-    def open_super_batch(self) -> None: self.extract_tab.open_super_batch()
-    def open_web_batch_wizard(self) -> None: self.extract_tab.open_web_batch_wizard()
-
-    def refresh_question_list(self) -> None: self.review_tab.refresh_question_list()
-    def show_question(self, row: int) -> None: self.review_tab.show_question(row)
-    def save_active_question(self) -> None: self.review_tab.save_active_question()
-    def mark_dirty(self) -> None: self.review_tab.mark_dirty()
-    def add_question(self) -> None: self.review_tab.add_question()
-    def duplicate_question(self) -> None: self.review_tab.duplicate_question()
-    def delete_question(self) -> None: self.review_tab.delete_question()
-    def move_question_up(self) -> None: self.review_tab.move_question_up()
-    def move_question_down(self) -> None: self.review_tab.move_question_down()
-    def open_answer_matrix(self) -> None: self.review_tab.open_answer_matrix()
-    def import_custom_questions_file(self) -> None: self.review_tab.import_custom_questions_file()
-    def save_questions_as(self) -> None: self.review_tab.save_questions_as()
-    def save_test(self) -> None: self.review_tab.save_test()
-    def show_markdown_help(self) -> None: self.review_tab.show_markdown_help()
-
-    def select_all_play_exams(self) -> None: self.export_tab.select_all_play_exams()
-    def clear_all_play_exams(self) -> None: self.export_tab.clear_all_play_exams()
-    def invert_play_exams_selection(self) -> None: self.export_tab.invert_play_exams_selection()
-    def select_all_exams(self) -> None: self.export_tab.select_all_exams()
-    def clear_all_exams(self) -> None: self.export_tab.clear_all_exams()
-    def checked_play_workspaces(self) -> list: return self.export_tab.checked_play_workspaces()
-    def update_summary(self) -> None: self.export_tab.update_summary()
-    def prepare_and_play_quiz(self) -> None: self.export_tab.prepare_and_play_quiz()
-    def export_quiz(self) -> None: self.export_tab.export_quiz()
-    def open_image_cropper(self) -> None: self.export_tab.open_image_cropper()
-    def open_runs_folder(self) -> None: self.export_tab.open_runs_folder()
+    def __dir__(self) -> list[str]:
+        """Include child tab attributes in introspection and autocompletion."""
+        attrs = set(super().__dir__())
+        for tab in (
+            getattr(self, "extract_tab", None),
+            getattr(self, "review_tab", None),
+            getattr(self, "export_tab", None),
+        ):
+            if tab is not None:
+                attrs.update(dir(tab))
+        return sorted(attrs)
 
     # ==================== MainWindow Core Functions ====================
     def start_worker(self, worker: Worker) -> None:
@@ -455,7 +300,7 @@ class MainWindow(QWidget):
         self.state["root"] = target
         self.settings.setValue("last_root", str(target))
         self._add_recent_folder(str(target))
-        self._set_root_label(target) if False else self._set_root_label(target)
+        self._set_root_label(target)
         self.populate_tests()
         self._set_status(f"Loaded exam folder: {target}", "success")
 
@@ -468,8 +313,8 @@ class MainWindow(QWidget):
             self.status_label.setText(str(exc))
             return
         self.state["batch_candidates"] = candidates
-        self.exam_list.clear()
-        self.play_list.clear()
+        self.extract_tab.exam_list.clear()
+        self.export_tab.play_list.clear()
 
         # Colors for dark/light mode — picked to be readable on both backgrounds
         _CLR_READY   = QColor("#2ea043")   # green  — extracted, no issues
@@ -503,7 +348,7 @@ class MainWindow(QWidget):
             item.setCheckState(Qt.CheckState.Unchecked)
             item.setForeground(brush)
             item.setToolTip(tooltip)
-            self.exam_list.addItem(item)
+            self.extract_tab.exam_list.addItem(item)
 
             play_item = QListWidgetItem(label)
             play_item.setData(Qt.ItemDataRole.UserRole, candidate.workspace)
@@ -511,12 +356,12 @@ class MainWindow(QWidget):
             play_item.setCheckState(Qt.CheckState.Checked if is_ready else Qt.CheckState.Unchecked)
             play_item.setForeground(brush)
             play_item.setToolTip(tooltip)
-            self.play_list.addItem(play_item)
+            self.export_tab.play_list.addItem(play_item)
 
         self._set_root_label(self.state['root'])
-        if self.exam_list.count() > 0:
-            self.exam_list.setCurrentRow(0)
-        self.update_summary()
+        if self.extract_tab.exam_list.count() > 0:
+            self.extract_tab.exam_list.setCurrentRow(0)
+        self.export_tab.update_summary()
 
     def reload_folder(self) -> None:
         if not self.state["root"]:
@@ -550,9 +395,9 @@ class MainWindow(QWidget):
         if workspace:
             if not self.confirm_discard_changes():
                 if previous:
-                    self.exam_list.blockSignals(True)
-                    self.exam_list.setCurrentItem(previous)
-                    self.exam_list.blockSignals(False)
+                    self.extract_tab.exam_list.blockSignals(True)
+                    self.extract_tab.exam_list.setCurrentItem(previous)
+                    self.extract_tab.exam_list.blockSignals(False)
                 return
             self.load_workspace(workspace)
 
@@ -564,39 +409,39 @@ class MainWindow(QWidget):
         self.state["index"] = -1
         self.state["loading"] = True
         self.settings.setValue("last_workspace", workspace.name)
-        self.current_exam_title.setText(f"Exam: {workspace.name}")
+        self.extract_tab.current_exam_title.setText(f"Exam: {workspace.name}")
 
-        self.pdf_combo.blockSignals(True)
-        self.pdf_combo.clear()
+        self.extract_tab.pdf_combo.blockSignals(True)
+        self.extract_tab.pdf_combo.clear()
         sources = discover_sources(workspace)
         if getattr(workspace, "source_pdf", None):
-            self.pdf_combo.addItem(workspace.source_pdf.name, workspace.source_pdf)
+            self.extract_tab.pdf_combo.addItem(workspace.source_pdf.name, workspace.source_pdf)
         elif sources.pdf:
-            self.pdf_combo.addItem(sources.pdf.name, sources.pdf)
+            self.extract_tab.pdf_combo.addItem(sources.pdf.name, sources.pdf)
         _pdf_exts = {".pdf", ".docx"}
         for doc in sorted(
             (p for p in workspace.path.iterdir() if p.is_file() and p.suffix.lower() in _pdf_exts),
             key=lambda item: item.name.casefold(),
         ):
-            if self.pdf_combo.findData(doc) < 0:
-                self.pdf_combo.addItem(doc.name, doc)
-        if not self.pdf_combo.count():
-            self.pdf_combo.addItem("No exam file selected", None)
-        self.pdf_combo.blockSignals(False)
+            if self.extract_tab.pdf_combo.findData(doc) < 0:
+                self.extract_tab.pdf_combo.addItem(doc.name, doc)
+        if not self.extract_tab.pdf_combo.count():
+            self.extract_tab.pdf_combo.addItem("No exam file selected", None)
+        self.extract_tab.pdf_combo.blockSignals(False)
 
-        self.answer_combo.clear()
-        self.answer_combo.addItem("No answer key", None)
+        self.extract_tab.answer_combo.clear()
+        self.extract_tab.answer_combo.addItem("No answer key", None)
         for answer in sources.answer_keys:
-            self.answer_combo.addItem(answer.name, answer)
+            self.extract_tab.answer_combo.addItem(answer.name, answer)
         _ans_exts = {".csv", ".xlsx", ".xls"}
         for ans in sorted(
             (p for p in workspace.path.iterdir() if p.is_file() and p.suffix.lower() in _ans_exts),
             key=lambda item: item.name.casefold(),
         ):
-            if self.answer_combo.findData(ans) < 0:
-                self.answer_combo.addItem(ans.name, ans)
+            if self.extract_tab.answer_combo.findData(ans) < 0:
+                self.extract_tab.answer_combo.addItem(ans.name, ans)
 
-        self.preview.setText("No exam preview loaded.")
+        self.extract_tab.preview.setText("No exam preview loaded.")
 
         self.state["loading"] = False
         try:
@@ -609,15 +454,15 @@ class MainWindow(QWidget):
             self._set_status(f"{workspace.name}: No questions.md yet. Extract questions or write them in the review tab.", "info")
 
         self.state["index"] = 0 if self.state["questions"] else -1
-        self.refresh_question_list()
+        self.review_tab.refresh_question_list()
         self._update_tab_labels()
-        self.update_summary()
+        self.export_tab.update_summary()
         self.extract_tab._on_pdf_selection_changed()
 
     def confirm_discard_changes(self) -> bool:
         if not self.state["dirty"]:
             return True
-        self.save_active_question()
+        self.review_tab.save_active_question()
         choice = QMessageBox.question(
             self,
             "Unsaved changes",
@@ -626,7 +471,7 @@ class MainWindow(QWidget):
             QMessageBox.StandardButton.Save,
         )
         if choice == QMessageBox.StandardButton.Save:
-            self.save_test()
+            self.review_tab.save_test()
             return True
         if choice == QMessageBox.StandardButton.Discard:
             self.state["dirty"] = False
@@ -656,11 +501,11 @@ class MainWindow(QWidget):
             self.populate_tests()
             last_workspace = self.settings.value("last_workspace")
             if last_workspace:
-                for index in range(self.exam_list.count()):
-                    item = self.exam_list.item(index)
+                for index in range(self.extract_tab.exam_list.count()):
+                    item = self.extract_tab.exam_list.item(index)
                     workspace = item.data(Qt.ItemDataRole.UserRole)
                     if workspace and workspace.name == last_workspace:
-                        self.exam_list.setCurrentItem(item)
+                        self.extract_tab.exam_list.setCurrentItem(item)
                         break
 
     def closeEvent(self, event) -> None:

@@ -1,17 +1,25 @@
-"""Regression tests for GUI fixes in Round 3:
+"""Regression tests for GUI fixes and dynamic delegation in Round 3:
 - discover_batch export and imports
 - LITE_STYLESHEET typography rule
 - Question editor relative image preview resolution
 - MainWindow session restore with invalid paths
+- MainWindow dynamic __getattr__ and __dir__ delegation
 """
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 import pytest
 
 from quizbuilder import batch
 from quizbuilder import workspace
 from quizbuilder.gui import styles
+
+
+# Valid 1x1 PNG byte sequence
+VALID_1X1_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
 
 
 def test_batch_module_exports_discover_batch():
@@ -37,12 +45,7 @@ def test_question_editor_image_preview_with_workspace_path(tmp_path):
     img_dir = tmp_path / "images"
     img_dir.mkdir()
     sample_img = img_dir / "diagram.png"
-    # Write a 1x1 transparent PNG
-    sample_img.write_bytes(
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00"
-        b"\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    sample_img.write_bytes(VALID_1X1_PNG)
 
     editor = QuestionEditorWidget()
     question = {
@@ -83,3 +86,45 @@ def test_main_window_restore_session_invalid_root(tmp_path):
     window.close()
     window.deleteLater()
 
+
+def test_main_window_dynamic_delegation(tmp_path):
+    """Verify __getattr__ and __dir__ delegate seamlessly to all 3 tabs."""
+    pytest.importorskip("PySide6")
+    from PySide6.QtWidgets import QApplication
+    from quizbuilder.config import Config
+    from quizbuilder.gui.app import MainWindow
+
+    _app = QApplication.instance() or QApplication([])
+
+    window = MainWindow(Config.defaults(root=tmp_path))
+
+    # Attributes on extract_tab
+    assert hasattr(window, "exam_list")
+    assert window.exam_list is window.extract_tab.exam_list
+    assert hasattr(window, "select_all_extract_exams")
+    assert callable(window.select_all_extract_exams)
+
+    # Attributes on review_tab
+    assert hasattr(window, "question_editor")
+    assert window.question_editor is window.review_tab.question_editor
+    assert hasattr(window, "refresh_question_list")
+    assert callable(window.refresh_question_list)
+
+    # Attributes on export_tab
+    assert hasattr(window, "play_list")
+    assert window.play_list is window.export_tab.play_list
+    assert hasattr(window, "select_all_play_exams")
+    assert callable(window.select_all_play_exams)
+
+    # Unknown attribute raises AttributeError
+    with pytest.raises(AttributeError):
+        _ = window.non_existent_attribute_12345
+
+    # dir(window) includes tab attributes
+    dir_attrs = dir(window)
+    assert "exam_list" in dir_attrs
+    assert "question_editor" in dir_attrs
+    assert "play_list" in dir_attrs
+
+    window.close()
+    window.deleteLater()
