@@ -289,7 +289,8 @@ class ReviewTabWidget(QWidget):
 
         self.main_window.state["loading"] = True
         self.question_editor.setEnabled(True)
-        self.question_editor.set_question(question)
+        ws = self.main_window.state.get("workspace")
+        self.question_editor.set_question(question, workspace_path=ws.path if ws else None)
         self.main_window.state["loading"] = False
 
     def save_active_question(self) -> None:
@@ -390,7 +391,8 @@ class ReviewTabWidget(QWidget):
             self.refresh_question_list()
             current_idx = self.main_window.state["index"]
             if 0 <= current_idx < len(questions):
-                self.question_editor.set_question(questions[current_idx])
+                ws = self.main_window.state.get("workspace")
+                self.question_editor.set_question(questions[current_idx], workspace_path=ws.path if ws else None)
 
     def import_custom_questions_file(self) -> None:
         workspace = self.main_window.state["workspace"]

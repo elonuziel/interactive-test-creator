@@ -286,7 +286,7 @@ class ExportTabWidget(QWidget):
                 selected = []
 
             if not selected:
-                from ...workspace import discover_batch
+                from ...batch import discover_batch
                 candidates = discover_batch(root)
                 selected = [c.workspace for c in candidates if c.workspace.questions_path.is_file()]
 
@@ -378,13 +378,14 @@ class ExportTabWidget(QWidget):
 
         selected = self.checked_play_workspaces()
         if not selected:
-            from ...workspace import discover_batch
+            from ...batch import discover_batch
             candidates = discover_batch(root)
             selected = [c.workspace for c in candidates if c.workspace.questions_path.is_file()]
 
         if not selected:
             QMessageBox.warning(self, "No questions found", "No workspaces containing questions.md were found.")
             return
+        self.build_all_button.setEnabled(False)
         self.main_window._set_status(f"Compiling standalone quiz.html for {len(selected)} exams...", "busy")
 
         def build():

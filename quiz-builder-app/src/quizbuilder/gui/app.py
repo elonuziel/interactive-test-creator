@@ -645,9 +645,14 @@ class MainWindow(QWidget):
     def _restore_session(self) -> None:
         saved = self.settings.value("last_exam_folder", "") or self.settings.value("last_root", "")
         configured = self.config.workspace_root
-        self.state["root"] = configured if configured.is_dir() else Path(saved) if (saved and Path(saved).is_dir()) else configured
-        if self.state["root"] and self.state["root"].is_dir():
-            self._set_root_label(self.state['root'])
+        target_root = None
+        if configured and configured.is_dir():
+            target_root = configured
+        elif saved and Path(saved).is_dir():
+            target_root = Path(saved)
+        self.state["root"] = target_root
+        if target_root:
+            self._set_root_label(target_root)
             self.populate_tests()
             last_workspace = self.settings.value("last_workspace")
             if last_workspace:

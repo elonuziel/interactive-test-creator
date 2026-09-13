@@ -50,6 +50,7 @@ QTabBar::tab:selected { background: #ffffff; color: #2563eb; font-weight: 600; }
 QListWidget::item:selected { background: #e0e7ff; color: #1e1b4b; }
 QFrame#draggablePdf { background: #eff6ff; border: 2px dashed #93c5fd; border-radius: 8px; }
 QFrame#draggablePdf:hover { background: #dbeafe; border-color: #3b82f6; }
+QLabel { color: #1e293b; }
 QProgressBar { background: #e2e8f0; }
 QProgressBar::chunk { background: #2563eb; }
 QSplitter::handle { background: #e2e8f0; }
