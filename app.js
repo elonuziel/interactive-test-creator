@@ -393,12 +393,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCustomPracticeSelection() {
-        const selectedIndices = getCustomSelectedIndices();
-        const count = selectedIndices.length;
+        const count = getCustomSelectedIndices().length;
         if (customSelectedCount) customSelectedCount.textContent = count;
-        if (startCustomPracticeBtn) {
-            startCustomPracticeBtn.disabled = (count === 0);
-        }
+        if (startCustomPracticeBtn) startCustomPracticeBtn.disabled = count === 0;
     }
 
     [chkMixWrong, chkMixUnanswered, chkMixFlagged].forEach(chk => {

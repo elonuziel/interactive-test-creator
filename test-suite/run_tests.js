@@ -107,6 +107,29 @@ runTest('Mix & Match Custom Practice', 'Combines categories and manual selection
     assert.deepStrictEqual(selected, [0, 2, 3]);
 });
 
+runTest('updateCustomPracticeSelection Helper', 'Updates DOM elements or handles null elements gracefully', () => {
+    let customSelectedCount = { textContent: '' };
+    let startCustomPracticeBtn = { disabled: false };
+
+    function updateCustomPracticeSelection(getIndicesFn, countEl, btnEl) {
+        const count = getIndicesFn().length;
+        if (countEl) countEl.textContent = count;
+        if (btnEl) btnEl.disabled = (count === 0);
+    }
+
+    updateCustomPracticeSelection(() => [0, 1, 2], customSelectedCount, startCustomPracticeBtn);
+    assert.strictEqual(customSelectedCount.textContent, 3);
+    assert.strictEqual(startCustomPracticeBtn.disabled, false);
+
+    updateCustomPracticeSelection(() => [], customSelectedCount, startCustomPracticeBtn);
+    assert.strictEqual(customSelectedCount.textContent, 0);
+    assert.strictEqual(startCustomPracticeBtn.disabled, true);
+
+    // Test null elements
+    updateCustomPracticeSelection(() => [1], null, null);
+});
+
+
 runTest('Standalone Export', 'Escapes script terminators and inlines scripts', () => {
     const QuizExport = require('../quiz-export.js');
     const template = '<link rel="stylesheet" href="style.css"><script id="quiz-data" type="application/json"></script><script src="quiz-core.js"></script><script src="app.js"></script>';
