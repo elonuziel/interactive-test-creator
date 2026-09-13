@@ -82,3 +82,4 @@ def test_main_window_restore_session_invalid_root(tmp_path):
 
     window.close()
     window.deleteLater()
+
