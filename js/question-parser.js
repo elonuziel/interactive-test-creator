@@ -168,6 +168,7 @@
         const ansInlineGlobal = /(?:^|[\s\u2022\-\*\+\(\[])([אבגדהוזחטי])\s*[\.\)]\s*/g;
         const noisePattern = /^עמוד\s+\d+\s+מתוך\s+\d+$/;
         const footerPattern = /^-+\s*סוף\s+המבחן\s*-+$/;
+        const examHeaderPattern = /(?:קוד מבחן|מבחן מס)/;
         const qInlineLocator = /\s(#*\s*(?:שאלה\s+(?:מספר\s*)?:?\s*:?\d+\s*:?|[\(\[]?\s*:??\d+\s*[\)\(\.-\]]?)\s+)/i;
         const hebOptionOrder = { 'א': 1, 'ב': 2, 'ג': 3, 'ד': 4, 'ה': 5, 'ו': 6, 'ז': 7, 'ח': 8, 'ט': 9 };
 
@@ -585,7 +586,7 @@
             let lastHeaderNum = null;
             for (let i = 0; i < workingLines.length; i++) {
                 const line = workingLines[i];
-                if (!line || noisePattern.test(line) || line.includes('קוד מבחן') || line.includes("מבחן מס") || line.includes('מבחן מס')) {
+                if (!line || noisePattern.test(line) || examHeaderPattern.test(line)) {
                     continue;
                 }
                 const reversedLine = line.split(/\s+/).reverse().join(' ');
@@ -635,7 +636,7 @@
 
                 for (let bi = 1; bi < blockLines.length; bi++) {
                     let line = blockLines[bi];
-                    if (!line || noisePattern.test(line) || line.includes('קוד מבחן') || line.includes("מבחן מס") || line.includes('מבחן מס')) {
+                    if (!line || noisePattern.test(line) || examHeaderPattern.test(line)) {
                         continue;
                     }
 
