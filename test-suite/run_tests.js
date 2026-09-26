@@ -211,6 +211,20 @@ runTest('Progress Controller Module', 'Verifies ProgressController starts tasks,
     assert.strictEqual(task.isAborted(), true);
 });
 
+
+runTest('Question Parser - WhiteSpace Normalization', 'Handles null, undefined, NBSP, multiline, and extra whitespace correctly', () => {
+    const QuestionParser = require('../js/question-parser.js');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(null), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(undefined), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(''), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('   '), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('hello\u00A0world'), 'hello world');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('  hello \t \n world  '), 'hello world');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('\u00A0\u00A0test\u00A0\u00A0'), 'test');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(123), '123');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('  שאלה   מספר  1  '), 'שאלה מספר 1');
+});
+
 runTest('Question Parser - Markdown', 'Parses Hebrew exam questions formatted in Markdown', () => {
     const QuestionParser = require('../js/question-parser.js');
     const md = [
