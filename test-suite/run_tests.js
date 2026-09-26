@@ -280,6 +280,43 @@ runTest('Question Parser - Text Extraction & Inline Options', 'Parses text with 
     assert.strictEqual(parsed[1].options[0], 'התא');
 });
 
+runTest('PDF Service - groupPdfTextItemsToLines Line Grouping & Performance', 'Groups items by y geometry efficiently', () => {
+    const PdfService = require('../js/pdf-service.js');
+
+    const items = [
+        { str: 'שאלה 1', transform: [1, 0, 0, 1, 100, 700], dir: 'rtl', width: 50 },
+        { str: 'מהו DNA?', transform: [1, 0, 0, 1, 40, 702], dir: 'rtl', width: 50 },
+        { str: 'א. חומצת גרעין', transform: [1, 0, 0, 1, 40, 680], dir: 'rtl', width: 80 },
+        { str: 'ב. חלבון', transform: [1, 0, 0, 1, 40, 660], dir: 'rtl', width: 50 }
+    ];
+
+    const lines = PdfService.groupPdfTextItemsToLines(items);
+    assert.strictEqual(lines.length, 3);
+    assert.ok(lines[0].includes('שאלה 1') && lines[0].includes('מהו DNA?'));
+    assert.strictEqual(lines[1], 'א. חומצת גרעין');
+    assert.strictEqual(lines[2], 'ב. חלבון');
+
+    const largeItems = [];
+    for (let i = 0; i < 5000; i++) {
+        const lineIdx = Math.floor(i / 5);
+        const y = 10000 - (lineIdx * 12) + (i % 2);
+        const x = (i % 5) * 100;
+        largeItems.push({
+            str: 'item_' + i,
+            transform: [1, 0, 0, 1, x, y],
+            dir: 'ltr',
+            width: 40
+        });
+    }
+
+    const startMs = Date.now();
+    const benchmarkLines = PdfService.groupPdfTextItemsToLines(largeItems);
+    const durationMs = Date.now() - startMs;
+
+    assert.strictEqual(benchmarkLines.length, 1000);
+    console.log('     📊 [BENCHMARK] groupPdfTextItemsToLines (5,000 items): ' + durationMs + 'ms');
+});
+
 runTest('PDF Service - Heuristics & Geometry', 'Evaluates direction detection and Hebrew breakage scores', () => {
     const PdfService = require('../js/pdf-service.js');
     assert.strictEqual(PdfService.hasHebrew('שלום עולם'), true);
