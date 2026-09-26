@@ -136,12 +136,19 @@ document.addEventListener('DOMContentLoaded', () => {
         let deck = getStudyDeck();
         const currentTestTitle = testId || 'מבחן';
 
+        const deckMap = new Map();
+        deck.forEach((item, index) => {
+            if (item && item.id) {
+                deckMap.set(item.id, index);
+            }
+        });
+
         questionsList.forEach((q, i) => {
             const ans = answers[i];
             const isCorrect = ans && ans.isCorrect;
             if (!isCorrect) {
                 const cardId = `${currentTestTitle}::${q.id || i}::${(q.question || '').substring(0, 30)}`;
-                const existingIndex = deck.findIndex(item => item.id === cardId);
+                const existingIndex = deckMap.get(cardId);
                 const correctOption = q.options ? q.options.find(o => o.id === q.correctIndex) : null;
 
                 const cardData = {
@@ -158,10 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     mastered: false
                 };
 
-                if (existingIndex >= 0) {
+                if (existingIndex !== undefined) {
                     deck[existingIndex] = { ...deck[existingIndex], ...cardData, mastered: false };
                 } else {
                     deck.push(cardData);
+                    deckMap.set(cardId, deck.length - 1);
                 }
             }
         });
