@@ -197,6 +197,88 @@ runTest('Auto-Advance Countdown', 'Verifies countdown markup generation and styl
     assert.ok(styleCss.includes('@keyframes autoAdvanceShrink'), 'autoAdvanceShrink animation missing in style.css');
 });
 
+runTest('Progress Controller Initialization', 'Verifies ProgressController init sets elements, callbacks, and attaches abort button click handlers', () => {
+    const ProgressController = require('../js/progress-controller.js');
+
+    function createMockElement() {
+        const listeners = {};
+        return {
+            listeners,
+            classList: {
+                add: () => {},
+                remove: () => {},
+                toggle: () => {}
+            },
+            style: {},
+            textContent: '',
+            disabled: false,
+            setAttribute: () => {},
+            addEventListener(event, fn) {
+                if (!listeners[event]) listeners[event] = [];
+                listeners[event].push(fn);
+            },
+            click() {
+                if (listeners['click']) {
+                    listeners['click'].forEach(fn => fn());
+                }
+            }
+        };
+    }
+
+    // Test init with null/undefined parameters (default fallbacks)
+    ProgressController.init();
+
+    let statusMsg = null;
+    let isError = null;
+    const statusCallback = (msg, err) => {
+        statusMsg = msg;
+        isError = err;
+    };
+
+    const progressAbortBtn = createMockElement();
+    const stickyProgressAbortBtn = createMockElement();
+    const progressCard = createMockElement();
+
+    ProgressController.init({
+        progressAbortBtn,
+        stickyProgressAbortBtn,
+        progressCard
+    }, statusCallback);
+
+    // Ensure event listeners were registered
+    assert.ok(progressAbortBtn.listeners['click'] && progressAbortBtn.listeners['click'].length > 0);
+    assert.ok(stickyProgressAbortBtn.listeners['click'] && stickyProgressAbortBtn.listeners['click'].length > 0);
+
+    // Clicking when activeTask is null should not fail or trigger abort
+    progressAbortBtn.click();
+    assert.strictEqual(ProgressController.activeTask, null);
+
+    // Start task and test abort button click on progressAbortBtn
+    const task1 = ProgressController.startTask('Task 1', { cancellable: true });
+    assert.strictEqual(task1.isAborted(), false);
+
+    progressAbortBtn.click();
+    assert.strictEqual(task1.isAborted(), true);
+    assert.strictEqual(statusMsg, 'הפעולה בוטלה על ידי המשתמש.');
+
+    if (ProgressController.dismissTimeout) {
+        clearTimeout(ProgressController.dismissTimeout);
+        ProgressController.dismissTimeout = null;
+    }
+
+    // Start another task and test stickyProgressAbortBtn click
+    const task2 = ProgressController.startTask('Task 2', { cancellable: true });
+    assert.strictEqual(task2.isAborted(), false);
+
+    stickyProgressAbortBtn.click();
+    assert.strictEqual(task2.isAborted(), true);
+
+    if (ProgressController.dismissTimeout) {
+        clearTimeout(ProgressController.dismissTimeout);
+        ProgressController.dismissTimeout = null;
+    }
+});
+
 runTest('Progress Controller Module', 'Verifies ProgressController starts tasks, dispatches updates, and handles abort signals', () => {
     const ProgressController = require('../js/progress-controller.js');
     const task = ProgressController.startTask('Test task', { cancellable: true, detail: 'Processing...' });
