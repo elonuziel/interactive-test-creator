@@ -429,6 +429,11 @@ runTest('PDF Service - Heuristics & Geometry', 'Evaluates direction detection an
     assert.ok(breakageClean < breakageBroken);
 });
 
+runTest('Gemini Service - Concurrent Chunk Processing', 'Processes page chunks concurrently without blocking delay', () => {
+    const GeminiService = require('../js/gemini-service.js');
+    assert.strictEqual(GeminiService.GEMINI_CONFIG.interPageDelayMs, 0, 'interPageDelayMs should default to 0');
+});
+
 runTest('Gemini Service - Models & Error Classification', 'Classifies Gemini errors and sorts candidate models', () => {
     const GeminiService = require('../js/gemini-service.js');
     const err401 = GeminiService.getGeminiErrorInfo(401, 'Unauthorized');

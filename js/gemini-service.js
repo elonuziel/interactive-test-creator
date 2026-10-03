@@ -21,7 +21,7 @@
         maxQuotaRetries: 5,
         initialRetryDelayMs: 5000,
         maxRetryDelayMs: 60000,
-        interPageDelayMs: 8000,
+        interPageDelayMs: 0,
         ocrChunkSize: 20
     };
 
@@ -454,44 +454,90 @@
         throw new Error(`Gemini request failed: לא נמצא מודל Gemini נתמך. ${attemptErrors.join(' | ')}`);
     }
 
-    async function extractTextViaGemini(pdf, apiKey, { chunkSizeOverride = null, task = null, statusCallback = null, renderAllPdfPageImagesFn, maybeFixHebrewWordOrderFn } = {}) {
+    async function extractTextViaGemini(pdf, apiKey, { chunkSizeOverride = null, task = null, statusCallback = null, renderAllPdfPageImagesFn, maybeFixHebrewWordOrderFn, maxConcurrency = 3 } = {}) {
         if (!apiKey) {
             throw new Error('ה-PDF נראה סרוק ואין מפתח Gemini זמין לחילוץ טקסט. הזן API key או Passcode תקין.');
         }
 
-        const pages = [];
         const { imageDatas, pagePreviews } = await renderAllPdfPageImagesFn(pdf, task);
 
         const CHUNK_SIZE = Math.max(1, Number(chunkSizeOverride || GEMINI_CONFIG.ocrChunkSize) || 1);
         const totalChunks = Math.ceil(imageDatas.length / CHUNK_SIZE);
-        let chunkIndex = 0;
 
+        if (totalChunks === 0) {
+            return { pages: [], pagePreviews: pagePreviews || [], text: '' };
+        }
+
+        const fixFn = maybeFixHebrewWordOrderFn || (str => str);
+        const chunkResults = new Array(totalChunks);
+        let completedChunks = 0;
+
+        const chunks = [];
         for (let i = 0; i < imageDatas.length; i += CHUNK_SIZE) {
-            if (task && task.isAborted()) {
-                throw new Error('הפעולה בוטלה על ידי המשתמש.');
-            }
-            chunkIndex++;
-            const chunk = imageDatas.slice(i, i + CHUNK_SIZE);
+            const chunkIndex = chunks.length;
             const startPage = i + 1;
             const endPage = Math.min(i + CHUNK_SIZE, imageDatas.length);
-            const currentPercent = 25 + Math.round((chunkIndex / totalChunks) * 65);
-            const detailMsg = `מפענח עמודים ${startPage}-${endPage} מתוך ${imageDatas.length} ב-Gemini (צ'אנק ${chunkIndex}/${totalChunks})...`;
+            const chunkData = imageDatas.slice(i, i + CHUNK_SIZE);
+            chunks.push({ chunkIndex, startPage, endPage, chunkData });
+        }
 
-            if (task) {
-                task.update(currentPercent, detailMsg);
-            } else if (statusCallback) {
-                statusCallback(detailMsg);
-            }
+        const limit = Math.max(1, Number(maxConcurrency) || 3);
+        let nextChunkIdx = 0;
 
-            const chunkPagesText = await callGeminiOcr(apiKey, chunk, task, statusCallback);
-            const fixFn = maybeFixHebrewWordOrderFn || (str => str);
-            pages.push(...chunkPagesText.map((pageText) => fixFn(pageText || '')));
-
-            if (i + CHUNK_SIZE < imageDatas.length && GEMINI_CONFIG.interPageDelayMs > 0) {
-                if (task) {
-                    task.update(currentPercent, `ממתין בין קריאות API (${GEMINI_CONFIG.interPageDelayMs / 1000} שניות)...`);
+        async function worker() {
+            while (nextChunkIdx < chunks.length) {
+                if (task && task.isAborted()) {
+                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
                 }
-                await delay(GEMINI_CONFIG.interPageDelayMs);
+
+                const currentChunk = chunks[nextChunkIdx++];
+                const { chunkIndex, startPage, endPage, chunkData } = currentChunk;
+
+                if (completedChunks === 0) {
+                    const startMsg = `מפענח עמודים ${startPage}-${endPage} מתוך ${imageDatas.length} ב-Gemini (צ'אנק ${chunkIndex + 1}/${totalChunks})...`;
+                    if (task) {
+                        task.update(25, startMsg);
+                    } else if (statusCallback) {
+                        statusCallback(startMsg);
+                    }
+                }
+
+                const chunkPagesText = await callGeminiOcr(apiKey, chunkData, task, statusCallback);
+
+                if (task && task.isAborted()) {
+                    throw new Error('הפעולה בוטלה על ידי המשתמש.');
+                }
+
+                chunkResults[chunkIndex] = chunkPagesText.map((pageText) => fixFn(pageText || ''));
+                completedChunks++;
+
+                const currentPercent = 25 + Math.round((completedChunks / totalChunks) * 65);
+                const detailMsg = `פוענחו ${completedChunks} מתוך ${totalChunks} צ'אנקים (${startPage}-${endPage})...`;
+
+                if (task) {
+                    task.update(currentPercent, detailMsg);
+                } else if (statusCallback) {
+                    statusCallback(detailMsg);
+                }
+
+                if (GEMINI_CONFIG.interPageDelayMs > 0 && nextChunkIdx < chunks.length) {
+                    await delay(GEMINI_CONFIG.interPageDelayMs);
+                }
+            }
+        }
+
+        const workers = [];
+        const workerCount = Math.min(limit, totalChunks);
+        for (let w = 0; w < workerCount; w++) {
+            workers.push(worker());
+        }
+
+        await Promise.all(workers);
+
+        const pages = [];
+        for (let c = 0; c < totalChunks; c++) {
+            if (chunkResults[c]) {
+                pages.push(...chunkResults[c]);
             }
         }
 
