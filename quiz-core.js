@@ -121,20 +121,26 @@
         return Object.prototype.hasOwnProperty.call(letters, raw) ? letters[raw] : null;
     }
 
+    function normalizeCell(cell) {
+        if (cell === null || cell === undefined) return '';
+        const str = String(cell).trim().toLowerCase();
+        return str.endsWith('.0') ? str.slice(0, -2) : str;
+    }
+
     function extractAnswersForForm(rows, formNumber) {
         if (!Array.isArray(rows) || !rows.length) return new Map();
         const target = normalizeFormNumber(formNumber);
         let headers = null;
         let selectedRow = null;
 
-        for (const row of rows) {
+        for (let r = 0; r < rows.length; r++) {
+            const row = rows[r];
             if (!Array.isArray(row) || !row.length) continue;
-            const first = String(row[0] || '').trim().toLowerCase();
-            if (first.includes('שאלון') || first.includes('form')) {
+            const normalizedFirst = normalizeCell(row[0]);
+            if (normalizedFirst.includes('שאלון') || normalizedFirst.includes('form')) {
                 headers = row;
                 continue;
             }
-            const normalizedFirst = first.replace(/\.0$/, '');
             if (target && (normalizedFirst === target || normalizedFirst.includes(target))) {
                 selectedRow = row;
                 break;
@@ -142,21 +148,38 @@
         }
 
         if (!selectedRow && target) {
-            selectedRow = rows.find((row) => row.some((cell) => String(cell || '').trim().toLowerCase().replace(/\.0$/, '') === target));
+            for (let r = 0; r < rows.length; r++) {
+                const row = rows[r];
+                if (!Array.isArray(row) || !row.length) continue;
+                let found = false;
+                for (let c = 0; c < row.length; c++) {
+                    if (normalizeCell(row[c]) === target) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    selectedRow = row;
+                    break;
+                }
+            }
         }
+
         if (!selectedRow && !target && rows.length > 1) selectedRow = rows[1];
         if (!selectedRow) return new Map();
 
         const answers = new Map();
         if (headers) {
-            headers.forEach((header, columnIndex) => {
-                const match = String(header || '').match(/\d+/);
-                if (!match) return;
+            for (let columnIndex = 0; columnIndex < headers.length; columnIndex++) {
+                const header = headers[columnIndex];
+                if (header === null || header === undefined) continue;
+                const match = String(header).match(/\d+/);
+                if (!match) continue;
                 const answer = parseAnswer(selectedRow[columnIndex]);
                 if (answer !== null && answer >= 0) answers.set(Number(match[0]), answer);
-            });
+            }
         } else {
-            const startsAt = String(selectedRow[0] || '').trim().toLowerCase().replace(/\.0$/, '') === target ? 1 : 0;
+            const startsAt = normalizeCell(selectedRow[0]) === target ? 1 : 0;
             for (let columnIndex = startsAt, questionNumber = 1; columnIndex < selectedRow.length; columnIndex++) {
                 const answer = parseAnswer(selectedRow[columnIndex]);
                 if (answer !== null && answer >= 0) answers.set(questionNumber++, answer);
