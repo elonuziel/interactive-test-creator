@@ -660,7 +660,6 @@ STRICT EXTRACTION & FORMATTING RULES:
             });
             EditorUi.setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ ${file.name}!`, false, true, elements);
         } catch (error) {
-            console.error('Error loading question file:', error);
             EditorUi.setStatus(error.message || `נכשלה טעינת קובץ ${file.name}.`, true, false, elements);
         }
     });
