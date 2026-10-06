@@ -628,7 +628,6 @@
 
             if (task) task.finish(`PDF נקי נוצר בהצלחה עם ${keptIndices.length} עמודים וההורדה התחילה!`);
         } catch (err) {
-            console.error('Failed to export clean PDF:', err);
             alert(`שגיאה ביצירת PDF נקי: ${err.message || err}`);
             if (task) task.fail(err.message || 'שגיאה ביצירת PDF נקי.');
         }
