@@ -451,8 +451,8 @@ STRICT EXTRACTION & FORMATTING RULES:
     elements.runParse?.addEventListener('click', async () => {
         try {
             await runParse();
-        } catch (error) {
-            console.warn('runParse finished with notice/error:', error);
+        } catch {
+            // Error notice is already handled and rendered to the user inside runParse()
         }
     });
 
