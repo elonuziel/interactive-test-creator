@@ -187,11 +187,15 @@ def test_excludes_quizbuilder_internals(tmp_path: Path) -> None:
 def test_case_insensitive_pdf_suffix(tmp_path: Path) -> None:
     folder = tmp_path / "exam_caps"
     folder.mkdir()
-    p = folder / "EXAM.PDF"
-    p.write_bytes(b"%PDF-1.4")
+    p1 = folder / "EXAM.PDF"
+    p1.write_bytes(b"%PDF-1.4")
+    p2 = folder / "lower.pdf"
+    p2.write_bytes(b"%PDF-1.4")
 
     candidates = discover_batch(tmp_path)
-    assert len(candidates) == 1
+    assert len(candidates) == 2
+    sources = {str(c.workspace.source_pdf.name) for c in candidates if c.workspace.source_pdf}
+    assert sources == {"EXAM.PDF", "lower.pdf"}
 
 
 # ---------------------------------------------------------------------------
