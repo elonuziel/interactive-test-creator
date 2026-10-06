@@ -1099,8 +1099,8 @@
                         const imageData = await renderPageImageDataFn(page, 2.5);
                         q.image = `data:image/png;base64,${imageData}`;
                         attachedCount++;
-                    } catch (e) {
-                        console.warn(`Could not render page ${targetPage} for question ${i + 1}:`, e);
+                    } catch (_e) {
+                        // Ignore individual page rendering failures gracefully
                     }
                 }
             }
