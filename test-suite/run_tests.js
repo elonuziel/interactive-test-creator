@@ -411,6 +411,53 @@ runTest('Question Parser - Text Extraction & Inline Options', 'Parses text with 
     assert.strictEqual(parsed[1].options[0], 'התא');
 });
 
+
+runTest('Question Parser - CSV Merging Error Handling', 'Handles errors silently in non-explicit mode and reports errors in explicit mode', async () => {
+    const QuestionParser = require('../js/question-parser.js');
+
+    let toastMsg = null;
+    let taskFailedMsg = null;
+
+    const mockState = {
+        questions: [{ question: "Q1", options: ["A", "B"] }]
+    };
+    const mockElements = {
+        csvFile: { files: [{ name: "answers.csv", text: async () => { throw new Error("Read error"); } }] },
+        formNumber: { value: "101" }
+    };
+    const mockProgressController = {
+        startTask: () => ({
+            update: () => {},
+            finish: () => {},
+            fail: (msg) => { taskFailedMsg = msg; }
+        })
+    };
+
+    // Non-explicit merge failure should handle quietly without console output or toasts/task failures
+    await QuestionParser.tryMergeAnswersFromCsv({
+        explicit: false,
+        elements: mockElements,
+        state: mockState,
+        progressController: mockProgressController,
+        showToastFn: (msg) => { toastMsg = msg; }
+    });
+
+    assert.strictEqual(toastMsg, null);
+    assert.strictEqual(taskFailedMsg, null);
+
+    // Explicit merge failure should report errors via toast and task failure
+    await QuestionParser.tryMergeAnswersFromCsv({
+        explicit: true,
+        elements: mockElements,
+        state: mockState,
+        progressController: mockProgressController,
+        showToastFn: (msg) => { toastMsg = msg; }
+    });
+
+    assert.ok(toastMsg && toastMsg.includes("Read error"));
+    assert.ok(taskFailedMsg && taskFailedMsg.includes("Read error"));
+});
+
 runTest('PDF Service - groupPdfTextItemsToLines Line Grouping & Performance', 'Groups items by y geometry efficiently', () => {
     const PdfService = require('../js/pdf-service.js');
 
