@@ -450,6 +450,27 @@ runTest('Gemini Service - Models & Error Classification', 'Classifies Gemini err
     assert.strictEqual(sorted[2].model, 'gemini-1.5-flash');
 });
 
+runTest('Gemini Service - verifyTestWithGemini Fallback', 'Gracefully falls back to original parsedQuestions on API/JSON failure', async () => {
+    const GeminiService = require('../js/gemini-service.js');
+    const sampleQuestions = [{ question: 'מהו DNA?', options: ['חומצת גרעין', 'חלבון'], correctIndex: 0 }];
+
+    // Mock global fetch to return invalid non-JSON or HTTP errors
+    const originalFetch = global.fetch;
+    global.fetch = async () => ({
+        ok: true,
+        json: async () => ({
+            candidates: [{ content: { parts: [{ text: 'Invalid non-JSON response' }] } }]
+        })
+    });
+
+    try {
+        const result = await GeminiService.verifyTestWithGemini(sampleQuestions, 'dummy-api-key');
+        assert.deepStrictEqual(result, sampleQuestions);
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts are referenced in correct dependency order', () => {
     const fs = require('fs');
     const path = require('path');
