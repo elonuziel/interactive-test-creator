@@ -194,37 +194,46 @@
         const discovered = [];
         const seen = new Set();
 
-        for (const version of GEMINI_CONFIG.apiVersions) {
-            const endpoint = `https://generativelanguage.googleapis.com/${version}/models?key=${encodeURIComponent(apiKey)}`;
-            try {
-                const response = await fetch(endpoint);
-                if (!response.ok) {
-                    continue;
+        const resultsPerVersion = await Promise.all(
+            GEMINI_CONFIG.apiVersions.map(async (version) => {
+                const endpoint = `https://generativelanguage.googleapis.com/${version}/models?key=${encodeURIComponent(apiKey)}`;
+                try {
+                    const response = await fetch(endpoint);
+                    if (!response.ok) {
+                        return [];
+                    }
+
+                    const payload = await response.json();
+                    const models = payload.models || [];
+                    const versionCandidates = [];
+
+                    for (const model of models) {
+                        const modelName = normalizeModelName(model.name || '');
+                        const supportedMethods = model.supportedGenerationMethods || [];
+                        if (!modelName || !supportedMethods.includes('generateContent')) {
+                            continue;
+                        }
+
+                        if (!modelName.includes('gemini') || !modelName.includes('flash')) {
+                            continue;
+                        }
+
+                        versionCandidates.push({ version, model: modelName });
+                    }
+                    return versionCandidates;
+                } catch {
+                    return [];
                 }
+            })
+        );
 
-                const payload = await response.json();
-                const models = payload.models || [];
-                for (const model of models) {
-                    const modelName = normalizeModelName(model.name || '');
-                    const supportedMethods = model.supportedGenerationMethods || [];
-                    if (!modelName || !supportedMethods.includes('generateContent')) {
-                        continue;
-                    }
-
-                    if (!modelName.includes('gemini') || !modelName.includes('flash')) {
-                        continue;
-                    }
-
-                    const key = `${version}:${modelName}`;
-                    if (seen.has(key)) {
-                        continue;
-                    }
-
+        for (const candidates of resultsPerVersion) {
+            for (const item of candidates) {
+                const key = `${item.version}:${item.model}`;
+                if (!seen.has(key)) {
                     seen.add(key);
-                    discovered.push({ version, model: modelName });
+                    discovered.push(item);
                 }
-            } catch {
-                // Fall through to static fallback list.
             }
         }
 
