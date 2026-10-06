@@ -217,6 +217,7 @@
 
     <script src="../quiz-core.js"></script>
     <script src="../quiz-export.js"></script>
+    <script src="../js/cropper-modal.js"></script>
     <script>
         // ── Theme Manager ──────────────────────────────────────────────────────
         let theme = localStorage.getItem('theme') || 'light';
@@ -269,7 +270,7 @@
         const QuizExport = window.QuizExport;
 
         // ── Test Suites ───────────────────────────────────────────────────────
-        function runSuite() {
+        async function runSuite() {
             const container = document.getElementById('test-results-container');
             container.innerHTML = '';
             const showInspect = document.getElementById('toggle-inspect-data').checked;
@@ -471,6 +472,88 @@
                         }
                     ]
                 }
+            ,
+                {
+                    name: '8. Cropper Modal PDF Byte Retrieval (CropperModal.getPdfBytesForCrop)',
+                    description: 'Validates getPdfBytesForCrop with empty/missing state, Uint8Array/ArrayBuffer state, file input fallback, and file read rejections.',
+                    tests: [
+                        {
+                            name: 'Returns null when appState is uninitialized or missing PDF data',
+                            details: 'Ensures getPdfBytesForCrop resolves to null without throwing when no PDF sources exist.',
+                            fn: async () => {
+                                const CropperModal = window.CropperModal;
+                                CropperModal.initCropperModal({}, {});
+                                const result = await CropperModal.getPdfBytesForCrop();
+                                assertEqual(result, null, 'Returns null for empty state');
+                                return { result };
+                            }
+                        },
+                        {
+                            name: 'Returns Uint8Array when appState contains pdfBytes array',
+                            details: 'Ensures existing pdfBytes in appState are returned as a Uint8Array.',
+                            fn: async () => {
+                                const CropperModal = window.CropperModal;
+                                const pdfBytes = [1, 2, 3, 4, 5];
+                                CropperModal.initCropperModal({ pdfBytes }, {});
+                                const result = await CropperModal.getPdfBytesForCrop();
+                                assert(result instanceof Uint8Array, 'Result is Uint8Array');
+                                assertDeepEqual(Array.from(result), pdfBytes, 'Matches original bytes');
+                                return { result: Array.from(result) };
+                            }
+                        },
+                        {
+                            name: 'Converts and caches pdfArrayBuffer into pdfBytes',
+                            details: 'Ensures pdfArrayBuffer in appState is sliced, converted to Uint8Array, and cached in pdfBytes.',
+                            fn: async () => {
+                                const CropperModal = window.CropperModal;
+                                const buffer = new Uint8Array([10, 20, 30]).buffer;
+                                const state = { pdfArrayBuffer: buffer };
+                                CropperModal.initCropperModal(state, {});
+                                const result = await CropperModal.getPdfBytesForCrop();
+                                assert(result instanceof Uint8Array, 'Result is Uint8Array');
+                                assertDeepEqual(Array.from(result), [10, 20, 30], 'Matches buffer content');
+                                assert(state.pdfBytes instanceof Uint8Array, 'Cached state.pdfBytes exists');
+                                return { result: Array.from(result) };
+                            }
+                        },
+                        {
+                            name: 'Reads file input arrayBuffer when state lacks cached bytes',
+                            details: 'Ensures file input arrayBuffer is read, cached in state, and returned.',
+                            fn: async () => {
+                                const CropperModal = window.CropperModal;
+                                const state = {};
+                                const mockFile = {
+                                    arrayBuffer: async () => new Uint8Array([100, 200]).buffer
+                                };
+                                CropperModal.initCropperModal(state, { pdfFile: { files: [mockFile] } });
+                                const result = await CropperModal.getPdfBytesForCrop();
+                                assert(result instanceof Uint8Array, 'Result is Uint8Array');
+                                assertDeepEqual(Array.from(result), [100, 200], 'Matches file buffer content');
+                                return { result: Array.from(result) };
+                            }
+                        },
+                        {
+                            name: 'Propagates error when pdfFile input arrayBuffer fails to read',
+                            details: 'Ensures file read rejections are thrown as async rejections.',
+                            fn: async () => {
+                                const CropperModal = window.CropperModal;
+                                const mockFile = {
+                                    arrayBuffer: async () => { throw new Error('Failed to read PDF file bytes'); }
+                                };
+                                CropperModal.initCropperModal({}, { pdfFile: { files: [mockFile] } });
+                                let caught = false;
+                                try {
+                                    await CropperModal.getPdfBytesForCrop();
+                                } catch (err) {
+                                    caught = true;
+                                    assertEqual(err.message, 'Failed to read PDF file bytes', 'Error message matches');
+                                }
+                                assert(caught, 'Error was thrown and caught');
+                                return { caught };
+                            }
+                        }
+                    ]
+                }
             ];
 
             let totalPassed = 0;
@@ -479,7 +562,7 @@
 
             const globalStart = performance.now();
 
-            suites.forEach((suite) => {
+            for (const suite of suites) {
                 const card = document.createElement('div');
                 card.className = 'test-card';
 
@@ -490,14 +573,14 @@
                     </div>
                 </div>`;
 
-                suite.tests.forEach((test) => {
+                for (const test of suite.tests) {
                     let isPass = true;
                     let errorMsg = '';
                     let inspectData = null;
                     const startMs = performance.now();
 
                     try {
-                        inspectData = test.fn();
+                        inspectData = await test.fn();
                         totalPassed++;
                     } catch (err) {
                         isPass = false;
@@ -521,11 +604,11 @@
                             ${(showInspect && inspectData) ? `<pre class="inspect-box">🔍 Inspect Payload:\n${JSON.stringify(inspectData, null, 2)}</pre>` : ''}
                         </div>
                     `;
-                });
+                }
 
                 card.innerHTML = suiteHtml;
                 container.appendChild(card);
-            });
+            }
 
             totalDurationMs = (performance.now() - globalStart).toFixed(2);
 

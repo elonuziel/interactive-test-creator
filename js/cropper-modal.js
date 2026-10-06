@@ -32,19 +32,23 @@
         appElements = elements;
         callbacks = cb;
 
-        cropElements = {
-            modal: document.getElementById('crop-modal'),
-            pageSelect: document.getElementById('crop-page-select'),
-            canvas: document.getElementById('crop-canvas'),
-            closeBtn: document.getElementById('crop-modal-close'),
-            cancelBtn: document.getElementById('crop-cancel-btn'),
-            resetBtn: document.getElementById('crop-reset-btn'),
-            saveBtn: document.getElementById('crop-save-btn'),
-            statusText: document.getElementById('crop-status-text')
-        };
+        if (typeof document !== 'undefined') {
+            cropElements = {
+                modal: document.getElementById('crop-modal'),
+                pageSelect: document.getElementById('crop-page-select'),
+                canvas: document.getElementById('crop-canvas'),
+                closeBtn: document.getElementById('crop-modal-close'),
+                cancelBtn: document.getElementById('crop-cancel-btn'),
+                resetBtn: document.getElementById('crop-reset-btn'),
+                saveBtn: document.getElementById('crop-save-btn'),
+                statusText: document.getElementById('crop-status-text')
+            };
 
-        if (cropElements.modal && cropElements.modal.parentElement !== document.body) {
-            document.body.appendChild(cropElements.modal);
+            if (cropElements.modal && cropElements.modal.parentElement !== document.body) {
+                document.body.appendChild(cropElements.modal);
+            }
+        } else {
+            cropElements = {};
         }
 
         cropElements.canvas?.addEventListener('mousedown', (e) => {
@@ -80,7 +84,7 @@
             }
         });
 
-        window.addEventListener('mouseup', () => {
+        if (typeof window !== 'undefined') window.addEventListener('mouseup', () => {
             if (isCroppingDrag) {
                 isCroppingDrag = false;
             }
@@ -158,6 +162,7 @@
         const pdfInput = appElements?.pdfFile?.files?.[0];
         if (pdfInput) {
             const buffer = await pdfInput.arrayBuffer();
+            if (!appState) appState = {};
             appState.pdfArrayBuffer = buffer.slice(0);
             appState.pdfBytes = new Uint8Array(buffer);
             return new Uint8Array(appState.pdfBytes);
