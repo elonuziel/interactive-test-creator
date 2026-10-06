@@ -763,7 +763,6 @@
             .filter((q) => q.question && q.options.length >= 2);
 
         if (diagnostics.length) {
-            console.warn(`[parseQuestionsFromText] Dropped ${diagnostics.length} question candidate(s).`, diagnostics);
             const sample = diagnostics
                 .slice(0, 3)
                 .map((d) => `#${d.index}(${d.optionCount})`)
