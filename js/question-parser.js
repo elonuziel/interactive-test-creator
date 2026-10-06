@@ -967,7 +967,6 @@
                 setStatusFn(msg, false, true);
             }
         } catch (e) {
-            console.warn('Could not merge CSV answers automatically:', e);
             if (explicit) {
                 if (showToastFn) showToastFn(`שגיאה במיזוג תשובות: ${e.message}`, 'error');
                 if (task) task.fail(`שגיאה במיזוג תשובות: ${e.message}`);
