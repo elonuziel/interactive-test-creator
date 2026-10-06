@@ -61,6 +61,41 @@ runTest('CSV Answer Key Merging', 'Parses quoted CSV and extracts Hebrew/numeric
     assert.deepStrictEqual(Array.from(extractAnswersForForm(rows, '32').entries()), [[1, 3], [2, 2], [3, 1], [4, 0]]);
 });
 
+runTest('CSV Answer Key Merging', 'Performance benchmark & edge case validation for extractAnswersForForm', () => {
+    const rowsWithHeaders = [
+        ['שאלון', 'Q1', 'Q2', 'Q3', 'Q4'],
+        ['101.0', 'א', 'ב', 'ג', 'ד'],
+        ['102', '1', '2', '3', '4']
+    ];
+    assert.deepStrictEqual(Array.from(extractAnswersForForm(rowsWithHeaders, '101').entries()), [[1, 0], [2, 1], [3, 2], [4, 3]]);
+    assert.deepStrictEqual(Array.from(extractAnswersForForm(rowsWithHeaders, '102').entries()), [[1, 0], [2, 1], [3, 2], [4, 3]]);
+
+    assert.strictEqual(extractAnswersForForm(rowsWithHeaders, '999').size, 0);
+    assert.deepStrictEqual(Array.from(extractAnswersForForm(rowsWithHeaders, '').entries()), [[1, 0], [2, 1], [3, 2], [4, 3]]);
+
+    const largeRows = [['שאלון']];
+    for (let col = 1; col <= 50; col++) {
+        largeRows[0].push('Q' + col);
+    }
+    for (let r = 1; r <= 5000; r++) {
+        const row = [String(r)];
+        for (let col = 1; col <= 50; col++) {
+            row.push(['א', 'ב', 'ג', 'ד'][(r + col) % 4]);
+        }
+        largeRows.push(row);
+    }
+
+    const startMs = Date.now();
+    const iterations = 50;
+    let resMap;
+    for (let i = 0; i < iterations; i++) {
+        resMap = extractAnswersForForm(largeRows, '4999');
+    }
+    const durationMs = Date.now() - startMs;
+    assert.strictEqual(resMap.size, 50);
+    console.log('     📊 [BENCHMARK] extractAnswersForForm (' + iterations + ' calls x 5,000 rows x 50 cols): ' + durationMs + 'ms');
+});
+
 runTest('CSV Answer Key Merging', 'Merges correctIndex and disables random shuffling', () => {
     const questions = [
         { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true },
