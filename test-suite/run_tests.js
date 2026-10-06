@@ -532,6 +532,12 @@ runTest('Gemini Service - Models & Error Classification', 'Classifies Gemini err
     assert.strictEqual(sorted[2].model, 'gemini-1.5-flash');
 });
 
+runTest('Gemini Service - Pacing Configuration', 'Maintains safe sequential interPageDelayMs between 1000ms and 2500ms', () => {
+    const GeminiService = require('../js/gemini-service.js');
+    assert.ok(GeminiService.GEMINI_CONFIG.interPageDelayMs >= 1000 && GeminiService.GEMINI_CONFIG.interPageDelayMs <= 2500,
+        `interPageDelayMs (${GeminiService.GEMINI_CONFIG.interPageDelayMs}ms) should be balanced between 1000ms and 2500ms for free-tier rate safety`);
+});
+
 runTest('Gemini Service - verifyTestWithGemini Fallback', 'Gracefully falls back to original parsedQuestions on API/JSON failure', async () => {
     const GeminiService = require('../js/gemini-service.js');
     const sampleQuestions = [{ question: 'מהו DNA?', options: ['חומצת גרעין', 'חלבון'], correctIndex: 0 }];
