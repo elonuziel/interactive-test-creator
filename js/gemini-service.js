@@ -21,7 +21,7 @@
         maxQuotaRetries: 5,
         initialRetryDelayMs: 5000,
         maxRetryDelayMs: 60000,
-        interPageDelayMs: 8000,
+        interPageDelayMs: 1500,
         ocrChunkSize: 20
     };
 
