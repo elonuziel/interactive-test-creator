@@ -610,7 +610,7 @@ STRICT EXTRACTION & FORMATTING RULES:
                         parsedAsStrictJson = true;
                     }
                 } catch (jsonErr) {
-                    console.warn('JSON parse failed for uploaded question file. Trying markdown/text fallback.', jsonErr);
+                    // Fallback to markdown or plain text parser below
                 }
 
                 if (!parsedAsStrictJson) {
