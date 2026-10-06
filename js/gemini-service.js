@@ -705,8 +705,8 @@
                 if (Array.isArray(verified) && verified.length > 0 && verified[0].question) {
                     return verified;
                 }
-            } catch (e) {
-                console.warn(`Gemini verification failed for model ${candidate.model}:`, e);
+            } catch {
+                // ignore error and try next candidate model
             }
         }
 

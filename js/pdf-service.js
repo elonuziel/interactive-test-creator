@@ -168,10 +168,36 @@
         });
 
         const lines = [];
+        const bucketSize = 4;
+        const buckets = new Map();
+
         for (const item of normalized) {
-            const line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 4);
+            const bucketKey = Math.floor(item.y / bucketSize);
+            let line = null;
+
+            for (let b = bucketKey - 1; b <= bucketKey + 1; b++) {
+                const candidates = buckets.get(b);
+                if (candidates) {
+                    for (let i = 0; i < candidates.length; i++) {
+                        const candidate = candidates[i];
+                        if (Math.abs(candidate.y - item.y) <= bucketSize) {
+                            if (!line || candidate.id < line.id) {
+                                line = candidate;
+                            }
+                        }
+                    }
+                }
+            }
+
             if (!line) {
-                lines.push({ y: item.y, chunks: [item] });
+                line = { id: lines.length, y: item.y, chunks: [item] };
+                lines.push(line);
+                let candidates = buckets.get(bucketKey);
+                if (!candidates) {
+                    candidates = [];
+                    buckets.set(bucketKey, candidates);
+                }
+                candidates.push(line);
             } else {
                 line.chunks.push(item);
             }
@@ -602,7 +628,6 @@
 
             if (task) task.finish(`PDF נקי נוצר בהצלחה עם ${keptIndices.length} עמודים וההורדה התחילה!`);
         } catch (err) {
-            console.error('Failed to export clean PDF:', err);
             alert(`שגיאה ביצירת PDF נקי: ${err.message || err}`);
             if (task) task.fail(err.message || 'שגיאה ביצירת PDF נקי.');
         }

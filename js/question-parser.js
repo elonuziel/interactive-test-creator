@@ -763,7 +763,6 @@
             .filter((q) => q.question && q.options.length >= 2);
 
         if (diagnostics.length) {
-            console.warn(`[parseQuestionsFromText] Dropped ${diagnostics.length} question candidate(s).`, diagnostics);
             const sample = diagnostics
                 .slice(0, 3)
                 .map((d) => `#${d.index}(${d.optionCount})`)
@@ -967,7 +966,6 @@
                 setStatusFn(msg, false, true);
             }
         } catch (e) {
-            console.warn('Could not merge CSV answers automatically:', e);
             if (explicit) {
                 if (showToastFn) showToastFn(`שגיאה במיזוג תשובות: ${e.message}`, 'error');
                 if (task) task.fail(`שגיאה במיזוג תשובות: ${e.message}`);
@@ -1100,8 +1098,8 @@
                         const imageData = await renderPageImageDataFn(page, 2.5);
                         q.image = `data:image/png;base64,${imageData}`;
                         attachedCount++;
-                    } catch (e) {
-                        console.warn(`Could not render page ${targetPage} for question ${i + 1}:`, e);
+                    } catch (_e) {
+                        // Ignore individual page rendering failures gracefully
                     }
                 }
             }

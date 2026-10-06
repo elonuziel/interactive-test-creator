@@ -66,6 +66,41 @@ await runTest('CSV Answer Key Merging', 'Parses quoted CSV and extracts Hebrew/n
     assert.deepStrictEqual(Array.from(extractAnswersForForm(rows, '32').entries()), [[1, 3], [2, 2], [3, 1], [4, 0]]);
 });
 
+await runTest('CSV Answer Key Merging', 'Performance benchmark & edge case validation for extractAnswersForForm', () => {
+    const rowsWithHeaders = [
+        ['שאלון', 'Q1', 'Q2', 'Q3', 'Q4'],
+        ['101.0', 'א', 'ב', 'ג', 'ד'],
+        ['102', '1', '2', '3', '4']
+    ];
+    assert.deepStrictEqual(Array.from(extractAnswersForForm(rowsWithHeaders, '101').entries()), [[1, 0], [2, 1], [3, 2], [4, 3]]);
+    assert.deepStrictEqual(Array.from(extractAnswersForForm(rowsWithHeaders, '102').entries()), [[1, 0], [2, 1], [3, 2], [4, 3]]);
+
+    assert.strictEqual(extractAnswersForForm(rowsWithHeaders, '999').size, 0);
+    assert.deepStrictEqual(Array.from(extractAnswersForForm(rowsWithHeaders, '').entries()), [[1, 0], [2, 1], [3, 2], [4, 3]]);
+
+    const largeRows = [['שאלון']];
+    for (let col = 1; col <= 50; col++) {
+        largeRows[0].push('Q' + col);
+    }
+    for (let r = 1; r <= 5000; r++) {
+        const row = [String(r)];
+        for (let col = 1; col <= 50; col++) {
+            row.push(['א', 'ב', 'ג', 'ד'][(r + col) % 4]);
+        }
+        largeRows.push(row);
+    }
+
+    const startMs = Date.now();
+    const iterations = 50;
+    let resMap;
+    for (let i = 0; i < iterations; i++) {
+        resMap = extractAnswersForForm(largeRows, '4999');
+    }
+    const durationMs = Date.now() - startMs;
+    assert.strictEqual(resMap.size, 50);
+    console.log('     📊 [BENCHMARK] extractAnswersForForm (' + iterations + ' calls x 5,000 rows x 50 cols): ' + durationMs + 'ms');
+});
+
 await runTest('CSV Answer Key Merging', 'Merges correctIndex and disables random shuffling', () => {
     const questions = [
         { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true },
@@ -202,6 +237,88 @@ await runTest('Auto-Advance Countdown', 'Verifies countdown markup generation an
     assert.ok(styleCss.includes('@keyframes autoAdvanceShrink'), 'autoAdvanceShrink animation missing in style.css');
 });
 
+await runTest('Progress Controller Initialization', 'Verifies ProgressController init sets elements, callbacks, and attaches abort button click handlers', () => {
+    const ProgressController = require('../js/progress-controller.js');
+
+    function createMockElement() {
+        const listeners = {};
+        return {
+            listeners,
+            classList: {
+                add: () => {},
+                remove: () => {},
+                toggle: () => {}
+            },
+            style: {},
+            textContent: '',
+            disabled: false,
+            setAttribute: () => {},
+            addEventListener(event, fn) {
+                if (!listeners[event]) listeners[event] = [];
+                listeners[event].push(fn);
+            },
+            click() {
+                if (listeners['click']) {
+                    listeners['click'].forEach(fn => fn());
+                }
+            }
+        };
+    }
+
+    // Test init with null/undefined parameters (default fallbacks)
+    ProgressController.init();
+
+    let statusMsg = null;
+    let isError = null;
+    const statusCallback = (msg, err) => {
+        statusMsg = msg;
+        isError = err;
+    };
+
+    const progressAbortBtn = createMockElement();
+    const stickyProgressAbortBtn = createMockElement();
+    const progressCard = createMockElement();
+
+    ProgressController.init({
+        progressAbortBtn,
+        stickyProgressAbortBtn,
+        progressCard
+    }, statusCallback);
+
+    // Ensure event listeners were registered
+    assert.ok(progressAbortBtn.listeners['click'] && progressAbortBtn.listeners['click'].length > 0);
+    assert.ok(stickyProgressAbortBtn.listeners['click'] && stickyProgressAbortBtn.listeners['click'].length > 0);
+
+    // Clicking when activeTask is null should not fail or trigger abort
+    progressAbortBtn.click();
+    assert.strictEqual(ProgressController.activeTask, null);
+
+    // Start task and test abort button click on progressAbortBtn
+    const task1 = ProgressController.startTask('Task 1', { cancellable: true });
+    assert.strictEqual(task1.isAborted(), false);
+
+    progressAbortBtn.click();
+    assert.strictEqual(task1.isAborted(), true);
+    assert.strictEqual(statusMsg, 'הפעולה בוטלה על ידי המשתמש.');
+
+    if (ProgressController.dismissTimeout) {
+        clearTimeout(ProgressController.dismissTimeout);
+        ProgressController.dismissTimeout = null;
+    }
+
+    // Start another task and test stickyProgressAbortBtn click
+    const task2 = ProgressController.startTask('Task 2', { cancellable: true });
+    assert.strictEqual(task2.isAborted(), false);
+
+    stickyProgressAbortBtn.click();
+    assert.strictEqual(task2.isAborted(), true);
+
+    if (ProgressController.dismissTimeout) {
+        clearTimeout(ProgressController.dismissTimeout);
+        ProgressController.dismissTimeout = null;
+    }
+});
+
 await runTest('Progress Controller Module', 'Verifies ProgressController starts tasks, dispatches updates, and handles abort signals', () => {
     const ProgressController = require('../js/progress-controller.js');
     const task = ProgressController.startTask('Test task', { cancellable: true, detail: 'Processing...' });
@@ -214,6 +331,19 @@ await runTest('Progress Controller Module', 'Verifies ProgressController starts 
 
     task.abort('User cancelled');
     assert.strictEqual(task.isAborted(), true);
+});
+
+await runTest('Question Parser - WhiteSpace Normalization', 'Handles null, undefined, NBSP, multiline, and extra whitespace correctly', () => {
+    const QuestionParser = require('../js/question-parser.js');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(null), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(undefined), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(''), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('   '), '');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('hello\u00A0world'), 'hello world');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('  hello \t \n world  '), 'hello world');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('\u00A0\u00A0test\u00A0\u00A0'), 'test');
+    assert.strictEqual(QuestionParser.normalizeWhitespace(123), '123');
+    assert.strictEqual(QuestionParser.normalizeWhitespace('  שאלה   מספר  1  '), 'שאלה מספר 1');
 });
 
 await runTest('Question Parser - Markdown', 'Parses Hebrew exam questions formatted in Markdown', () => {
@@ -285,6 +415,89 @@ await runTest('Question Parser - Text Extraction & Inline Options', 'Parses text
     assert.strictEqual(parsed[1].options[0], 'התא');
 });
 
+await runTest('Question Parser - CSV Merging Error Handling', 'Handles errors silently in non-explicit mode and reports errors in explicit mode', async () => {
+    const QuestionParser = require('../js/question-parser.js');
+
+    let toastMsg = null;
+    let taskFailedMsg = null;
+
+    const mockState = {
+        questions: [{ question: "Q1", options: ["A", "B"] }]
+    };
+    const mockElements = {
+        csvFile: { files: [{ name: "answers.csv", text: async () => { throw new Error("Read error"); } }] },
+        formNumber: { value: "101" }
+    };
+    const mockProgressController = {
+        startTask: () => ({
+            update: () => {},
+            finish: () => {},
+            fail: (msg) => { taskFailedMsg = msg; }
+        })
+    };
+
+    // Non-explicit merge failure should handle quietly without console output or toasts/task failures
+    await QuestionParser.tryMergeAnswersFromCsv({
+        explicit: false,
+        elements: mockElements,
+        state: mockState,
+        progressController: mockProgressController,
+        showToastFn: (msg) => { toastMsg = msg; }
+    });
+
+    assert.strictEqual(toastMsg, null);
+    assert.strictEqual(taskFailedMsg, null);
+
+    // Explicit merge failure should report errors via toast and task failure
+    await QuestionParser.tryMergeAnswersFromCsv({
+        explicit: true,
+        elements: mockElements,
+        state: mockState,
+        progressController: mockProgressController,
+        showToastFn: (msg) => { toastMsg = msg; }
+    });
+
+    assert.ok(toastMsg && toastMsg.includes("Read error"));
+    assert.ok(taskFailedMsg && taskFailedMsg.includes("Read error"));
+});
+
+await runTest('PDF Service - groupPdfTextItemsToLines Line Grouping & Performance', 'Groups items by y geometry efficiently', () => {
+    const PdfService = require('../js/pdf-service.js');
+
+    const items = [
+        { str: 'שאלה 1', transform: [1, 0, 0, 1, 100, 700], dir: 'rtl', width: 50 },
+        { str: 'מהו DNA?', transform: [1, 0, 0, 1, 40, 702], dir: 'rtl', width: 50 },
+        { str: 'א. חומצת גרעין', transform: [1, 0, 0, 1, 40, 680], dir: 'rtl', width: 80 },
+        { str: 'ב. חלבון', transform: [1, 0, 0, 1, 40, 660], dir: 'rtl', width: 50 }
+    ];
+
+    const lines = PdfService.groupPdfTextItemsToLines(items);
+    assert.strictEqual(lines.length, 3);
+    assert.ok(lines[0].includes('שאלה 1') && lines[0].includes('מהו DNA?'));
+    assert.strictEqual(lines[1], 'א. חומצת גרעין');
+    assert.strictEqual(lines[2], 'ב. חלבון');
+
+    const largeItems = [];
+    for (let i = 0; i < 5000; i++) {
+        const lineIdx = Math.floor(i / 5);
+        const y = 10000 - (lineIdx * 12) + (i % 2);
+        const x = (i % 5) * 100;
+        largeItems.push({
+            str: 'item_' + i,
+            transform: [1, 0, 0, 1, x, y],
+            dir: 'ltr',
+            width: 40
+        });
+    }
+
+    const startMs = Date.now();
+    const benchmarkLines = PdfService.groupPdfTextItemsToLines(largeItems);
+    const durationMs = Date.now() - startMs;
+
+    assert.strictEqual(benchmarkLines.length, 1000);
+    console.log('     📊 [BENCHMARK] groupPdfTextItemsToLines (5,000 items): ' + durationMs + 'ms');
+});
+
 await runTest('PDF Service - Heuristics & Geometry', 'Evaluates direction detection and Hebrew breakage scores', () => {
     const PdfService = require('../js/pdf-service.js');
     assert.strictEqual(PdfService.hasHebrew('שלום עולם'), true);
@@ -320,6 +533,27 @@ await runTest('Gemini Service - Models & Error Classification', 'Classifies Gemi
     assert.strictEqual(sorted[0].model, 'gemini-2.5-flash');
     assert.strictEqual(sorted[1].model, 'gemini-2.0-flash');
     assert.strictEqual(sorted[2].model, 'gemini-1.5-flash');
+});
+
+await runTest('Gemini Service - verifyTestWithGemini Fallback', 'Gracefully falls back to original parsedQuestions on API/JSON failure', async () => {
+    const GeminiService = require('../js/gemini-service.js');
+    const sampleQuestions = [{ question: 'מהו DNA?', options: ['חומצת גרעין', 'חלבון'], correctIndex: 0 }];
+
+    // Mock global fetch to return invalid non-JSON or HTTP errors
+    const originalFetch = global.fetch;
+    global.fetch = async () => ({
+        ok: true,
+        json: async () => ({
+            candidates: [{ content: { parts: [{ text: 'Invalid non-JSON response' }] } }]
+        })
+    });
+
+    try {
+        const result = await GeminiService.verifyTestWithGemini(sampleQuestions, 'dummy-api-key');
+        assert.deepStrictEqual(result, sampleQuestions);
+    } finally {
+        global.fetch = originalFetch;
+    }
 });
 
 await runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts are referenced in correct dependency order', () => {

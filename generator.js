@@ -261,7 +261,7 @@ STRICT EXTRACTION & FORMATTING RULES:
                         EditorUi.setStatus(`משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל) לעיבוד...`, false, false, elements);
                     }
                 } catch (e) {
-                    console.warn('Could not build clean PDF for parse:', e);
+                    // Fall back to processing original PDF if clean PDF buffer construction fails
                 }
             }
 
@@ -451,8 +451,8 @@ STRICT EXTRACTION & FORMATTING RULES:
     elements.runParse?.addEventListener('click', async () => {
         try {
             await runParse();
-        } catch (error) {
-            console.warn('runParse finished with notice/error:', error);
+        } catch {
+            // Error notice is already handled and rendered to the user inside runParse()
         }
     });
 
@@ -610,7 +610,7 @@ STRICT EXTRACTION & FORMATTING RULES:
                         parsedAsStrictJson = true;
                     }
                 } catch (jsonErr) {
-                    console.warn('JSON parse failed for uploaded question file. Trying markdown/text fallback.', jsonErr);
+                    // Fallback to markdown or plain text parser below
                 }
 
                 if (!parsedAsStrictJson) {
@@ -660,7 +660,6 @@ STRICT EXTRACTION & FORMATTING RULES:
             });
             EditorUi.setStatus(`נטענו ${normalizedQuestions.length} שאלות בהצלחה מקובץ ${file.name}!`, false, true, elements);
         } catch (error) {
-            console.error('Error loading question file:', error);
             EditorUi.setStatus(error.message || `נכשלה טעינת קובץ ${file.name}.`, true, false, elements);
         }
     });
