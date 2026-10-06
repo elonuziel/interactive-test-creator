@@ -11,10 +11,14 @@ const {
     validateQuestions
 } = require('../quiz-core.js');
 
-function runTest(suiteName, name, fn) {
+
+let testsPassed = 0;
+let testsFailed = 0;
+
+async function runTest(suiteName, name, fn) {
     const startMs = Date.now();
     try {
-        fn();
+        await fn();
         const durationMs = Date.now() - startMs;
         console.log(`  ✅ [PASS] ${suiteName} -> ${name} (${durationMs}ms)`);
         testsPassed++;
@@ -25,11 +29,12 @@ function runTest(suiteName, name, fn) {
     }
 }
 
+async function main() {
 console.log('🧪 Interactive Test Creator — Node.js Component Integration Unit Tests\n');
-let testsPassed = 0;
-let testsFailed = 0;
+testsPassed = 0;
+testsFailed = 0;
 
-runTest('JSON Normalization', 'Strips option letter prefixes and cleans double spaces', () => {
+await runTest('JSON Normalization', 'Strips option letter prefixes and cleans double spaces', () => {
     const input = [{ question: '  שאלה  1.  מהו DNA?  ', options: ['א. חומצת גרעין', 'ב. חלבון', 'ג. שומן'] }];
     const result = normalizeQuestionsJson(input);
     assert.strictEqual(result.length, 1);
@@ -37,14 +42,14 @@ runTest('JSON Normalization', 'Strips option letter prefixes and cleans double s
     assert.deepStrictEqual(result[0].options, ['חומצת גרעין', 'חלבון', 'שומן']);
 });
 
-runTest('JSON Normalization', 'Removes PDF footer artifacts', () => {
+await runTest('JSON Normalization', 'Removes PDF footer artifacts', () => {
     const input = [{ question: 'מהו תפקוד המיטוכונדריה? עמוד 3 מתוך 12 - סוף המבחן -', options: ['ייצור אנרגיה', 'תפיסת סוכרים'] }];
     const result = normalizeQuestionsJson(input);
     assert.strictEqual(result[0].question, 'מהו תפקוד המיטוכונדריה?');
     assert.strictEqual(stripExamFooterArtifacts('x [cite: 12]'), 'x');
 });
 
-runTest('JSON Normalization', 'Filters empty questions and resets invalid correctIndex', () => {
+await runTest('JSON Normalization', 'Filters empty questions and resets invalid correctIndex', () => {
     const input = [
         { question: '', options: ['תשובה 1'] },
         { question: 'שאלה תקינה', options: ['תשובה 1', 'תשובה 2'], correctIndex: 99 }
@@ -54,14 +59,14 @@ runTest('JSON Normalization', 'Filters empty questions and resets invalid correc
     assert.strictEqual(result[0].correctIndex, 0);
 });
 
-runTest('CSV Answer Key Merging', 'Parses quoted CSV and extracts Hebrew/numeric answers', () => {
+await runTest('CSV Answer Key Merging', 'Parses quoted CSV and extracts Hebrew/numeric answers', () => {
     const csv = 'Form,Q1,Q2,Q3,Q4\n76,א,ב,ג,ד\n32,4,3,2,1';
     const rows = parseCsvRows(csv);
     assert.deepStrictEqual(Array.from(extractAnswersForForm(rows, '76').entries()), [[1, 0], [2, 1], [3, 2], [4, 3]]);
     assert.deepStrictEqual(Array.from(extractAnswersForForm(rows, '32').entries()), [[1, 3], [2, 2], [3, 1], [4, 0]]);
 });
 
-runTest('CSV Answer Key Merging', 'Performance benchmark & edge case validation for extractAnswersForForm', () => {
+await runTest('CSV Answer Key Merging', 'Performance benchmark & edge case validation for extractAnswersForForm', () => {
     const rowsWithHeaders = [
         ['שאלון', 'Q1', 'Q2', 'Q3', 'Q4'],
         ['101.0', 'א', 'ב', 'ג', 'ד'],
@@ -96,7 +101,7 @@ runTest('CSV Answer Key Merging', 'Performance benchmark & edge case validation 
     console.log('     📊 [BENCHMARK] extractAnswersForForm (' + iterations + ' calls x 5,000 rows x 50 cols): ' + durationMs + 'ms');
 });
 
-runTest('CSV Answer Key Merging', 'Merges correctIndex and disables random shuffling', () => {
+await runTest('CSV Answer Key Merging', 'Merges correctIndex and disables random shuffling', () => {
     const questions = [
         { question: 'Q1', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true },
         { question: 'Q2', options: ['A', 'B', 'C'], correctIndex: 0, shuffleOptions: true }
@@ -107,7 +112,7 @@ runTest('CSV Answer Key Merging', 'Merges correctIndex and disables random shuff
     assert.strictEqual(merged[0].shuffleOptions, false);
 });
 
-runTest('Storage Hashing', 'Generates deterministic keys based on the full question sample', () => {
+await runTest('Storage Hashing', 'Generates deterministic keys based on the full question sample', () => {
     const first = [{ question: 'Botany question test', options: ['1', '2'] }];
     const second = [{ question: 'Physics question test', options: ['1', '2'] }];
     assert.strictEqual(getStorageKey(first), getStorageKey(first));
@@ -115,7 +120,7 @@ runTest('Storage Hashing', 'Generates deterministic keys based on the full quest
     assert.ok(getStorageKey(first).startsWith('quiz_answers_'));
 });
 
-runTest('Question Validation', 'Rejects malformed questions with actionable errors', () => {
+await runTest('Question Validation', 'Rejects malformed questions with actionable errors', () => {
     const errors = validateQuestions([
         { question: '', options: ['only one'], correctIndex: 3 },
         { question: 'Valid', options: ['A', 'B'], correctIndex: 0, sourcePage: 0 }
@@ -125,7 +130,7 @@ runTest('Question Validation', 'Rejects malformed questions with actionable erro
     assert.ok(errors.some((error) => error.includes('שאלה 2: sourcePage אינו תקין')));
 });
 
-runTest('Mix & Match Custom Practice', 'Combines categories and manual selections without duplicates', () => {
+await runTest('Mix & Match Custom Practice', 'Combines categories and manual selections without duplicates', () => {
     const answers = [
         { selectedOptionId: 1, isCorrect: false },
         { selectedOptionId: 0, isCorrect: true },
@@ -142,7 +147,7 @@ runTest('Mix & Match Custom Practice', 'Combines categories and manual selection
     assert.deepStrictEqual(selected, [0, 2, 3]);
 });
 
-runTest('updateCustomPracticeSelection Helper', 'Updates DOM elements or handles null elements gracefully', () => {
+await runTest('updateCustomPracticeSelection Helper', 'Updates DOM elements or handles null elements gracefully', () => {
     let customSelectedCount = { textContent: '' };
     let startCustomPracticeBtn = { disabled: false };
 
@@ -165,7 +170,7 @@ runTest('updateCustomPracticeSelection Helper', 'Updates DOM elements or handles
 });
 
 
-runTest('Standalone Export', 'Escapes script terminators and inlines scripts', () => {
+await runTest('Standalone Export', 'Escapes script terminators and inlines scripts', () => {
     const QuizExport = require('../quiz-export.js');
     const template = '<link rel="stylesheet" href="style.css"><script id="quiz-data" type="application/json"></script><script src="quiz-core.js"></script><script src="app.js"></script>';
     let html = QuizExport.injectStylesheet(template, 'body{}');
@@ -182,7 +187,7 @@ runTest('Standalone Export', 'Escapes script terminators and inlines scripts', (
     assert.ok(!html.includes('src="app.js"'));
 });
 
-runTest('Progress System DOM & Styles', 'Verifies progress bar DOM markup in index.html and style.css', () => {
+await runTest('Progress System DOM & Styles', 'Verifies progress bar DOM markup in index.html and style.css', () => {
     const fs = require('fs');
     const path = require('path');
     const indexHtml = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
@@ -204,7 +209,7 @@ runTest('Progress System DOM & Styles', 'Verifies progress bar DOM markup in ind
     assert.ok(styleCss.includes('.indeterminate'), '.indeterminate animation CSS missing');
 });
 
-runTest('Progress Controller Lifecycle', 'Validates AbortController and progress state calculation', () => {
+await runTest('Progress Controller Lifecycle', 'Validates AbortController and progress state calculation', () => {
     const abortCtrl = new AbortController();
     assert.strictEqual(abortCtrl.signal.aborted, false);
     abortCtrl.abort();
@@ -216,7 +221,7 @@ runTest('Progress Controller Lifecycle', 'Validates AbortController and progress
     assert.strictEqual(clamp(150), 100);
 });
 
-runTest('Auto-Advance Countdown', 'Verifies countdown markup generation and styles in player', () => {
+await runTest('Auto-Advance Countdown', 'Verifies countdown markup generation and styles in player', () => {
     const fs = require('fs');
     const path = require('path');
     const appJs = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
@@ -232,7 +237,7 @@ runTest('Auto-Advance Countdown', 'Verifies countdown markup generation and styl
     assert.ok(styleCss.includes('@keyframes autoAdvanceShrink'), 'autoAdvanceShrink animation missing in style.css');
 });
 
-runTest('Progress Controller Initialization', 'Verifies ProgressController init sets elements, callbacks, and attaches abort button click handlers', () => {
+await runTest('Progress Controller Initialization', 'Verifies ProgressController init sets elements, callbacks, and attaches abort button click handlers', () => {
     const ProgressController = require('../js/progress-controller.js');
 
     function createMockElement() {
@@ -314,7 +319,7 @@ runTest('Progress Controller Initialization', 'Verifies ProgressController init 
     }
 });
 
-runTest('Progress Controller Module', 'Verifies ProgressController starts tasks, dispatches updates, and handles abort signals', () => {
+await runTest('Progress Controller Module', 'Verifies ProgressController starts tasks, dispatches updates, and handles abort signals', () => {
     const ProgressController = require('../js/progress-controller.js');
     const task = ProgressController.startTask('Test task', { cancellable: true, detail: 'Processing...' });
     assert.ok(task);
@@ -328,8 +333,7 @@ runTest('Progress Controller Module', 'Verifies ProgressController starts tasks,
     assert.strictEqual(task.isAborted(), true);
 });
 
-
-runTest('Question Parser - WhiteSpace Normalization', 'Handles null, undefined, NBSP, multiline, and extra whitespace correctly', () => {
+await runTest('Question Parser - WhiteSpace Normalization', 'Handles null, undefined, NBSP, multiline, and extra whitespace correctly', () => {
     const QuestionParser = require('../js/question-parser.js');
     assert.strictEqual(QuestionParser.normalizeWhitespace(null), '');
     assert.strictEqual(QuestionParser.normalizeWhitespace(undefined), '');
@@ -342,7 +346,7 @@ runTest('Question Parser - WhiteSpace Normalization', 'Handles null, undefined, 
     assert.strictEqual(QuestionParser.normalizeWhitespace('  שאלה   מספר  1  '), 'שאלה מספר 1');
 });
 
-runTest('Question Parser - Markdown', 'Parses Hebrew exam questions formatted in Markdown', () => {
+await runTest('Question Parser - Markdown', 'Parses Hebrew exam questions formatted in Markdown', () => {
     const QuestionParser = require('../js/question-parser.js');
     const md = [
         '### שאלה 1: מהו התפקיד העיקרי של ההמוגלובין? (עמוד 2)',
@@ -368,7 +372,7 @@ runTest('Question Parser - Markdown', 'Parses Hebrew exam questions formatted in
     assert.strictEqual(parsed[1].sourcePage, 1);
 });
 
-runTest('Question Parser - Hebrew Word Order & Heuristics', 'Detects reversed Hebrew and cleans header prefixes', () => {
+await runTest('Question Parser - Hebrew Word Order & Heuristics', 'Detects reversed Hebrew and cleans header prefixes', () => {
     const QuestionParser = require('../js/question-parser.js');
     const normalHebrew = 'שאלה מספר 1: מהי הביולוגיה?\nשאלה מספר 2: מהי הכימיה?';
     assert.strictEqual(QuestionParser.maybeFixHebrewWordOrder(normalHebrew), normalHebrew);
@@ -387,7 +391,7 @@ runTest('Question Parser - Hebrew Word Order & Heuristics', 'Detects reversed He
     assert.strictEqual(QuestionParser.stripQuestionHeaderPrefix('שאלה 5: הסבר את תהליך הפוטוסינתזה'), 'הסבר את תהליך הפוטוסינתזה');
 });
 
-runTest('Question Parser - Text Extraction & Inline Options', 'Parses text with inline answer options', () => {
+await runTest('Question Parser - Text Extraction & Inline Options', 'Parses text with inline answer options', () => {
     const QuestionParser = require('../js/question-parser.js');
     const rawText = [
         'שאלה 1',
@@ -411,8 +415,7 @@ runTest('Question Parser - Text Extraction & Inline Options', 'Parses text with 
     assert.strictEqual(parsed[1].options[0], 'התא');
 });
 
-
-runTest('Question Parser - CSV Merging Error Handling', 'Handles errors silently in non-explicit mode and reports errors in explicit mode', async () => {
+await runTest('Question Parser - CSV Merging Error Handling', 'Handles errors silently in non-explicit mode and reports errors in explicit mode', async () => {
     const QuestionParser = require('../js/question-parser.js');
 
     let toastMsg = null;
@@ -458,7 +461,7 @@ runTest('Question Parser - CSV Merging Error Handling', 'Handles errors silently
     assert.ok(taskFailedMsg && taskFailedMsg.includes("Read error"));
 });
 
-runTest('PDF Service - groupPdfTextItemsToLines Line Grouping & Performance', 'Groups items by y geometry efficiently', () => {
+await runTest('PDF Service - groupPdfTextItemsToLines Line Grouping & Performance', 'Groups items by y geometry efficiently', () => {
     const PdfService = require('../js/pdf-service.js');
 
     const items = [
@@ -495,7 +498,7 @@ runTest('PDF Service - groupPdfTextItemsToLines Line Grouping & Performance', 'G
     console.log('     📊 [BENCHMARK] groupPdfTextItemsToLines (5,000 items): ' + durationMs + 'ms');
 });
 
-runTest('PDF Service - Heuristics & Geometry', 'Evaluates direction detection and Hebrew breakage scores', () => {
+await runTest('PDF Service - Heuristics & Geometry', 'Evaluates direction detection and Hebrew breakage scores', () => {
     const PdfService = require('../js/pdf-service.js');
     assert.strictEqual(PdfService.hasHebrew('שלום עולם'), true);
     assert.strictEqual(PdfService.hasHebrew('Hello World 123'), false);
@@ -511,7 +514,7 @@ runTest('PDF Service - Heuristics & Geometry', 'Evaluates direction detection an
     assert.ok(breakageClean < breakageBroken);
 });
 
-runTest('Gemini Service - Models & Error Classification', 'Classifies Gemini errors and sorts candidate models', () => {
+await runTest('Gemini Service - Models & Error Classification', 'Classifies Gemini errors and sorts candidate models', () => {
     const GeminiService = require('../js/gemini-service.js');
     const err401 = GeminiService.getGeminiErrorInfo(401, 'Unauthorized');
     assert.strictEqual(err401.code, 'auth');
@@ -532,13 +535,13 @@ runTest('Gemini Service - Models & Error Classification', 'Classifies Gemini err
     assert.strictEqual(sorted[2].model, 'gemini-1.5-flash');
 });
 
-runTest('Gemini Service - Pacing Configuration', 'Maintains safe sequential interPageDelayMs between 1000ms and 2500ms', () => {
+await runTest('Gemini Service - Pacing Configuration', 'Maintains safe sequential interPageDelayMs between 1000ms and 2500ms', () => {
     const GeminiService = require('../js/gemini-service.js');
     assert.ok(GeminiService.GEMINI_CONFIG.interPageDelayMs >= 1000 && GeminiService.GEMINI_CONFIG.interPageDelayMs <= 2500,
         `interPageDelayMs (${GeminiService.GEMINI_CONFIG.interPageDelayMs}ms) should be balanced between 1000ms and 2500ms for free-tier rate safety`);
 });
 
-runTest('Gemini Service - verifyTestWithGemini Fallback', 'Gracefully falls back to original parsedQuestions on API/JSON failure', async () => {
+await runTest('Gemini Service - verifyTestWithGemini Fallback', 'Gracefully falls back to original parsedQuestions on API/JSON failure', async () => {
     const GeminiService = require('../js/gemini-service.js');
     const sampleQuestions = [{ question: 'מהו DNA?', options: ['חומצת גרעין', 'חלבון'], correctIndex: 0 }];
 
@@ -559,7 +562,7 @@ runTest('Gemini Service - verifyTestWithGemini Fallback', 'Gracefully falls back
     }
 });
 
-runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts are referenced in correct dependency order', () => {
+await runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts are referenced in correct dependency order', () => {
     const fs = require('fs');
     const path = require('path');
     const indexHtml = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
@@ -590,7 +593,7 @@ runTest('Module Scripts Loading in index.html', 'Verifies all modular scripts ar
     }
 });
 
-runTest('PWA Manifest & Service Worker Integrity', 'Verifies web manifest and service worker precache assets exist', () => {
+await runTest('PWA Manifest & Service Worker Integrity', 'Verifies web manifest and service worker precache assets exist', () => {
     const fs = require('fs');
     const path = require('path');
     const manifestPath = path.join(__dirname, '../manifest.webmanifest');
@@ -609,9 +612,67 @@ runTest('PWA Manifest & Service Worker Integrity', 'Verifies web manifest and se
     assert.ok(swContent.includes('PRECACHE_ASSETS'), 'PRECACHE_ASSETS missing in sw.js');
 });
 
+
+await runTest('Cropper Modal - getPdfBytesForCrop', 'Returns null when appState is uninitialized or missing PDF data', async () => {
+    const CropperModal = require('../js/cropper-modal.js');
+    CropperModal.initCropperModal({}, {});
+    const result = await CropperModal.getPdfBytesForCrop();
+    assert.strictEqual(result, null);
+});
+
+await runTest('Cropper Modal - getPdfBytesForCrop', 'Returns Uint8Array when appState contains pdfBytes array', async () => {
+    const CropperModal = require('../js/cropper-modal.js');
+    const pdfBytes = [1, 2, 3, 4, 5];
+    CropperModal.initCropperModal({ pdfBytes }, {});
+    const result = await CropperModal.getPdfBytesForCrop();
+    assert.ok(result instanceof Uint8Array);
+    assert.deepStrictEqual(Array.from(result), pdfBytes);
+});
+
+await runTest('Cropper Modal - getPdfBytesForCrop', 'Converts and caches pdfArrayBuffer into pdfBytes', async () => {
+    const CropperModal = require('../js/cropper-modal.js');
+    const buffer = new Uint8Array([10, 20, 30]).buffer;
+    const state = { pdfArrayBuffer: buffer };
+    CropperModal.initCropperModal(state, {});
+    const result = await CropperModal.getPdfBytesForCrop();
+    assert.ok(result instanceof Uint8Array);
+    assert.deepStrictEqual(Array.from(result), [10, 20, 30]);
+    assert.ok(state.pdfBytes instanceof Uint8Array);
+});
+
+await runTest('Cropper Modal - getPdfBytesForCrop', 'Reads file input arrayBuffer when state lacks cached bytes', async () => {
+    const CropperModal = require('../js/cropper-modal.js');
+    const state = {};
+    const mockFile = {
+        arrayBuffer: async () => new Uint8Array([100, 200]).buffer
+    };
+    CropperModal.initCropperModal(state, { pdfFile: { files: [mockFile] } });
+    const result = await CropperModal.getPdfBytesForCrop();
+    assert.ok(result instanceof Uint8Array);
+    assert.deepStrictEqual(Array.from(result), [100, 200]);
+    assert.ok(state.pdfBytes instanceof Uint8Array);
+});
+
+await runTest('Cropper Modal - getPdfBytesForCrop', 'Propagates error when pdfFile input arrayBuffer fails to read', async () => {
+    const CropperModal = require('../js/cropper-modal.js');
+    const mockFile = {
+        arrayBuffer: async () => { throw new Error('Failed to read PDF file bytes'); }
+    };
+    CropperModal.initCropperModal({}, { pdfFile: { files: [mockFile] } });
+    await assert.rejects(
+        async () => { await CropperModal.getPdfBytesForCrop(); },
+        { message: 'Failed to read PDF file bytes' }
+    );
+});
+
 console.log('\n──────────────────────────────────────────────────────────────');
 console.log(`📊 Final Execution Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
 console.log('──────────────────────────────────────────────────────────────\n');
 
-if (testsFailed > 0) process.exit(1);
 
+}
+
+main().catch((err) => {
+    console.error('Unhandled test runner error:', err);
+    process.exit(1);
+});
