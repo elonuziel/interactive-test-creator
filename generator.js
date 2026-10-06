@@ -261,7 +261,7 @@ STRICT EXTRACTION & FORMATTING RULES:
                         EditorUi.setStatus(`משתמש ב-PDF נקי (${keptCount} עמודים נבחרו בסרגל) לעיבוד...`, false, false, elements);
                     }
                 } catch (e) {
-                    console.warn('Could not build clean PDF for parse:', e);
+                    // Fall back to processing original PDF if clean PDF buffer construction fails
                 }
             }
 
