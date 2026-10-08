@@ -714,6 +714,96 @@ await runTest('PDF Service - Lazy Sidebar Thumbnails', 'Verifies renderSingleThu
     assert.strictEqual(typeof pdfService.renderSingleThumbnail, 'function', 'renderSingleThumbnail must be exported');
 });
 
+await runTest('Quiz Player Refactor - QuizSessionState', 'Manages session lifecycle, answers, flags, and timing committing', () => {
+    const { QuizSessionState } = require('../app.js');
+    const state = new QuizSessionState();
+    const sampleQuestions = [
+        { question: 'שאלה 1', options: [{ id: 0, text: 'א' }, { id: 1, text: 'ב' }], correctIndex: 0 },
+        { question: 'שאלה 2', options: [{ id: 0, text: 'א' }, { id: 1, text: 'ב' }], correctIndex: 1 },
+        { question: 'שאלה 3', options: [{ id: 0, text: 'א' }, { id: 1, text: 'ב' }], correctIndex: 0 }
+    ];
+
+    state.allMasterQuestions = [...sampleQuestions];
+    state.initSession({ mode: 'new', questions: sampleQuestions });
+
+    assert.strictEqual(state.questions.length, 3);
+    assert.strictEqual(state.currentQuestionIndex, 0);
+    assert.strictEqual(state.userAnswers.length, 3);
+    assert.strictEqual(state.userFlags.length, 3);
+    assert.strictEqual(state.questionTimes.length, 3);
+
+    // Record answer
+    const isCorrect1 = state.recordAnswer(0, 0, 0);
+    assert.strictEqual(isCorrect1, true);
+    assert.deepStrictEqual(state.userAnswers[0], { selectedOptionId: 0, isCorrect: true });
+
+    const isCorrect2 = state.recordAnswer(1, 0, 1);
+    assert.strictEqual(isCorrect2, false);
+    assert.deepStrictEqual(state.userAnswers[1], { selectedOptionId: 0, isCorrect: false });
+
+    // Flags
+    assert.strictEqual(state.toggleFlag(1), true);
+    assert.strictEqual(state.userFlags[1], true);
+    assert.strictEqual(state.toggleFlag(1), false);
+    assert.strictEqual(state.userFlags[1], false);
+
+    // Timing commit
+    state.currentQuestionStartTimestamp = Date.now() - 3000; // 3 seconds ago
+    state.currentQuestionIndex = 0;
+    state.commitCurrentQuestionTime();
+    assert.ok(state.questionTimes[0] >= 3, `Expected at least 3 seconds, got ${state.questionTimes[0]}`);
+    assert.strictEqual(state.currentQuestionStartTimestamp, null);
+
+    // Payload
+    const payload = state.getStoragePayload();
+    assert.strictEqual(payload.answers.length, 3);
+    assert.strictEqual(payload.questionTimes.length, 3);
+
+    // Resume session
+    const resumeState = new QuizSessionState();
+    resumeState.questions = [...sampleQuestions];
+    resumeState.initSession({
+        mode: 'resume',
+        savedState: {
+            answers: payload.answers,
+            flags: [false, true, false],
+            index: 1,
+            questionTimes: [5, 10, 0],
+            totalElapsedSeconds: 15,
+            remainingCountdownSeconds: 1785
+        }
+    });
+    assert.strictEqual(resumeState.currentQuestionIndex, 1);
+    assert.strictEqual(resumeState.userFlags[1], true);
+    assert.strictEqual(resumeState.totalElapsedSeconds, 15);
+    assert.deepStrictEqual(resumeState.questionTimes, [5, 10, 0]);
+
+    // Retry incorrect
+    const wrongOnly = state.getWrongOrUnansweredQuestions();
+    assert.strictEqual(wrongOnly.length, 2); // Q2 (wrong) + Q3 (unanswered)
+});
+
+await runTest('Quiz Player Refactor - QuizTimerEngine', 'Controls intervals and auto-advance safely without memory leaks', () => {
+    const { QuizTimerEngine, QuizSessionState } = require('../app.js');
+    const timer = new QuizTimerEngine();
+    const state = new QuizSessionState();
+    state.questions = [{ question: 'Q1' }];
+    state.initSession({ mode: 'new' });
+
+    timer.startExamTimer({ state });
+    assert.ok(timer.examInterval !== null, 'examInterval must be active');
+    timer.stopExamTimer(state);
+    assert.strictEqual(timer.examInterval, null, 'examInterval must be cleared');
+
+    timer.startAutoAdvance({ durationMs: 500 });
+    assert.ok(timer.autoAdvanceTimer !== null, 'autoAdvanceTimer must be set');
+    timer.clearAutoAdvance();
+    assert.strictEqual(timer.autoAdvanceTimer, null, 'autoAdvanceTimer must be cleared');
+    assert.strictEqual(timer.autoAdvanceInterval, null, 'autoAdvanceInterval must be cleared');
+
+    timer.cleanup(state);
+});
+
 console.log('\n──────────────────────────────────────────────────────────────');
 console.log(`📊 Final Execution Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
 console.log('──────────────────────────────────────────────────────────────\n');

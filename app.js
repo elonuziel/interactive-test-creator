@@ -1,316 +1,15 @@
-document.addEventListener('DOMContentLoaded', () => {
-
-    // ── State ────────────────────────────────────────────────────────────────
-    let questions = [];
-    let allMasterQuestions = [];
-    let currentQuestionIndex = 0;
-    let userAnswers = []; // { selectedOptionId: number, isCorrect: boolean } | null
-    let userFlags = []; // boolean per question
-    let isImmediateFeedback = false;
-    let autoAdvanceTimer = null;
-    let autoAdvanceInterval = null;
-    let reviewFilter = 'all'; // 'all' | 'wrong' | 'unanswered' | 'flagged'
-    let isReviewMode = false; // true when reviewing from results screen
-    let theme = localStorage.getItem('theme') || 'light';
-
-    // ── Timer & Timing Analytics State ──────────────────────────────────────
-    let isTimerEnabled = localStorage.getItem('quiz_timer_enabled') === 'true';
-    let timerMode = localStorage.getItem('quiz_timer_mode') || 'stopwatch'; // 'stopwatch' | 'countdown'
-    let timerCountdownMinutes = parseInt(localStorage.getItem('quiz_timer_minutes') || '30', 10);
-    let isQuestionTimerEnabled = localStorage.getItem('quiz_question_timer_enabled') !== 'false'; // default true
-
-    let totalElapsedSeconds = 0;
-    let remainingCountdownSeconds = timerCountdownMinutes * 60;
-    let questionTimes = []; // number of active seconds spent per question
-    let currentQuestionStartTimestamp = null;
-    let examTimerInterval = null;
-
-    const STORAGE_KEY = 'quiz_answers_v1';
-
-    function clearAutoAdvance() {
-        if (autoAdvanceTimer) {
-            clearTimeout(autoAdvanceTimer);
-            autoAdvanceTimer = null;
-        }
-        if (autoAdvanceInterval) {
-            clearInterval(autoAdvanceInterval);
-            autoAdvanceInterval = null;
-        }
+(function (root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        define([], factory);
+    } else if (typeof module === 'object' && module.exports) {
+        module.exports = factory();
+    } else {
+        root.QuizApp = factory();
     }
+}(typeof self !== 'undefined' ? self : this, function () {
+    'use strict';
 
-    // ── DOM Elements ─────────────────────────────────────────────────────────
-    const setupScreen   = document.getElementById('setup-screen');
-    const quizScreen    = document.getElementById('quiz-screen');
-    const resultsScreen = document.getElementById('results-screen');
-
-    const startBtn          = document.getElementById('start-btn');
-    const resumeBtn         = document.getElementById('resume-btn');
-    const resumeNotice      = document.getElementById('resume-notice');
-    const prevBtn           = document.getElementById('prev-btn');
-    const nextBtn           = document.getElementById('next-btn');
-    const submitBtn         = document.getElementById('submit-btn');
-    const restartBtn        = document.getElementById('restart-btn');
-    const retryIncorrectBtn = document.getElementById('retry-incorrect-btn');
-    const retryFlaggedBtn   = document.getElementById('retry-flagged-btn');
-    const reviewBackBtn     = document.getElementById('review-back-btn');
-    const flagBtn           = document.getElementById('flag-btn');
-
-    const flaggedCountBadgeAction = document.getElementById('flagged-count-badge-action');
-    const flaggedCountBadgeFilter = document.getElementById('flagged-count-badge-filter');
-
-    const chkMixWrong            = document.getElementById('chk-mix-wrong');
-    const chkMixUnanswered       = document.getElementById('chk-mix-unanswered');
-    const chkMixFlagged          = document.getElementById('chk-mix-flagged');
-    const cntMixWrong            = document.getElementById('cnt-mix-wrong');
-    const cntMixUnanswered       = document.getElementById('cnt-mix-unanswered');
-    const cntMixFlagged          = document.getElementById('cnt-mix-flagged');
-    const startCustomPracticeBtn = document.getElementById('start-custom-practice-btn');
-    const customSelectedCount    = document.getElementById('custom-selected-count');
-
-    let manualSelectedIndices = new Set();
-
-    const questionCounter   = document.getElementById('question-counter');
-    const questionText      = document.getElementById('question-text');
-    const questionImage     = document.getElementById('question-image');
-    const optionsContainer  = document.getElementById('options-container');
-    const progressBar       = document.getElementById('progress-bar');
-    const feedbackMessage   = document.getElementById('feedback-message');
-    const jumpBar           = document.getElementById('question-jump-bar');
-    const zoomOverlay       = document.getElementById('zoom-overlay');
-    const zoomImg           = document.getElementById('zoom-img');
-
-    // Cropper Elements
-    const openCropperBtn    = document.getElementById('open-cropper-btn');
-    const cropperModal      = document.getElementById('cropper-modal');
-    const closeCropperBtn   = document.getElementById('close-cropper-btn');
-    const confirmCropBtn    = document.getElementById('confirm-crop-btn');
-    const cropperImage      = document.getElementById('cropper-image');
-    let cropperInstance     = null;
-    let croppedImages       = {}; // Store crop data URLs per full image path
-    const themeToggle    = document.getElementById('theme-toggle');
-    const feedbackToggle = document.getElementById('immediate-feedback-toggle');
-    const welcomeFeedbackToggle = document.getElementById('welcome-immediate-feedback-toggle');
-    const themeIcon      = document.getElementById('theme-icon');
-    const filterBtns     = document.querySelectorAll('.filter-btn');
-    const builderNavLink = document.getElementById('builder-nav-link');
-    const onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
-
-    // Timer Elements
-    const quizTimerToggle           = document.getElementById('quiz-timer-toggle');
-    const timerOptionsContainer     = document.getElementById('timer-options-container');
-    const timerModeStopwatch        = document.getElementById('timer-mode-stopwatch');
-    const timerModeCountdown        = document.getElementById('timer-mode-countdown');
-    const timerCountdownMinutesInput = document.getElementById('timer-countdown-minutes');
-    const questionTimerToggle       = document.getElementById('question-timer-toggle');
-
-    const examTimerBadge            = document.getElementById('exam-timer-badge');
-    const timerDisplay              = document.getElementById('timer-display');
-    const questionTimeBadge         = document.getElementById('question-time-badge');
-    const questionTimeDisplay       = document.getElementById('question-time-display');
-
-    const timingAnalyticsCard       = document.getElementById('timing-analytics-card');
-    const totalTimeStat             = document.getElementById('total-time-stat');
-    const meanTimeStat              = document.getElementById('mean-time-stat');
-    const timedQuestionsStat        = document.getElementById('timed-questions-stat');
-
-    if (builderNavLink) {
-        builderNavLink.href = onlineBuilderUrl;
-        builderNavLink.textContent = 'יוצר מבחן אונליין ←';
-        builderNavLink.title = 'פתח יוצר מבחן אונליין';
-    }
-
-    // A live quiz is opened from a blob URL, so a relative `index.html` link
-    // cannot resolve back to the builder. Return through the opener instead.
-    // For downloaded standalone quizzes (or direct quiz_player.html visits),
-    // there is no opener and the normal link remains available.
-    builderNavLink?.addEventListener('click', (event) => {
-        if (!window.opener || window.opener.closed) return;
-
-        event.preventDefault();
-        const builderWindow = window.opener;
-        try {
-            builderWindow.focus();
-        } catch {
-            // Focusing another tab can be denied by the browser; closing still works.
-        }
-
-        window.close();
-
-        // Some browsers refuse to close a tab they do not consider script-opened.
-        // In that case, use the opener's current URL rather than resolving the
-        // relative link against the blob URL (which produces about:blank#blocked).
-        setTimeout(() => {
-            if (window.closed) return;
-            try {
-                window.location.replace(builderWindow.location.href);
-            } catch {
-                // Keep the page usable if the browser blocks opener inspection.
-            }
-        }, 100);
-    });
-
-    // ── Theme ────────────────────────────────────────────────────────────────
-    function setTheme(newTheme) {
-        theme = newTheme;
-        document.documentElement.setAttribute('data-theme', theme);
-        localStorage.setItem('theme', theme);
-        if (theme === 'dark') {
-            themeIcon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>';
-        } else {
-            themeIcon.innerHTML = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>';
-        }
-    }
-    setTheme(theme);
-
-    themeToggle.addEventListener('click', () => setTheme(theme === 'light' ? 'dark' : 'light'));
-
-    // ── Immediate Feedback / Auto-Review ──────────────────────────────────────
-    const savedFeedback = localStorage.getItem('quiz_immediate_feedback');
-    if (savedFeedback !== null) {
-        isImmediateFeedback = savedFeedback === 'true';
-    }
-
-    function setImmediateFeedback(enabled) {
-        isImmediateFeedback = Boolean(enabled);
-        if (feedbackToggle) feedbackToggle.checked = isImmediateFeedback;
-        if (welcomeFeedbackToggle) welcomeFeedbackToggle.checked = isImmediateFeedback;
-        localStorage.setItem('quiz_immediate_feedback', isImmediateFeedback);
-    }
-    setImmediateFeedback(isImmediateFeedback);
-
-    feedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
-    welcomeFeedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
-
-    // ── Timer Configuration & Handlers ───────────────────────────────────────
-    function initTimerControls() {
-        if (quizTimerToggle) {
-            quizTimerToggle.checked = isTimerEnabled;
-            if (timerOptionsContainer) {
-                timerOptionsContainer.classList.toggle('hidden', !isTimerEnabled);
-            }
-            quizTimerToggle.addEventListener('change', (e) => {
-                isTimerEnabled = e.target.checked;
-                localStorage.setItem('quiz_timer_enabled', isTimerEnabled);
-                if (timerOptionsContainer) {
-                    timerOptionsContainer.classList.toggle('hidden', !isTimerEnabled);
-                }
-            });
-        }
-
-        if (timerModeStopwatch && timerModeCountdown) {
-            if (timerMode === 'countdown') {
-                timerModeCountdown.checked = true;
-            } else {
-                timerModeStopwatch.checked = true;
-            }
-            timerModeStopwatch.addEventListener('change', () => {
-                if (timerModeStopwatch.checked) {
-                    timerMode = 'stopwatch';
-                    localStorage.setItem('quiz_timer_mode', 'stopwatch');
-                }
-            });
-            timerModeCountdown.addEventListener('change', () => {
-                if (timerModeCountdown.checked) {
-                    timerMode = 'countdown';
-                    localStorage.setItem('quiz_timer_mode', 'countdown');
-                }
-            });
-        }
-
-        if (timerCountdownMinutesInput) {
-            timerCountdownMinutesInput.value = timerCountdownMinutes;
-            timerCountdownMinutesInput.addEventListener('input', () => {
-                const val = parseInt(timerCountdownMinutesInput.value, 10);
-                if (val && val >= 1) {
-                    timerCountdownMinutes = val;
-                    localStorage.setItem('quiz_timer_minutes', val);
-                }
-            });
-        }
-
-        if (questionTimerToggle) {
-            questionTimerToggle.checked = isQuestionTimerEnabled;
-            questionTimerToggle.addEventListener('change', (e) => {
-                isQuestionTimerEnabled = e.target.checked;
-                localStorage.setItem('quiz_question_timer_enabled', isQuestionTimerEnabled);
-            });
-        }
-    }
-    initTimerControls();
-
-    function startExamTimer(resume = false) {
-        stopExamTimer();
-
-        if (!resume) {
-            totalElapsedSeconds = 0;
-            remainingCountdownSeconds = timerCountdownMinutes * 60;
-        }
-
-        if (examTimerBadge) {
-            examTimerBadge.classList.toggle('hidden', !isTimerEnabled);
-            examTimerBadge.classList.remove('warning');
-        }
-        if (questionTimeBadge) {
-            questionTimeBadge.classList.toggle('hidden', !isQuestionTimerEnabled);
-        }
-
-        currentQuestionStartTimestamp = Date.now();
-        updateTimerDisplays();
-
-        examTimerInterval = setInterval(() => {
-            totalElapsedSeconds++;
-            if (timerMode === 'countdown') {
-                remainingCountdownSeconds--;
-                if (remainingCountdownSeconds <= 0) {
-                    remainingCountdownSeconds = 0;
-                    stopExamTimer();
-                    if (examTimerBadge) examTimerBadge.classList.add('warning');
-                    updateTimerDisplays();
-                    // Auto submit when time has elapsed
-                    setTimeout(() => {
-                        if (submitBtn) submitBtn.click();
-                    }, 800);
-                    return;
-                } else if (remainingCountdownSeconds <= 60 && examTimerBadge) {
-                    examTimerBadge.classList.add('warning');
-                }
-            }
-
-            updateTimerDisplays();
-        }, 1000);
-    }
-
-    function stopExamTimer() {
-        if (examTimerInterval) {
-            clearInterval(examTimerInterval);
-            examTimerInterval = null;
-        }
-        commitCurrentQuestionTime();
-    }
-
-    function commitCurrentQuestionTime() {
-        if (currentQuestionStartTimestamp && currentQuestionIndex >= 0 && currentQuestionIndex < questions.length) {
-            const now = Date.now();
-            const diffSecs = Math.max(0, Math.round((now - currentQuestionStartTimestamp) / 1000));
-            questionTimes[currentQuestionIndex] = (questionTimes[currentQuestionIndex] || 0) + diffSecs;
-            currentQuestionStartTimestamp = null;
-        }
-    }
-
-    function updateTimerDisplays() {
-        if (timerDisplay && isTimerEnabled) {
-            const secs = (timerMode === 'countdown') ? remainingCountdownSeconds : totalElapsedSeconds;
-            timerDisplay.textContent = window.QuizCore ? window.QuizCore.formatDuration(secs) : `${secs}s`;
-        }
-
-        if (questionTimeDisplay && isQuestionTimerEnabled) {
-            const alreadySpent = questionTimes[currentQuestionIndex] || 0;
-            const currentActive = (!isReviewMode && currentQuestionStartTimestamp) ? Math.max(0, Math.round((Date.now() - currentQuestionStartTimestamp) / 1000)) : 0;
-            const totalForThisQ = alreadySpent + currentActive;
-            questionTimeDisplay.textContent = window.QuizCore ? window.QuizCore.formatDuration(totalForThisQ) : `${totalForThisQ}s`;
-        }
-    }
-
+    // ── Helper Utilities ───────────────────────────────────────────────────────
     function escapeHtml(str) {
         if (!str) return '';
         return String(str)
@@ -321,843 +20,1260 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, '&#039;');
     }
 
-    // ── localStorage Persistence ──────────────────────────────────────────────
-    const getStorageKey = () => window.QuizCore.getStorageKey(questions);
+    // ── Quiz Session State ─────────────────────────────────────────────────────
+    class QuizSessionState {
+        constructor() {
+            this.questions = [];
+            this.allMasterQuestions = [];
+            this.currentQuestionIndex = 0;
+            this.userAnswers = [];
+            this.userFlags = [];
+            this.questionTimes = [];
+            this.totalElapsedSeconds = 0;
+            this.remainingCountdownSeconds = 0;
+            this.currentQuestionStartTimestamp = null;
+            this.manualSelectedIndices = new Set();
+            this.isReviewMode = false;
+            this.reviewFilter = 'all';
+            this.croppedImages = {};
 
-    function saveProgress() {
-        commitCurrentQuestionTime();
-        if (!isReviewMode) {
-            currentQuestionStartTimestamp = Date.now();
+            // User Settings
+            this.isImmediateFeedback = false;
+            this.isTimerEnabled = false;
+            this.timerMode = 'stopwatch'; // 'stopwatch' | 'countdown'
+            this.timerCountdownMinutes = 30;
+            this.isQuestionTimerEnabled = true;
         }
-        localStorage.setItem(getStorageKey(), JSON.stringify({
-            answers: userAnswers,
-            flags: userFlags,
-            index: currentQuestionIndex,
-            questionTimes,
-            totalElapsedSeconds,
-            remainingCountdownSeconds
-        }));
-    }
 
-    function loadProgress() {
-        try {
-            const raw = localStorage.getItem(getStorageKey());
-            return raw ? JSON.parse(raw) : null;
-        } catch(e) { return null; }
-    }
-
-    function clearProgress() {
-        localStorage.removeItem(getStorageKey());
-    }
-
-    // ── Fetch Questions ───────────────────────────────────────────────────────
-    const inlineQuestions = document.getElementById('quiz-data')?.textContent.trim();
-    const questionsSource = inlineQuestions
-        ? Promise.resolve(JSON.parse(inlineQuestions))
-        : fetch('questions.json').then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-        });
-
-    questionsSource
-        .then(data => {
-            if (!Array.isArray(data) || data.length === 0) {
-                throw new Error('questions.json is empty or malformed');
+        initSession({ mode, questions = null, savedState = null, defaultCountdownMinutes = 30 }) {
+            if (mode === 'resume' && savedState) {
+                this.userAnswers = Array.isArray(savedState.answers) ? savedState.answers : new Array(this.questions.length).fill(null);
+                this.userFlags = Array.isArray(savedState.flags) ? savedState.flags : new Array(this.questions.length).fill(false);
+                this.currentQuestionIndex = typeof savedState.index === 'number' ? savedState.index : 0;
+                this.questionTimes = Array.isArray(savedState.questionTimes) ? savedState.questionTimes : new Array(this.questions.length).fill(0);
+                this.totalElapsedSeconds = typeof savedState.totalElapsedSeconds === 'number' ? savedState.totalElapsedSeconds : 0;
+                this.remainingCountdownSeconds = typeof savedState.remainingCountdownSeconds === 'number'
+                    ? savedState.remainingCountdownSeconds
+                    : (this.timerCountdownMinutes || defaultCountdownMinutes) * 60;
+                this.isReviewMode = false;
+                this.currentQuestionStartTimestamp = Date.now();
+                return;
             }
-            questions = data.map(q => {
-                const options = q.options.map((text, id) => ({ id, text }));
-                if (q.shuffleOptions) {
-                    // Fisher-Yates shuffle for 000-style tests that default all answers to א.
-                    for (let i = options.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [options[i], options[j]] = [options[j], options[i]];
+
+            if (mode === 'restart') {
+                if (this.allMasterQuestions && this.allMasterQuestions.length > 0) {
+                    this.questions = [...this.allMasterQuestions];
+                }
+            } else if (questions) {
+                this.questions = [...questions];
+            }
+
+            const count = this.questions.length;
+            this.userAnswers = new Array(count).fill(null);
+            this.userFlags = (mode === 'retry-flagged') ? new Array(count).fill(true) : new Array(count).fill(false);
+            this.questionTimes = new Array(count).fill(0);
+            this.currentQuestionIndex = 0;
+            this.totalElapsedSeconds = 0;
+            this.remainingCountdownSeconds = (this.timerCountdownMinutes || defaultCountdownMinutes) * 60;
+            this.isReviewMode = false;
+            this.reviewFilter = 'all';
+            this.manualSelectedIndices.clear();
+            this.currentQuestionStartTimestamp = Date.now();
+        }
+
+        commitCurrentQuestionTime() {
+            if (this.currentQuestionStartTimestamp && this.currentQuestionIndex >= 0 && this.currentQuestionIndex < this.questions.length) {
+                const now = Date.now();
+                const diffSecs = Math.max(0, Math.round((now - this.currentQuestionStartTimestamp) / 1000));
+                this.questionTimes[this.currentQuestionIndex] = (this.questionTimes[this.currentQuestionIndex] || 0) + diffSecs;
+                this.currentQuestionStartTimestamp = null;
+            }
+        }
+
+        recordAnswer(index, selectedOptionId, correctId) {
+            if (index < 0 || index >= this.questions.length) return false;
+            const isCorrect = selectedOptionId === correctId;
+            this.userAnswers[index] = { selectedOptionId, isCorrect };
+            return isCorrect;
+        }
+
+        toggleFlag(index) {
+            if (index >= 0 && index < this.questions.length) {
+                this.userFlags[index] = !this.userFlags[index];
+                return this.userFlags[index];
+            }
+            return false;
+        }
+
+        getStoragePayload() {
+            return {
+                answers: this.userAnswers,
+                flags: this.userFlags,
+                index: this.currentQuestionIndex,
+                questionTimes: this.questionTimes,
+                totalElapsedSeconds: this.totalElapsedSeconds,
+                remainingCountdownSeconds: this.remainingCountdownSeconds
+            };
+        }
+
+        getWrongOrUnansweredQuestions() {
+            return this.questions.filter((q, i) => !this.userAnswers[i] || !this.userAnswers[i].isCorrect);
+        }
+
+        getFlaggedQuestions() {
+            return this.questions.filter((q, i) => this.userFlags[i]);
+        }
+
+        getCustomPracticeIndices(chkWrong, chkUnanswered, chkFlagged) {
+            const quizCore = (typeof window !== 'undefined' ? window.QuizCore : null) || (typeof require !== 'undefined' ? require('./quiz-core.js') : null);
+            if (!quizCore) return Array.from(this.manualSelectedIndices);
+            return quizCore.getCustomSelectedIndices(
+                this.questions,
+                this.userAnswers,
+                this.userFlags,
+                { wrong: chkWrong, unanswered: chkUnanswered, flagged: chkFlagged },
+                Array.from(this.manualSelectedIndices)
+            );
+        }
+    }
+
+    // ── Quiz Timer Engine ──────────────────────────────────────────────────────
+    class QuizTimerEngine {
+        constructor() {
+            this.examInterval = null;
+            this.autoAdvanceTimer = null;
+            this.autoAdvanceInterval = null;
+        }
+
+        startExamTimer({ state, onTick, onExpire, onWarning }) {
+            this.stopExamTimer();
+            state.currentQuestionStartTimestamp = Date.now();
+
+            this.examInterval = setInterval(() => {
+                state.totalElapsedSeconds++;
+                if (state.timerMode === 'countdown') {
+                    state.remainingCountdownSeconds--;
+                    if (state.remainingCountdownSeconds <= 0) {
+                        state.remainingCountdownSeconds = 0;
+                        this.stopExamTimer();
+                        if (onWarning) onWarning(true);
+                        if (onTick) onTick();
+                        if (onExpire) onExpire();
+                        return;
+                    } else if (state.remainingCountdownSeconds <= 60 && onWarning) {
+                        onWarning(false);
                     }
                 }
-                return { ...q, options };
-            });
-            allMasterQuestions = [...questions];
+                if (onTick) onTick();
+            }, 1000);
+        }
 
-            // Update welcome text now that questions are confirmed loaded
-            const welcomeDesc = document.querySelector('.welcome-card > p');
-            if (welcomeDesc) {
-                const shuffledQuestions = questions.filter(q => q.shuffleOptions).length;
-                welcomeDesc.textContent = shuffledQuestions
-                    ? `נטענו ${questions.length} שאלות בהצלחה. סדר התשובות מעורבב אוטומטית במבחני 000 ללא קובץ תשובות.`
-                    : `נטענו ${questions.length} שאלות בהצלחה.`;
+        stopExamTimer(state) {
+            if (this.examInterval) {
+                clearInterval(this.examInterval);
+                this.examInterval = null;
             }
-
-            // Check for saved progress
-            const saved = loadProgress();
-            if (saved && saved.answers && saved.answers.length === questions.length) {
-                resumeNotice.classList.remove('hidden');
+            if (state) {
+                state.commitCurrentQuestionTime();
             }
-        })
-        .catch(err => {
-            console.error('Error loading questions.json:', err);
-            const welcomeCard = document.querySelector('.welcome-card');
-            if (welcomeCard) {
-                const errDiv = document.createElement('div');
-                errDiv.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:.75rem;background:var(--error-bg);color:var(--error-color);border:1px solid var(--error-color);font-size:.9rem;';
-                errDiv.innerHTML = `⚠️ לא נמצא קובץ שאלות. <a href="${onlineBuilderUrl}" id="builder-nav-error-link" style="color:inherit;text-decoration:underline;">יוצר מבחן אונליין</a> כדי לטעון שאלות, או השתמש בכפתור "פתור מבחן כעת".`;
-                welcomeCard.appendChild(errDiv);
-            }
-            startBtn.disabled = true;
-            startBtn.style.opacity = '0.4';
-        });
-
-    // ── Image Zoom ────────────────────────────────────────────────────────────
-    questionImage.addEventListener('click', () => {
-        if (questionImage.classList.contains('hidden')) return;
-        zoomImg.src = questionImage.src;
-        zoomOverlay.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    });
-
-    zoomOverlay.addEventListener('click', closeZoom);
-
-    function closeZoom() {
-        zoomOverlay.classList.add('hidden');
-        document.body.style.overflow = '';
-    }
-
-    // ── Keyboard Navigation ───────────────────────────────────────────────────
-    document.addEventListener('keydown', e => {
-        // Close zoom
-        if (e.key === 'Escape') {
-            if (!zoomOverlay.classList.contains('hidden')) { closeZoom(); return; }
         }
 
-        // Only act when quiz or results screen is active
-        const onQuiz = quizScreen.classList.contains('active');
-        const onResults = resultsScreen.classList.contains('active');
-        if (!onQuiz && !onResults) return;
+        startAutoAdvance({ durationMs = 1500, onTick, onComplete }) {
+            this.clearAutoAdvance();
+            const startTime = Date.now();
 
-        if (onResults) {
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                isReviewMode = true;
-                currentQuestionIndex = questions.length - 1;
-                switchScreen(resultsScreen, quizScreen);
-                renderQuestion();
-            }
-            return;
-        }
-
-        // Option selection: dynamic keys based on number of options (1-9)
-        const keyNum = parseInt(e.key);
-        if (keyNum >= 1 && keyNum <= 9) {
-            const opts = optionsContainer.querySelectorAll('.option');
-            if (opts[keyNum - 1] && !opts[keyNum - 1].classList.contains('disabled')) {
-                opts[keyNum - 1].click();
-            }
-            return;
-        }
-
-        // Navigation (RTL: ArrowRight = go back/previous, ArrowLeft = go forward/next)
-        if (e.key === 'ArrowRight') {
-            if (!prevBtn.disabled) prevBtn.click();
-        }
-        if (e.key === 'ArrowLeft') {
-            if (!submitBtn.classList.contains('hidden')) submitBtn.click();
-            else if (!nextBtn.classList.contains('hidden')) nextBtn.click();
-        }
-    });
-
-    // ── Screen Switching ──────────────────────────────────────────────────────
-    function switchScreen(from, to) {
-        from.classList.remove('active');
-        to.classList.add('active');
-    }
-
-    // ── Start / Resume / Restart ──────────────────────────────────────────────
-    startBtn.addEventListener('click', () => {
-        clearProgress();
-        userAnswers = new Array(questions.length).fill(null);
-        userFlags = new Array(questions.length).fill(false);
-        questionTimes = new Array(questions.length).fill(0);
-        currentQuestionIndex = 0;
-        isReviewMode = false;
-        switchScreen(setupScreen, quizScreen);
-        startExamTimer(false);
-        renderQuestion();
-    });
-
-    resumeBtn.addEventListener('click', () => {
-        const saved = loadProgress();
-        userAnswers = (saved && saved.answers) ? saved.answers : new Array(questions.length).fill(null);
-        userFlags = (saved && saved.flags) ? saved.flags : new Array(questions.length).fill(false);
-        currentQuestionIndex = saved ? saved.index : 0;
-        if (saved && Array.isArray(saved.questionTimes)) {
-            questionTimes = saved.questionTimes;
-        } else {
-            questionTimes = new Array(questions.length).fill(0);
-        }
-        if (saved && typeof saved.totalElapsedSeconds === 'number') {
-            totalElapsedSeconds = saved.totalElapsedSeconds;
-        }
-        if (saved && typeof saved.remainingCountdownSeconds === 'number') {
-            remainingCountdownSeconds = saved.remainingCountdownSeconds;
-        }
-        switchScreen(setupScreen, quizScreen);
-        startExamTimer(true);
-        renderQuestion();
-    });
-
-    restartBtn.addEventListener('click', () => {
-        stopExamTimer();
-        clearProgress();
-        if (allMasterQuestions && allMasterQuestions.length > 0) {
-            questions = [...allMasterQuestions];
-        }
-        userAnswers = new Array(questions.length).fill(null);
-        userFlags = new Array(questions.length).fill(false);
-        questionTimes = new Array(questions.length).fill(0);
-        totalElapsedSeconds = 0;
-        remainingCountdownSeconds = timerCountdownMinutes * 60;
-        currentQuestionIndex = 0;
-        isReviewMode = false;
-        reviewFilter = 'all';
-        filterBtns.forEach(b => {
-            b.classList.toggle('active', b.dataset.filter === 'all');
-        });
-        switchScreen(resultsScreen, setupScreen);
-    });
-
-    if (retryIncorrectBtn) {
-        retryIncorrectBtn.addEventListener('click', () => {
-            const wrongOrUnanswered = questions.filter((q, i) => !userAnswers[i] || !userAnswers[i].isCorrect);
-            if (!wrongOrUnanswered.length) return;
-
-            questions = wrongOrUnanswered;
-            userAnswers = new Array(questions.length).fill(null);
-            userFlags = new Array(questions.length).fill(false);
-            questionTimes = new Array(questions.length).fill(0);
-            totalElapsedSeconds = 0;
-            remainingCountdownSeconds = timerCountdownMinutes * 60;
-            currentQuestionIndex = 0;
-            isReviewMode = false;
-            reviewFilter = 'all';
-            filterBtns.forEach(b => {
-                b.classList.toggle('active', b.dataset.filter === 'all');
-            });
-            clearProgress();
-            switchScreen(resultsScreen, quizScreen);
-            startExamTimer(false);
-            renderQuestion();
-        });
-    }
-
-    if (retryFlaggedBtn) {
-        retryFlaggedBtn.addEventListener('click', () => {
-            const flaggedList = questions.filter((q, i) => userFlags[i]);
-            if (!flaggedList.length) return;
-
-            questions = flaggedList;
-            userAnswers = new Array(questions.length).fill(null);
-            userFlags = new Array(questions.length).fill(true);
-            questionTimes = new Array(questions.length).fill(0);
-            totalElapsedSeconds = 0;
-            remainingCountdownSeconds = timerCountdownMinutes * 60;
-            currentQuestionIndex = 0;
-            isReviewMode = false;
-            reviewFilter = 'all';
-            filterBtns.forEach(b => {
-                b.classList.toggle('active', b.dataset.filter === 'all');
-            });
-            clearProgress();
-            switchScreen(resultsScreen, quizScreen);
-            startExamTimer(false);
-            renderQuestion();
-        });
-    }
-
-    // ── Custom Practice Mix & Match ───────────────────────────────────────────
-    function getCustomSelectedIndices() {
-        return window.QuizCore.getCustomSelectedIndices(
-            questions,
-            userAnswers,
-            userFlags,
-            {
-                wrong: !!chkMixWrong?.checked,
-                unanswered: !!chkMixUnanswered?.checked,
-                flagged: !!chkMixFlagged?.checked
-            },
-            Array.from(manualSelectedIndices)
-        );
-    }
-
-    function updateCustomPracticeSelection() {
-        const count = getCustomSelectedIndices().length;
-        if (customSelectedCount) customSelectedCount.textContent = count;
-        if (startCustomPracticeBtn) startCustomPracticeBtn.disabled = count === 0;
-    }
-
-    [chkMixWrong, chkMixUnanswered, chkMixFlagged].forEach(chk => {
-        chk?.addEventListener('change', updateCustomPracticeSelection);
-    });
-
-    if (startCustomPracticeBtn) {
-        startCustomPracticeBtn.addEventListener('click', () => {
-            const selectedIndices = getCustomSelectedIndices();
-            if (!selectedIndices.length) return;
-
-            const customSubList = selectedIndices.map(i => questions[i]);
-            const newFlags = selectedIndices.map(i => userFlags[i]);
-
-            questions = customSubList;
-            userAnswers = new Array(questions.length).fill(null);
-            userFlags = newFlags;
-            questionTimes = new Array(questions.length).fill(0);
-            totalElapsedSeconds = 0;
-            remainingCountdownSeconds = timerCountdownMinutes * 60;
-            manualSelectedIndices.clear();
-            currentQuestionIndex = 0;
-            isReviewMode = false;
-            reviewFilter = 'all';
-            filterBtns.forEach(b => {
-                b.classList.toggle('active', b.dataset.filter === 'all');
-            });
-            clearProgress();
-            switchScreen(resultsScreen, quizScreen);
-            startExamTimer(false);
-            renderQuestion();
-        });
-    }
-
-    if (reviewBackBtn) {
-        reviewBackBtn.addEventListener('click', () => {
-            isReviewMode = true;
-            currentQuestionIndex = questions.length - 1;
-            switchScreen(resultsScreen, quizScreen);
-            renderQuestion();
-        });
-    }
-
-    // ── Navigation Buttons ────────────────────────────────────────────────────
-    nextBtn.addEventListener('click', () => {
-        if (currentQuestionIndex < questions.length - 1) {
-            commitCurrentQuestionTime();
-            currentQuestionIndex++;
-            currentQuestionStartTimestamp = Date.now();
-            renderQuestion();
-        }
-    });
-
-    prevBtn.addEventListener('click', () => {
-        if (currentQuestionIndex > 0) {
-            commitCurrentQuestionTime();
-            currentQuestionIndex--;
-            currentQuestionStartTimestamp = Date.now();
-            renderQuestion();
-        }
-    });
-
-    submitBtn.addEventListener('click', () => {
-        if (isReviewMode) {
-            isReviewMode = false;
-            switchScreen(quizScreen, resultsScreen);
-            renderResults();
-            return;
-        }
-        stopExamTimer();
-        clearProgress();
-        switchScreen(quizScreen, resultsScreen);
-        renderResults();
-    });
-
-    // ── Jump Bar ──────────────────────────────────────────────────────────────
-    function renderJumpBar() {
-        jumpBar.innerHTML = '';
-        questions.forEach((q, i) => {
-            const btn = document.createElement('button');
-            btn.className = 'jump-btn';
-            btn.textContent = i + 1;
-            btn.setAttribute('aria-label', `שאלה ${i + 1}`);
-
-            const answer = userAnswers[i];
-            if (answer) {
-                if (isImmediateFeedback) {
-                    btn.classList.add(answer.isCorrect ? 'answered-correct' : 'answered-wrong');
-                } else {
-                    btn.classList.add('answered-neutral');
+            this.autoAdvanceInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const remainingMs = Math.max(0, durationMs - elapsed);
+                const remainingSeconds = Math.ceil(remainingMs / 1000);
+                if (onTick) onTick(remainingSeconds, remainingMs);
+                if (remainingMs <= 0) {
+                    if (this.autoAdvanceInterval) {
+                        clearInterval(this.autoAdvanceInterval);
+                        this.autoAdvanceInterval = null;
+                    }
                 }
-            }
-            if (userFlags[i]) {
-                btn.classList.add('flagged');
-            }
-            if (i === currentQuestionIndex) {
-                btn.classList.add('current');
-                btn.setAttribute('aria-current', 'step');
-            }
+            }, 100);
 
-            btn.addEventListener('click', () => {
-                commitCurrentQuestionTime();
-                currentQuestionIndex = i;
-                currentQuestionStartTimestamp = Date.now();
-                renderQuestion();
+            this.autoAdvanceTimer = setTimeout(() => {
+                this.clearAutoAdvance();
+                if (onComplete) onComplete();
+            }, durationMs);
+        }
+
+        clearAutoAdvance() {
+            if (this.autoAdvanceTimer) {
+                clearTimeout(this.autoAdvanceTimer);
+                this.autoAdvanceTimer = null;
+            }
+            if (this.autoAdvanceInterval) {
+                clearInterval(this.autoAdvanceInterval);
+                this.autoAdvanceInterval = null;
+            }
+        }
+
+        cleanup(state) {
+            this.stopExamTimer(state);
+            this.clearAutoAdvance();
+        }
+    }
+
+    // ── Persistence Service ────────────────────────────────────────────────────
+    const QuizPersistence = {
+        getStorageKey(questions) {
+            const quizCore = (typeof window !== 'undefined' ? window.QuizCore : null) || (typeof require !== 'undefined' ? require('./quiz-core.js') : null);
+            return quizCore ? quizCore.getStorageKey(questions) : 'quiz_answers_v1';
+        },
+
+        saveProgress(storageKey, state) {
+            if (typeof localStorage === 'undefined' || !storageKey) return;
+            state.commitCurrentQuestionTime();
+            if (!state.isReviewMode) {
+                state.currentQuestionStartTimestamp = Date.now();
+            }
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(state.getStoragePayload()));
+            } catch (e) {
+                console.warn('Failed saving quiz progress to localStorage:', e);
+            }
+        },
+
+        loadProgress(storageKey) {
+            if (typeof localStorage === 'undefined' || !storageKey) return null;
+            try {
+                const raw = localStorage.getItem(storageKey);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) {
+                return null;
+            }
+        },
+
+        clearProgress(storageKey) {
+            if (typeof localStorage === 'undefined' || !storageKey) return;
+            try {
+                localStorage.removeItem(storageKey);
+            } catch (e) {}
+        }
+    };
+
+    // ── Cropper Controller ─────────────────────────────────────────────────────
+    class CropperController {
+        constructor() {
+            this.cropperLibLoaded = false;
+            this.cropperInstance = null;
+        }
+
+        loadCropperLib() {
+            if (this.cropperLibLoaded) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css';
+                document.head.appendChild(link);
+
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js';
+                script.onload = () => { this.cropperLibLoaded = true; resolve(); };
+                script.onerror = reject;
+                document.head.appendChild(script);
             });
-            jumpBar.appendChild(btn);
-        });
-    }
-
-    // ── Render Question ───────────────────────────────────────────────────────
-    function renderQuestion() {
-        clearAutoAdvance();
-        const q = questions[currentQuestionIndex];
-        const answered = userAnswers[currentQuestionIndex];
-
-        // Update timer displays & visibility
-        if (isReviewMode) {
-            if (examTimerBadge) examTimerBadge.classList.add('hidden');
-            if (questionTimeBadge) questionTimeBadge.classList.add('hidden');
-        } else {
-            if (examTimerBadge) examTimerBadge.classList.toggle('hidden', !isTimerEnabled);
-            if (questionTimeBadge) questionTimeBadge.classList.toggle('hidden', !isQuestionTimerEnabled);
-            updateTimerDisplays();
         }
 
-        questionCounter.textContent = `שאלה ${currentQuestionIndex + 1} מתוך ${questions.length}`;
-        questionText.textContent = q.question;
-        requestAnimationFrame(() => questionText.focus({ preventScroll: true }));
+        async open({ fullSrc, elements }) {
+            if (!fullSrc || !elements.cropperModal || !elements.cropperImage) return;
+            await this.loadCropperLib();
 
-        // Flag button state
-        if (flagBtn) {
-            const isFlagged = !!userFlags[currentQuestionIndex];
-            flagBtn.classList.toggle('starred', isFlagged);
-            const starSpan = flagBtn.querySelector('.flag-star');
-            const textSpan = flagBtn.querySelector('.flag-text');
-            if (starSpan) starSpan.textContent = isFlagged ? '★' : '☆';
-            if (textSpan) textSpan.textContent = isFlagged ? 'מסומנת' : 'סמן שאלה';
-        }
+            elements.cropperModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
 
-        // Image
-        if (q.image) {
-            // Check if user has already cropped this image
-            if (croppedImages[q.image]) {
-                questionImage.src = croppedImages[q.image];
-            } else {
-                questionImage.src = q.image;
+            const initCropper = () => {
+                if (this.cropperInstance) this.cropperInstance.destroy();
+                this.cropperInstance = new Cropper(elements.cropperImage, {
+                    viewMode: 1,
+                    dragMode: 'crop',
+                    autoCropArea: 0.5,
+                    restore: false,
+                    guides: true,
+                    center: true,
+                    highlight: false,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: false,
+                });
+            };
+
+            elements.cropperImage.onload = initCropper;
+            elements.cropperImage.src = fullSrc;
+            if (elements.cropperImage.complete) {
+                initCropper();
             }
-            questionImage.dataset.fullSrc = q.image;
-            questionImage.classList.remove('hidden');
-            openCropperBtn.classList.remove('hidden');
-        } else {
-            questionImage.classList.add('hidden');
-            openCropperBtn.classList.add('hidden');
-            questionImage.src = '';
-            questionImage.dataset.fullSrc = '';
         }
 
-        // Progress bar
-        progressBar.style.width = `${(currentQuestionIndex / questions.length) * 100}%`;
-
-        // Feedback
-        feedbackMessage.classList.add('hidden');
-        feedbackMessage.className = 'feedback-message hidden';
-        feedbackMessage.innerHTML = '';
-
-        // Navigation buttons
-        prevBtn.disabled = currentQuestionIndex === 0;
-        const isLast = currentQuestionIndex === questions.length - 1;
-        nextBtn.classList.toggle('hidden', false); // never hide next
-        submitBtn.classList.toggle('hidden', !isLast);
-        if (isReviewMode) {
-            submitBtn.textContent = 'חזרה לתוצאות';
-            submitBtn.classList.remove('hidden');
-        } else {
-            submitBtn.textContent = 'הגש מבחן';
+        close(elements) {
+            if (elements.cropperModal) {
+                elements.cropperModal.classList.add('hidden');
+            }
+            document.body.style.overflow = '';
+            if (this.cropperInstance) {
+                this.cropperInstance.destroy();
+                this.cropperInstance = null;
+            }
         }
 
-        // Options
-        optionsContainer.innerHTML = '';
-        q.options.forEach((option, posIndex) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'option';
-            btn.textContent = option.text;
-            btn.setAttribute('data-key', posIndex + 1); // keyboard shortcut hint
-
-            // Restore previous selection
-            if (answered) {
-                if (answered.selectedOptionId === option.id) btn.classList.add('selected');
-
-                if (isImmediateFeedback) {
-                    btn.classList.add('disabled');
-                    if (option.id === q.correctIndex) btn.classList.add('correct');
-                    else if (answered.selectedOptionId === option.id) btn.classList.add('incorrect');
-                }
-            }
-
-            btn.setAttribute('aria-label', `תשובה ${posIndex + 1}: ${option.text}`);
-            btn.addEventListener('click', () => handleOptionSelect(option.id, btn, q.correctIndex));
-            optionsContainer.appendChild(btn);
-        });
-
-        // Show feedback if already answered
-        if (answered && isImmediateFeedback) showFeedbackMessage(answered.isCorrect);
-
-        // Update jump bar
-        renderJumpBar();
-    }
-
-    if (flagBtn) {
-        flagBtn.addEventListener('click', () => {
-            userFlags[currentQuestionIndex] = !userFlags[currentQuestionIndex];
-            saveProgress();
-            renderQuestion();
-        });
-    }
-
-    // ── Handle Option Select ──────────────────────────────────────────────────
-    function handleOptionSelect(selectedId, btnElement, correctId) {
-        const answered = userAnswers[currentQuestionIndex];
-
-        // Lock in immediate feedback mode
-        if (isImmediateFeedback && answered) return;
-
-        const isCorrect = selectedId === correctId;
-        userAnswers[currentQuestionIndex] = { selectedOptionId: selectedId, isCorrect };
-        saveProgress();
-
-        // Update UI
-        optionsContainer.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
-        btnElement.classList.add('selected');
-
-        if (isImmediateFeedback) {
-            // Re-render to apply correct/incorrect styles cleanly
-            renderQuestion();
-            if (isCorrect && !isReviewMode) {
-                const isLast = currentQuestionIndex === questions.length - 1;
-                const targetText = isLast ? 'לסיום המבחן' : 'לשאלה הבאה';
-                showFeedbackMessage(true, true, targetText);
-
-                const totalDurationMs = 1500;
-                const startTime = Date.now();
-
-                autoAdvanceInterval = setInterval(() => {
-                    const elapsed = Date.now() - startTime;
-                    const remainingMs = Math.max(0, totalDurationMs - elapsed);
-                    const remainingSeconds = Math.ceil(remainingMs / 1000);
-                    const secElem = feedbackMessage.querySelector('.auto-advance-seconds');
-                    if (secElem) {
-                        secElem.textContent = String(remainingSeconds > 0 ? remainingSeconds : 1);
-                    }
-                    if (remainingMs <= 0) {
-                        clearInterval(autoAdvanceInterval);
-                        autoAdvanceInterval = null;
-                    }
-                }, 100);
-
-                autoAdvanceTimer = setTimeout(() => {
-                    clearAutoAdvance();
-                    if (isLast) {
-                        submitBtn.click();
-                    } else {
-                        commitCurrentQuestionTime();
-                        currentQuestionIndex++;
-                        currentQuestionStartTimestamp = Date.now();
-                        renderQuestion();
-                    }
-                }, totalDurationMs);
-            }
-        } else {
-            // Just update jump bar dot
-            renderJumpBar();
+        getCroppedDataUrl() {
+            if (!this.cropperInstance) return null;
+            const canvas = this.cropperInstance.getCroppedCanvas();
+            return canvas ? canvas.toDataURL('image/png') : null;
         }
     }
 
-    // ── Feedback Message ──────────────────────────────────────────────────────
-    function showFeedbackMessage(isCorrect, autoAdvance = false, targetName = 'לשאלה הבאה') {
-        feedbackMessage.classList.remove('hidden');
-        feedbackMessage.innerHTML = '';
-        if (isCorrect) {
-            feedbackMessage.className = 'feedback-message success';
-            if (autoAdvance) {
-                const titleSpan = document.createElement('span');
-                titleSpan.className = 'feedback-title';
-                titleSpan.textContent = '✓ תשובה נכונה! כל הכבוד.';
+    // ── Quiz UI Controller ─────────────────────────────────────────────────────
+    class QuizUIController {
+        constructor() {
+            this.state = new QuizSessionState();
+            this.timer = new QuizTimerEngine();
+            this.cropper = new CropperController();
+            this.elements = {};
+            this.onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
+        }
 
-                const indicatorSpan = document.createElement('span');
-                indicatorSpan.className = 'auto-advance-indicator';
-                indicatorSpan.innerHTML = `⏳ עובר ${targetName} בעוד <strong class="auto-advance-seconds">2</strong> שניות...`;
+        init() {
+            this.cacheElements();
+            this.initSettings();
+            this.initTimerControls();
+            this.bindEvents();
+            this.loadQuestions();
+        }
 
-                const barTrack = document.createElement('div');
-                barTrack.className = 'auto-advance-bar-track';
-                const barFill = document.createElement('div');
-                barFill.className = 'auto-advance-bar-fill';
-                barTrack.appendChild(barFill);
+        cacheElements() {
+            const get = (id) => document.getElementById(id);
+            this.elements = {
+                // Screens
+                setupScreen: get('setup-screen'),
+                quizScreen: get('quiz-screen'),
+                resultsScreen: get('results-screen'),
 
-                feedbackMessage.appendChild(titleSpan);
-                feedbackMessage.appendChild(indicatorSpan);
-                feedbackMessage.appendChild(barTrack);
-            } else {
-                feedbackMessage.textContent = 'תשובה נכונה! כל הכבוד.';
+                // Controls
+                startBtn: get('start-btn'),
+                resumeBtn: get('resume-btn'),
+                resumeNotice: get('resume-notice'),
+                prevBtn: get('prev-btn'),
+                nextBtn: get('next-btn'),
+                submitBtn: get('submit-btn'),
+                restartBtn: get('restart-btn'),
+                retryIncorrectBtn: get('retry-incorrect-btn'),
+                retryFlaggedBtn: get('retry-flagged-btn'),
+                reviewBackBtn: get('review-back-btn'),
+                flagBtn: get('flag-btn'),
+
+                // Badges & Counters
+                flaggedCountBadgeAction: get('flagged-count-badge-action'),
+                flaggedCountBadgeFilter: get('flagged-count-badge-filter'),
+                incorrectCountBadge: get('incorrect-count-badge'),
+                questionCounter: get('question-counter'),
+                progressBar: document.querySelector('.progress-bar'),
+
+                // Custom practice mix
+                chkMixWrong: get('chk-mix-wrong'),
+                chkMixUnanswered: get('chk-mix-unanswered'),
+                chkMixFlagged: get('chk-mix-flagged'),
+                cntMixWrong: get('cnt-mix-wrong'),
+                cntMixUnanswered: get('cnt-mix-unanswered'),
+                cntMixFlagged: get('cnt-mix-flagged'),
+                startCustomPracticeBtn: get('start-custom-practice-btn'),
+                customSelectedCount: get('custom-selected-count'),
+
+                // Question card elements
+                questionText: get('question-text'),
+                questionImage: get('question-image'),
+                openCropperBtn: get('open-cropper-btn'),
+                optionsContainer: get('options-container'),
+                feedbackMessage: get('feedback-message'),
+                jumpBar: get('jump-bar'),
+
+                // Zoom modal
+                zoomOverlay: get('zoom-overlay'),
+                zoomImg: get('zoom-img'),
+
+                // Header toggles & navigation
+                themeToggle: get('theme-toggle'),
+                themeIcon: get('theme-icon'),
+                feedbackToggle: get('feedback-toggle'),
+                welcomeFeedbackToggle: get('welcome-feedback-toggle'),
+                builderNavLink: get('builder-nav-link'),
+
+                // Timer Controls & Badges
+                quizTimerToggle: get('quiz-timer-toggle'),
+                timerOptionsContainer: get('timer-options-container'),
+                timerModeStopwatch: get('timer-mode-stopwatch'),
+                timerModeCountdown: get('timer-mode-countdown'),
+                timerCountdownMinutesInput: get('timer-countdown-minutes'),
+                questionTimerToggle: get('question-timer-toggle'),
+                examTimerBadge: get('exam-timer-badge'),
+                timerDisplay: get('timer-display'),
+                questionTimeBadge: get('question-time-badge'),
+                questionTimeDisplay: get('question-time-display'),
+
+                // Results Timing Analytics
+                timingAnalyticsCard: get('timing-analytics-card'),
+                totalTimeStat: get('total-time-stat'),
+                meanTimeStat: get('mean-time-stat'),
+                timedQuestionsStat: get('timed-questions-stat'),
+                finalScore: get('final-score'),
+                scoreCircle: document.querySelector('.score-circle'),
+                scoreText: get('score-text'),
+                reviewContainer: get('review-container'),
+                filterBtns: document.querySelectorAll('.filter-btn'),
+
+                // Cropper Modal
+                cropperModal: get('cropper-modal'),
+                cropperImage: get('cropper-image'),
+                closeCropperBtn: get('close-cropper-btn'),
+                confirmCropBtn: get('confirm-crop-btn')
+            };
+
+            if (this.elements.builderNavLink) {
+                this.elements.builderNavLink.href = this.onlineBuilderUrl;
+                this.elements.builderNavLink.textContent = 'יוצר מבחן אונליין ←';
             }
-        } else {
-            feedbackMessage.className = 'feedback-message error';
-            feedbackMessage.textContent = 'תשובה שגויה.';
-        }
-    }
-
-    // ── Review Filter Buttons ─────────────────────────────────────────────────
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            filterBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            reviewFilter = btn.dataset.filter;
-            renderReviewList();
-        });
-    });
-
-    // ── Render Results ────────────────────────────────────────────────────────
-    function renderResults() {
-        const correctCount = userAnswers.filter(a => a && a.isCorrect).length;
-        const total = questions.length;
-        const percentage = Math.round((correctCount / total) * 100);
-
-        const wrongOrUnansweredCount = total - correctCount;
-        const retryBtn = document.getElementById('retry-incorrect-btn');
-        const badge = document.getElementById('incorrect-count-badge');
-        if (retryBtn && badge) {
-            if (wrongOrUnansweredCount > 0) {
-                retryBtn.classList.remove('hidden');
-                badge.textContent = wrongOrUnansweredCount;
-            } else {
-                retryBtn.classList.add('hidden');
-            }
         }
 
-        const wrongCount = userAnswers.filter(a => a && !a.isCorrect).length;
-        const unansweredCount = userAnswers.filter(a => !a).length;
-        const flaggedCount = userFlags.filter(Boolean).length;
-
-        if (cntMixWrong) cntMixWrong.textContent = wrongCount;
-        if (cntMixUnanswered) cntMixUnanswered.textContent = unansweredCount;
-        if (cntMixFlagged) cntMixFlagged.textContent = flaggedCount;
-
-        if (retryFlaggedBtn) {
-            if (flaggedCount > 0) {
-                retryFlaggedBtn.classList.remove('hidden');
-                if (flaggedCountBadgeAction) flaggedCountBadgeAction.textContent = flaggedCount;
-            } else {
-                retryFlaggedBtn.classList.add('hidden');
-            }
-        }
-        if (flaggedCountBadgeFilter) flaggedCountBadgeFilter.textContent = flaggedCount;
-
-        updateCustomPracticeSelection();
-
-        const scoreText = document.getElementById('score-text');
-        if (scoreText) {
-            scoreText.textContent = `ענית נכונה על ${correctCount} מתוך ${total} שאלות.`;
-        }
-
-        // Timing Analytics
-        if (timingAnalyticsCard) {
-            if (isTimerEnabled || isQuestionTimerEnabled) {
-                const stats = window.QuizCore ? window.QuizCore.calculateTimingStats(questionTimes) : null;
-                if (stats) {
-                    const totalSec = isTimerEnabled ? totalElapsedSeconds : stats.totalSeconds;
-                    if (totalTimeStat) {
-                        totalTimeStat.textContent = window.QuizCore ? window.QuizCore.formatDuration(totalSec) : `${totalSec}s`;
-                    }
-                    if (meanTimeStat) {
-                        meanTimeStat.textContent = stats.formattedMean;
-                    }
-                    if (timedQuestionsStat) {
-                        timedQuestionsStat.textContent = String(stats.activeCount);
-                    }
-                    timingAnalyticsCard.classList.remove('hidden');
-                }
-            } else {
-                timingAnalyticsCard.classList.add('hidden');
-            }
-        }
-
-        const circle = document.querySelector('.score-circle');
-        const scoreEl = document.getElementById('final-score');
-
-        // Animate score circle and counter from 0 → percentage
-        circle.style.background = `conic-gradient(var(--primary-color) 0%, var(--option-bg) 0%)`;
-        scoreEl.textContent = '0%';
-
-        let start = null;
-        const duration = 900;
-        function animateScore(ts) {
-            if (!start) start = ts;
-            const elapsed = ts - start;
-            const progress = Math.min(elapsed / duration, 1);
-            // Ease out cubic
-            const eased = 1 - Math.pow(1 - progress, 3);
-            const current = Math.round(eased * percentage);
-            scoreEl.textContent = `${current}%`;
-            circle.style.background =
-                `conic-gradient(var(--primary-color) ${current}%, var(--option-bg) 0%)`;
-            if (progress < 1) requestAnimationFrame(animateScore);
-        }
-        requestAnimationFrame(animateScore);
-
-        renderReviewList();
-    }
-
-    function renderReviewList() {
-        const reviewContainer = document.getElementById('review-container');
-        reviewContainer.innerHTML = '';
-
-        questions.forEach((q, i) => {
-            const answer = userAnswers[i];
-            const isCorrect = answer && answer.isCorrect;
-            const isUnanswered = !answer;
-
-            // Apply filter
-            if (reviewFilter === 'wrong'      && (isCorrect || isUnanswered)) return;
-            if (reviewFilter === 'unanswered' && !isUnanswered)                return;
-            if (reviewFilter === 'flagged'    && !userFlags[i])                return;
-
-            const div = document.createElement('div');
-            div.className = 'review-item';
-
-            const isManuallySelected = manualSelectedIndices.has(i);
-            const timeSpent = questionTimes[i] || 0;
-            const timeBadgeHtml = (isQuestionTimerEnabled && timeSpent > 0)
-                ? `<span class="review-time-badge" title="זמן מענה לשאלה">⏱️ ${window.QuizCore ? window.QuizCore.formatDuration(timeSpent) : timeSpent + 's'}</span>`
-                : '';
-
-            let html = `
-                <div class="review-item-header">
-                    <div class="review-question" style="margin:0;">${i + 1}. ${escapeHtml(q.question)}</div>
-                    ${timeBadgeHtml}
-                    <label class="review-card-select-label" onclick="event.stopPropagation();">
-                        <input type="checkbox" class="review-card-checkbox" data-index="${i}" ${isManuallySelected ? 'checked' : ''} style="accent-color:var(--primary-color);">
-                        <span>בחירה לתרגול</span>
-                    </label>
-                </div>
-            `;
-
-            q.options.forEach(opt => {
-                let cls = 'review-option';
-                if (opt.id === q.correctIndex)                              cls += ' correct';
-                else if (answer && answer.selectedOptionId === opt.id)      cls += ' incorrect';
-                html += `<div class="${cls}">${escapeHtml(opt.text)}</div>`;
+        initSettings() {
+            // Theme setup
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            this.setTheme(currentTheme);
+            this.elements.themeToggle?.addEventListener('click', () => {
+                const nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                this.setTheme(nextTheme);
             });
 
-            if (isUnanswered) {
-                html += `<div class="review-option incorrect">לא נענה</div>`;
+            // Immediate Feedback setup
+            const savedFeedback = localStorage.getItem('quiz_immediate_feedback');
+            const feedbackEnabled = savedFeedback !== null ? savedFeedback === 'true' : false;
+            this.setImmediateFeedback(feedbackEnabled);
+            this.elements.feedbackToggle?.addEventListener('change', (e) => this.setImmediateFeedback(e.target.checked));
+            this.elements.welcomeFeedbackToggle?.addEventListener('change', (e) => this.setImmediateFeedback(e.target.checked));
+        }
+
+        setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            if (this.elements.themeIcon) {
+                this.elements.themeIcon.innerHTML = theme === 'dark'
+                    ? '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>'
+                    : '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>';
             }
+        }
 
-            div.innerHTML = html;
-            div.style.cursor = 'pointer';
-            div.title = 'לחץ למעבר לשאלה';
+        setImmediateFeedback(enabled) {
+            this.state.isImmediateFeedback = Boolean(enabled);
+            if (this.elements.feedbackToggle) this.elements.feedbackToggle.checked = this.state.isImmediateFeedback;
+            if (this.elements.welcomeFeedbackToggle) this.elements.welcomeFeedbackToggle.checked = this.state.isImmediateFeedback;
+            localStorage.setItem('quiz_immediate_feedback', this.state.isImmediateFeedback);
+        }
 
-            const chk = div.querySelector('.review-card-checkbox');
-            if (chk) {
-                chk.addEventListener('change', (e) => {
-                    e.stopPropagation();
-                    const idx = parseInt(chk.dataset.index, 10);
-                    if (chk.checked) {
-                        manualSelectedIndices.add(idx);
-                    } else {
-                        manualSelectedIndices.delete(idx);
+        initTimerControls() {
+            this.state.isTimerEnabled = localStorage.getItem('quiz_timer_enabled') === 'true';
+            this.state.timerMode = localStorage.getItem('quiz_timer_mode') || 'stopwatch';
+            this.state.timerCountdownMinutes = parseInt(localStorage.getItem('quiz_timer_minutes') || '30', 10);
+            this.state.isQuestionTimerEnabled = localStorage.getItem('quiz_question_timer_enabled') !== 'false';
+
+            if (this.elements.quizTimerToggle) {
+                this.elements.quizTimerToggle.checked = this.state.isTimerEnabled;
+                if (this.elements.timerOptionsContainer) {
+                    this.elements.timerOptionsContainer.classList.toggle('hidden', !this.state.isTimerEnabled);
+                }
+                this.elements.quizTimerToggle.addEventListener('change', (e) => {
+                    this.state.isTimerEnabled = e.target.checked;
+                    localStorage.setItem('quiz_timer_enabled', this.state.isTimerEnabled);
+                    if (this.elements.timerOptionsContainer) {
+                        this.elements.timerOptionsContainer.classList.toggle('hidden', !this.state.isTimerEnabled);
                     }
-                    updateCustomPracticeSelection();
                 });
             }
 
-            div.addEventListener('click', () => {
-                isReviewMode = true;
-                currentQuestionIndex = i;
-                switchScreen(resultsScreen, quizScreen);
-                renderQuestion();
-            });
-            reviewContainer.appendChild(div);
-        });
+            if (this.elements.timerModeStopwatch && this.elements.timerModeCountdown) {
+                if (this.state.timerMode === 'countdown') {
+                    this.elements.timerModeCountdown.checked = true;
+                } else {
+                    this.elements.timerModeStopwatch.checked = true;
+                }
+                this.elements.timerModeStopwatch.addEventListener('change', () => {
+                    if (this.elements.timerModeStopwatch.checked) {
+                        this.state.timerMode = 'stopwatch';
+                        localStorage.setItem('quiz_timer_mode', 'stopwatch');
+                    }
+                });
+                this.elements.timerModeCountdown.addEventListener('change', () => {
+                    if (this.elements.timerModeCountdown.checked) {
+                        this.state.timerMode = 'countdown';
+                        localStorage.setItem('quiz_timer_mode', 'countdown');
+                    }
+                });
+            }
 
-        // Empty state message
-        if (!reviewContainer.hasChildNodes()) {
-            reviewContainer.innerHTML =
-                `<p style="text-align:center;color:var(--text-secondary);padding:2rem;">אין שאלות להצגה בסינון זה.</p>`;
+            if (this.elements.timerCountdownMinutesInput) {
+                this.elements.timerCountdownMinutesInput.value = this.state.timerCountdownMinutes;
+                this.elements.timerCountdownMinutesInput.addEventListener('input', () => {
+                    const val = parseInt(this.elements.timerCountdownMinutesInput.value, 10);
+                    if (val && val >= 1) {
+                        this.state.timerCountdownMinutes = val;
+                        localStorage.setItem('quiz_timer_minutes', val);
+                    }
+                });
+            }
+
+            if (this.elements.questionTimerToggle) {
+                this.elements.questionTimerToggle.checked = this.state.isQuestionTimerEnabled;
+                this.elements.questionTimerToggle.addEventListener('change', (e) => {
+                    this.state.isQuestionTimerEnabled = e.target.checked;
+                    localStorage.setItem('quiz_question_timer_enabled', this.state.isQuestionTimerEnabled);
+                });
+            }
+        }
+
+        switchScreen(from, to) {
+            from?.classList.remove('active');
+            to?.classList.add('active');
+        }
+
+        updateTimerDisplays() {
+            if (this.elements.timerDisplay && this.state.isTimerEnabled) {
+                const secs = (this.state.timerMode === 'countdown') ? this.state.remainingCountdownSeconds : this.state.totalElapsedSeconds;
+                this.elements.timerDisplay.textContent = window.QuizCore ? window.QuizCore.formatDuration(secs) : `${secs}s`;
+            }
+
+            if (this.elements.questionTimeDisplay && this.state.isQuestionTimerEnabled) {
+                const alreadySpent = this.state.questionTimes[this.state.currentQuestionIndex] || 0;
+                const currentActive = (!this.state.isReviewMode && this.state.currentQuestionStartTimestamp)
+                    ? Math.max(0, Math.round((Date.now() - this.state.currentQuestionStartTimestamp) / 1000))
+                    : 0;
+                const totalForThisQ = alreadySpent + currentActive;
+                this.elements.questionTimeDisplay.textContent = window.QuizCore ? window.QuizCore.formatDuration(totalForThisQ) : `${totalForThisQ}s`;
+            }
+        }
+
+        startSession(mode) {
+            this.timer.cleanup(this.state);
+
+            if (mode === 'new') {
+                QuizPersistence.clearProgress(QuizPersistence.getStorageKey(this.state.questions));
+                this.state.initSession({ mode: 'new', questions: this.state.allMasterQuestions });
+                this.switchScreen(this.elements.setupScreen, this.elements.quizScreen);
+                this.startTimerEngine();
+                this.renderQuestion();
+            } else if (mode === 'resume') {
+                const storageKey = QuizPersistence.getStorageKey(this.state.questions);
+                const saved = QuizPersistence.loadProgress(storageKey);
+                this.state.initSession({ mode: 'resume', savedState: saved });
+                this.switchScreen(this.elements.setupScreen, this.elements.quizScreen);
+                this.startTimerEngine(true);
+                this.renderQuestion();
+            } else if (mode === 'restart') {
+                QuizPersistence.clearProgress(QuizPersistence.getStorageKey(this.state.questions));
+                this.state.initSession({ mode: 'restart' });
+                this.elements.filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+                this.switchScreen(this.elements.resultsScreen, this.elements.setupScreen);
+            } else if (mode === 'retry-incorrect') {
+                const wrongList = this.state.getWrongOrUnansweredQuestions();
+                if (!wrongList.length) return;
+                QuizPersistence.clearProgress(QuizPersistence.getStorageKey(this.state.questions));
+                this.state.initSession({ mode: 'retry-incorrect', questions: wrongList });
+                this.elements.filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+                this.switchScreen(this.elements.resultsScreen, this.elements.quizScreen);
+                this.startTimerEngine();
+                this.renderQuestion();
+            } else if (mode === 'retry-flagged') {
+                const flaggedList = this.state.getFlaggedQuestions();
+                if (!flaggedList.length) return;
+                QuizPersistence.clearProgress(QuizPersistence.getStorageKey(this.state.questions));
+                this.state.initSession({ mode: 'retry-flagged', questions: flaggedList });
+                this.elements.filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+                this.switchScreen(this.elements.resultsScreen, this.elements.quizScreen);
+                this.startTimerEngine();
+                this.renderQuestion();
+            } else if (mode === 'custom-practice') {
+                const selectedIndices = this.state.getCustomPracticeIndices(
+                    !!this.elements.chkMixWrong?.checked,
+                    !!this.elements.chkMixUnanswered?.checked,
+                    !!this.elements.chkMixFlagged?.checked
+                );
+                if (!selectedIndices.length) return;
+
+                const customQuestions = selectedIndices.map(i => this.state.questions[i]);
+                const customFlags = selectedIndices.map(i => this.state.userFlags[i]);
+
+                QuizPersistence.clearProgress(QuizPersistence.getStorageKey(this.state.questions));
+                this.state.initSession({ mode: 'custom-practice', questions: customQuestions });
+                this.state.userFlags = customFlags;
+                this.elements.filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+                this.switchScreen(this.elements.resultsScreen, this.elements.quizScreen);
+                this.startTimerEngine();
+                this.renderQuestion();
+            }
+        }
+
+        startTimerEngine(resume = false) {
+            this.timer.stopExamTimer(this.state);
+
+            if (!resume) {
+                this.state.totalElapsedSeconds = 0;
+                this.state.remainingCountdownSeconds = this.state.timerCountdownMinutes * 60;
+            }
+
+            if (this.elements.examTimerBadge) {
+                this.elements.examTimerBadge.classList.toggle('hidden', !this.state.isTimerEnabled);
+                this.elements.examTimerBadge.classList.remove('warning');
+            }
+            if (this.elements.questionTimeBadge) {
+                this.elements.questionTimeBadge.classList.toggle('hidden', !this.state.isQuestionTimerEnabled);
+            }
+
+            this.updateTimerDisplays();
+
+            this.timer.startExamTimer({
+                state: this.state,
+                onTick: () => this.updateTimerDisplays(),
+                onWarning: (isExpired) => {
+                    if (this.elements.examTimerBadge) {
+                        this.elements.examTimerBadge.classList.add('warning');
+                    }
+                },
+                onExpire: () => {
+                    setTimeout(() => {
+                        if (this.elements.submitBtn) this.elements.submitBtn.click();
+                    }, 800);
+                }
+            });
+        }
+
+        renderQuestion() {
+            this.timer.clearAutoAdvance();
+            const q = this.state.questions[this.state.currentQuestionIndex];
+            const answered = this.state.userAnswers[this.state.currentQuestionIndex];
+
+            // Badges & Timer Visibility
+            if (this.state.isReviewMode) {
+                this.elements.examTimerBadge?.classList.add('hidden');
+                this.elements.questionTimeBadge?.classList.add('hidden');
+            } else {
+                this.elements.examTimerBadge?.classList.toggle('hidden', !this.state.isTimerEnabled);
+                this.elements.questionTimeBadge?.classList.toggle('hidden', !this.state.isQuestionTimerEnabled);
+                this.updateTimerDisplays();
+            }
+
+            if (this.elements.questionCounter) {
+                this.elements.questionCounter.textContent = `שאלה ${this.state.currentQuestionIndex + 1} מתוך ${this.state.questions.length}`;
+            }
+            if (this.elements.questionText) {
+                this.elements.questionText.textContent = q.question;
+                requestAnimationFrame(() => this.elements.questionText.focus({ preventScroll: true }));
+            }
+
+            // Flag state
+            if (this.elements.flagBtn) {
+                const isFlagged = !!this.state.userFlags[this.state.currentQuestionIndex];
+                this.elements.flagBtn.classList.toggle('starred', isFlagged);
+                const starSpan = this.elements.flagBtn.querySelector('.flag-star');
+                const textSpan = this.elements.flagBtn.querySelector('.flag-text');
+                if (starSpan) starSpan.textContent = isFlagged ? '★' : '☆';
+                if (textSpan) textSpan.textContent = isFlagged ? 'מסומנת' : 'סמן שאלה';
+            }
+
+            // Question Image
+            if (this.elements.questionImage && this.elements.openCropperBtn) {
+                if (q.image) {
+                    const activeSrc = this.state.croppedImages[q.image] || q.image;
+                    this.elements.questionImage.src = activeSrc;
+                    this.elements.questionImage.dataset.fullSrc = q.image;
+                    this.elements.questionImage.classList.remove('hidden');
+                    this.elements.openCropperBtn.classList.remove('hidden');
+                } else {
+                    this.elements.questionImage.classList.add('hidden');
+                    this.elements.openCropperBtn.classList.add('hidden');
+                    this.elements.questionImage.src = '';
+                    this.elements.questionImage.dataset.fullSrc = '';
+                }
+            }
+
+            // Progress bar
+            if (this.elements.progressBar) {
+                this.elements.progressBar.style.width = `${(this.state.currentQuestionIndex / this.state.questions.length) * 100}%`;
+            }
+
+            // Feedback Message reset
+            if (this.elements.feedbackMessage) {
+                this.elements.feedbackMessage.classList.add('hidden');
+                this.elements.feedbackMessage.className = 'feedback-message hidden';
+                this.elements.feedbackMessage.innerHTML = '';
+            }
+
+            // Navigation buttons
+            if (this.elements.prevBtn) this.elements.prevBtn.disabled = this.state.currentQuestionIndex === 0;
+            const isLast = this.state.currentQuestionIndex === this.state.questions.length - 1;
+            if (this.elements.nextBtn) this.elements.nextBtn.classList.remove('hidden');
+            if (this.elements.submitBtn) {
+                this.elements.submitBtn.classList.toggle('hidden', !isLast);
+                if (this.state.isReviewMode) {
+                    this.elements.submitBtn.textContent = 'חזרה לתוצאות';
+                    this.elements.submitBtn.classList.remove('hidden');
+                } else {
+                    this.elements.submitBtn.textContent = 'הגש מבחן';
+                }
+            }
+
+            // Options
+            if (this.elements.optionsContainer) {
+                this.elements.optionsContainer.innerHTML = '';
+                q.options.forEach((option, posIndex) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'option';
+                    btn.textContent = option.text;
+                    btn.setAttribute('data-key', posIndex + 1);
+
+                    if (answered) {
+                        if (answered.selectedOptionId === option.id) btn.classList.add('selected');
+                        if (this.state.isImmediateFeedback) {
+                            btn.classList.add('disabled');
+                            if (option.id === q.correctIndex) btn.classList.add('correct');
+                            else if (answered.selectedOptionId === option.id) btn.classList.add('incorrect');
+                        }
+                    }
+
+                    btn.setAttribute('aria-label', `תשובה ${posIndex + 1}: ${option.text}`);
+                    btn.addEventListener('click', () => this.handleOptionSelect(option.id, btn, q.correctIndex));
+                    this.elements.optionsContainer.appendChild(btn);
+                });
+            }
+
+            if (answered && this.state.isImmediateFeedback) {
+                this.showFeedbackMessage(answered.isCorrect);
+            }
+
+            this.renderJumpBar();
+        }
+
+        handleOptionSelect(selectedId, btnElement, correctId) {
+            const answered = this.state.userAnswers[this.state.currentQuestionIndex];
+            if (this.state.isImmediateFeedback && answered) return;
+
+            const isCorrect = this.state.recordAnswer(this.state.currentQuestionIndex, selectedId, correctId);
+            QuizPersistence.saveProgress(QuizPersistence.getStorageKey(this.state.questions), this.state);
+
+            if (this.elements.optionsContainer) {
+                this.elements.optionsContainer.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
+            }
+            btnElement?.classList.add('selected');
+
+            if (this.state.isImmediateFeedback) {
+                this.renderQuestion();
+                if (isCorrect && !this.state.isReviewMode) {
+                    const isLast = this.state.currentQuestionIndex === this.state.questions.length - 1;
+                    const targetText = isLast ? 'לסיום המבחן' : 'לשאלה הבאה';
+                    this.showFeedbackMessage(true, true, targetText);
+
+                    this.timer.startAutoAdvance({
+                        durationMs: 1500,
+                        onTick: (sec) => {
+                            const secElem = this.elements.feedbackMessage?.querySelector('.auto-advance-seconds');
+                            if (secElem) secElem.textContent = String(sec > 0 ? sec : 1);
+                        },
+                        onComplete: () => {
+                            if (isLast) {
+                                this.elements.submitBtn?.click();
+                            } else {
+                                this.state.commitCurrentQuestionTime();
+                                this.state.currentQuestionIndex++;
+                                this.state.currentQuestionStartTimestamp = Date.now();
+                                this.renderQuestion();
+                            }
+                        }
+                    });
+                }
+            } else {
+                this.renderJumpBar();
+            }
+        }
+
+        renderJumpBar() {
+            if (!this.elements.jumpBar) return;
+            this.elements.jumpBar.innerHTML = '';
+
+            this.state.questions.forEach((q, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'jump-btn';
+                btn.textContent = i + 1;
+                btn.setAttribute('aria-label', `שאלה ${i + 1}`);
+
+                const answer = this.state.userAnswers[i];
+                if (answer) {
+                    if (this.state.isImmediateFeedback) {
+                        btn.classList.add(answer.isCorrect ? 'answered-correct' : 'answered-wrong');
+                    } else {
+                        btn.classList.add('answered-neutral');
+                    }
+                }
+                if (this.state.userFlags[i]) {
+                    btn.classList.add('flagged');
+                }
+                if (i === this.state.currentQuestionIndex) {
+                    btn.classList.add('current');
+                    btn.setAttribute('aria-current', 'step');
+                }
+
+                btn.addEventListener('click', () => {
+                    this.state.commitCurrentQuestionTime();
+                    this.state.currentQuestionIndex = i;
+                    this.state.currentQuestionStartTimestamp = Date.now();
+                    this.renderQuestion();
+                });
+                this.elements.jumpBar.appendChild(btn);
+            });
+        }
+
+        showFeedbackMessage(isCorrect, autoAdvance = false, targetName = 'לשאלה הבאה') {
+            if (!this.elements.feedbackMessage) return;
+            this.elements.feedbackMessage.classList.remove('hidden');
+            this.elements.feedbackMessage.innerHTML = '';
+
+            if (isCorrect) {
+                this.elements.feedbackMessage.className = 'feedback-message success';
+                if (autoAdvance) {
+                    const titleSpan = document.createElement('span');
+                    titleSpan.className = 'feedback-title';
+                    titleSpan.textContent = '✓ תשובה נכונה! כל הכבוד.';
+
+                    const indicatorSpan = document.createElement('span');
+                    indicatorSpan.className = 'auto-advance-indicator';
+                    indicatorSpan.innerHTML = `⏳ עובר ${targetName} בעוד <strong class="auto-advance-seconds">2</strong> שניות...`;
+
+                    const barTrack = document.createElement('div');
+                    barTrack.className = 'auto-advance-bar-track';
+                    const barFill = document.createElement('div');
+                    barFill.className = 'auto-advance-bar-fill';
+                    barTrack.appendChild(barFill);
+
+                    this.elements.feedbackMessage.appendChild(titleSpan);
+                    this.elements.feedbackMessage.appendChild(indicatorSpan);
+                    this.elements.feedbackMessage.appendChild(barTrack);
+                } else {
+                    this.elements.feedbackMessage.textContent = 'תשובה נכונה! כל הכבוד.';
+                }
+            } else {
+                this.elements.feedbackMessage.className = 'feedback-message error';
+                this.elements.feedbackMessage.textContent = 'תשובה שגויה.';
+            }
+        }
+
+        renderResults() {
+            const correctCount = this.state.userAnswers.filter(a => a && a.isCorrect).length;
+            const total = this.state.questions.length;
+            const percentage = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+
+            const wrongOrUnansweredCount = total - correctCount;
+            if (this.elements.retryIncorrectBtn && this.elements.incorrectCountBadge) {
+                if (wrongOrUnansweredCount > 0) {
+                    this.elements.retryIncorrectBtn.classList.remove('hidden');
+                    this.elements.incorrectCountBadge.textContent = wrongOrUnansweredCount;
+                } else {
+                    this.elements.retryIncorrectBtn.classList.add('hidden');
+                }
+            }
+
+            const wrongCount = this.state.userAnswers.filter(a => a && !a.isCorrect).length;
+            const unansweredCount = this.state.userAnswers.filter(a => !a).length;
+            const flaggedCount = this.state.userFlags.filter(Boolean).length;
+
+            if (this.elements.cntMixWrong) this.elements.cntMixWrong.textContent = wrongCount;
+            if (this.elements.cntMixUnanswered) this.elements.cntMixUnanswered.textContent = unansweredCount;
+            if (this.elements.cntMixFlagged) this.elements.cntMixFlagged.textContent = flaggedCount;
+
+            if (this.elements.retryFlaggedBtn) {
+                if (flaggedCount > 0) {
+                    this.elements.retryFlaggedBtn.classList.remove('hidden');
+                    if (this.elements.flaggedCountBadgeAction) this.elements.flaggedCountBadgeAction.textContent = flaggedCount;
+                } else {
+                    this.elements.retryFlaggedBtn.classList.add('hidden');
+                }
+            }
+            if (this.elements.flaggedCountBadgeFilter) this.elements.flaggedCountBadgeFilter.textContent = flaggedCount;
+
+            this.updateCustomPracticeSelection();
+
+            if (this.elements.scoreText) {
+                this.elements.scoreText.textContent = `ענית נכונה על ${correctCount} מתוך ${total} שאלות.`;
+            }
+
+            // Results Timing Analytics
+            if (this.elements.timingAnalyticsCard) {
+                if (this.state.isTimerEnabled || this.state.isQuestionTimerEnabled) {
+                    const stats = window.QuizCore ? window.QuizCore.calculateTimingStats(this.state.questionTimes) : null;
+                    if (stats) {
+                        const totalSec = this.state.isTimerEnabled ? this.state.totalElapsedSeconds : stats.totalSeconds;
+                        if (this.elements.totalTimeStat) {
+                            this.elements.totalTimeStat.textContent = window.QuizCore ? window.QuizCore.formatDuration(totalSec) : `${totalSec}s`;
+                        }
+                        if (this.elements.meanTimeStat) {
+                            this.elements.meanTimeStat.textContent = stats.formattedMean;
+                        }
+                        if (this.elements.timedQuestionsStat) {
+                            this.elements.timedQuestionsStat.textContent = String(stats.activeCount);
+                        }
+                        this.elements.timingAnalyticsCard.classList.remove('hidden');
+                    }
+                } else {
+                    this.elements.timingAnalyticsCard.classList.add('hidden');
+                }
+            }
+
+            // Score Circle Animation
+            if (this.elements.scoreCircle && this.elements.finalScore) {
+                this.elements.scoreCircle.style.background = 'conic-gradient(var(--primary-color) 0%, var(--option-bg) 0%)';
+                this.elements.finalScore.textContent = '0%';
+
+                let startTs = null;
+                const duration = 900;
+                const animateScore = (ts) => {
+                    if (!startTs) startTs = ts;
+                    const elapsed = ts - startTs;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    const current = Math.round(eased * percentage);
+                    this.elements.finalScore.textContent = `${current}%`;
+                    this.elements.scoreCircle.style.background = `conic-gradient(var(--primary-color) ${current}%, var(--option-bg) 0%)`;
+                    if (progress < 1) requestAnimationFrame(animateScore);
+                };
+                requestAnimationFrame(animateScore);
+            }
+
+            this.renderReviewList();
+        }
+
+        renderReviewList() {
+            if (!this.elements.reviewContainer) return;
+            this.elements.reviewContainer.innerHTML = '';
+
+            this.state.questions.forEach((q, i) => {
+                const answer = this.state.userAnswers[i];
+                const isCorrect = answer && answer.isCorrect;
+                const isUnanswered = !answer;
+
+                if (this.state.reviewFilter === 'wrong'      && (isCorrect || isUnanswered)) return;
+                if (this.state.reviewFilter === 'unanswered' && !isUnanswered)                return;
+                if (this.state.reviewFilter === 'flagged'    && !this.state.userFlags[i])     return;
+
+                const div = document.createElement('div');
+                div.className = 'review-item';
+
+                const isManuallySelected = this.state.manualSelectedIndices.has(i);
+                const timeSpent = this.state.questionTimes[i] || 0;
+                const timeBadgeHtml = (this.state.isQuestionTimerEnabled && timeSpent > 0)
+                    ? `<span class="review-time-badge" title="זמן מענה לשאלה">⏱️ ${window.QuizCore ? window.QuizCore.formatDuration(timeSpent) : timeSpent + 's'}</span>`
+                    : '';
+
+                let html = `
+                    <div class="review-item-header">
+                        <div class="review-question" style="margin:0;">${i + 1}. ${escapeHtml(q.question)}</div>
+                        ${timeBadgeHtml}
+                        <label class="review-card-select-label" onclick="event.stopPropagation();">
+                            <input type="checkbox" class="review-card-checkbox" data-index="${i}" ${isManuallySelected ? 'checked' : ''} style="accent-color:var(--primary-color);">
+                            <span>בחירה לתרגול</span>
+                        </label>
+                    </div>
+                `;
+
+                q.options.forEach(opt => {
+                    let cls = 'review-option';
+                    if (opt.id === q.correctIndex)                              cls += ' correct';
+                    else if (answer && answer.selectedOptionId === opt.id)      cls += ' incorrect';
+                    html += `<div class="${cls}">${escapeHtml(opt.text)}</div>`;
+                });
+
+                if (isUnanswered) {
+                    html += '<div class="review-option incorrect">לא נענה</div>';
+                }
+
+                div.innerHTML = html;
+                div.style.cursor = 'pointer';
+                div.title = 'לחץ למעבר לשאלה';
+
+                const chk = div.querySelector('.review-card-checkbox');
+                if (chk) {
+                    chk.addEventListener('change', (e) => {
+                        e.stopPropagation();
+                        const idx = parseInt(chk.dataset.index, 10);
+                        if (chk.checked) {
+                            this.state.manualSelectedIndices.add(idx);
+                        } else {
+                            this.state.manualSelectedIndices.delete(idx);
+                        }
+                        this.updateCustomPracticeSelection();
+                    });
+                }
+
+                div.addEventListener('click', () => {
+                    this.state.isReviewMode = true;
+                    this.state.currentQuestionIndex = i;
+                    this.switchScreen(this.elements.resultsScreen, this.elements.quizScreen);
+                    this.renderQuestion();
+                });
+                this.elements.reviewContainer.appendChild(div);
+            });
+
+            if (!this.elements.reviewContainer.hasChildNodes()) {
+                this.elements.reviewContainer.innerHTML =
+                    '<p style="text-align:center;color:var(--text-secondary);padding:2rem;">אין שאלות להצגה בסינון זה.</p>';
+            }
+        }
+
+        updateCustomPracticeSelection() {
+            const count = this.state.getCustomPracticeIndices(
+                !!this.elements.chkMixWrong?.checked,
+                !!this.elements.chkMixUnanswered?.checked,
+                !!this.elements.chkMixFlagged?.checked
+            ).length;
+            if (this.elements.customSelectedCount) this.elements.customSelectedCount.textContent = count;
+            if (this.elements.startCustomPracticeBtn) this.elements.startCustomPracticeBtn.disabled = count === 0;
+        }
+
+        bindEvents() {
+            // Start / Resume / Restart
+            this.elements.startBtn?.addEventListener('click', () => this.startSession('new'));
+            this.elements.resumeBtn?.addEventListener('click', () => this.startSession('resume'));
+            this.elements.restartBtn?.addEventListener('click', () => this.startSession('restart'));
+            this.elements.retryIncorrectBtn?.addEventListener('click', () => this.startSession('retry-incorrect'));
+            this.elements.retryFlaggedBtn?.addEventListener('click', () => this.startSession('retry-flagged'));
+            this.elements.startCustomPracticeBtn?.addEventListener('click', () => this.startSession('custom-practice'));
+
+            // Review Back
+            this.elements.reviewBackBtn?.addEventListener('click', () => {
+                this.state.isReviewMode = true;
+                this.state.currentQuestionIndex = this.state.questions.length - 1;
+                this.switchScreen(this.elements.resultsScreen, this.elements.quizScreen);
+                this.renderQuestion();
+            });
+
+            // Navigation
+            this.elements.nextBtn?.addEventListener('click', () => {
+                if (this.state.currentQuestionIndex < this.state.questions.length - 1) {
+                    this.state.commitCurrentQuestionTime();
+                    this.state.currentQuestionIndex++;
+                    this.state.currentQuestionStartTimestamp = Date.now();
+                    this.renderQuestion();
+                }
+            });
+
+            this.elements.prevBtn?.addEventListener('click', () => {
+                if (this.state.currentQuestionIndex > 0) {
+                    this.state.commitCurrentQuestionTime();
+                    this.state.currentQuestionIndex--;
+                    this.state.currentQuestionStartTimestamp = Date.now();
+                    this.renderQuestion();
+                }
+            });
+
+            this.elements.submitBtn?.addEventListener('click', () => {
+                if (this.state.isReviewMode) {
+                    this.state.isReviewMode = false;
+                    this.switchScreen(this.elements.quizScreen, this.elements.resultsScreen);
+                    this.renderResults();
+                    return;
+                }
+                this.timer.stopExamTimer(this.state);
+                QuizPersistence.clearProgress(QuizPersistence.getStorageKey(this.state.questions));
+                this.switchScreen(this.elements.quizScreen, this.elements.resultsScreen);
+                this.renderResults();
+            });
+
+            // Flag Button
+            this.elements.flagBtn?.addEventListener('click', () => {
+                this.state.toggleFlag(this.state.currentQuestionIndex);
+                QuizPersistence.saveProgress(QuizPersistence.getStorageKey(this.state.questions), this.state);
+                this.renderQuestion();
+            });
+
+            // Review Filter Buttons
+            this.elements.filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    this.elements.filterBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    this.state.reviewFilter = btn.dataset.filter;
+                    this.renderReviewList();
+                });
+            });
+
+            // Custom practice checkbox listeners
+            [this.elements.chkMixWrong, this.elements.chkMixUnanswered, this.elements.chkMixFlagged].forEach(chk => {
+                chk?.addEventListener('change', () => this.updateCustomPracticeSelection());
+            });
+
+            // Image Zoom
+            this.elements.questionImage?.addEventListener('click', () => {
+                if (this.elements.questionImage.classList.contains('hidden')) return;
+                if (this.elements.zoomImg && this.elements.zoomOverlay) {
+                    this.elements.zoomImg.src = this.elements.questionImage.src;
+                    this.elements.zoomOverlay.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                }
+            });
+
+            const closeZoom = () => {
+                if (this.elements.zoomOverlay) {
+                    this.elements.zoomOverlay.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+            };
+            this.elements.zoomOverlay?.addEventListener('click', closeZoom);
+
+            // Cropper
+            this.elements.openCropperBtn?.addEventListener('click', () => {
+                const fullSrc = this.elements.questionImage?.dataset.fullSrc;
+                if (fullSrc) {
+                    this.cropper.open({ fullSrc, elements: this.elements });
+                }
+            });
+
+            this.elements.closeCropperBtn?.addEventListener('click', () => {
+                this.cropper.close(this.elements);
+            });
+
+            this.elements.confirmCropBtn?.addEventListener('click', () => {
+                const croppedData = this.cropper.getCroppedDataUrl();
+                const fullSrc = this.elements.questionImage?.dataset.fullSrc;
+                if (croppedData && fullSrc) {
+                    this.state.croppedImages[fullSrc] = croppedData;
+                    if (this.elements.questionImage) {
+                        this.elements.questionImage.src = croppedData;
+                    }
+                }
+                this.cropper.close(this.elements);
+            });
+
+            // Keyboard Navigation
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (this.elements.zoomOverlay && !this.elements.zoomOverlay.classList.contains('hidden')) {
+                        closeZoom();
+                        return;
+                    }
+                }
+
+                const onQuiz = this.elements.quizScreen && this.elements.quizScreen.classList.contains('active');
+                const onResults = this.elements.resultsScreen && this.elements.resultsScreen.classList.contains('active');
+                if (!onQuiz && !onResults) return;
+
+                if (onResults) {
+                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                        this.state.isReviewMode = true;
+                        this.state.currentQuestionIndex = this.state.questions.length - 1;
+                        this.switchScreen(this.elements.resultsScreen, this.elements.quizScreen);
+                        this.renderQuestion();
+                    }
+                    return;
+                }
+
+                const keyNum = parseInt(e.key, 10);
+                if (keyNum >= 1 && keyNum <= 9) {
+                    const opts = this.elements.optionsContainer?.querySelectorAll('.option');
+                    if (opts && opts[keyNum - 1] && !opts[keyNum - 1].classList.contains('disabled')) {
+                        opts[keyNum - 1].click();
+                    }
+                    return;
+                }
+
+                if (e.key === 'ArrowRight') {
+                    if (this.elements.prevBtn && !this.elements.prevBtn.disabled) this.elements.prevBtn.click();
+                }
+                if (e.key === 'ArrowLeft') {
+                    if (this.elements.submitBtn && !this.elements.submitBtn.classList.contains('hidden')) {
+                        this.elements.submitBtn.click();
+                    } else if (this.elements.nextBtn && !this.elements.nextBtn.classList.contains('hidden')) {
+                        this.elements.nextBtn.click();
+                    }
+                }
+            });
+        }
+
+        loadQuestions() {
+            const inlineData = document.getElementById('quiz-data')?.textContent.trim();
+            const questionsSource = inlineData
+                ? Promise.resolve(JSON.parse(inlineData))
+                : fetch('questions.json').then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                });
+
+            questionsSource
+                .then(data => {
+                    if (!Array.isArray(data) || data.length === 0) {
+                        throw new Error('questions.json is empty or malformed');
+                    }
+                    this.state.questions = data.map(q => {
+                        const options = q.options.map((text, id) => ({ id, text }));
+                        if (q.shuffleOptions) {
+                            for (let i = options.length - 1; i > 0; i--) {
+                                const j = Math.floor(Math.random() * (i + 1));
+                                [options[i], options[j]] = [options[j], options[i]];
+                            }
+                        }
+                        return { ...q, options };
+                    });
+                    this.state.allMasterQuestions = [...this.state.questions];
+
+                    const welcomeDesc = document.querySelector('.welcome-card > p');
+                    if (welcomeDesc) {
+                        const shuffled = this.state.questions.filter(q => q.shuffleOptions).length;
+                        welcomeDesc.textContent = shuffled
+                            ? `נטענו ${this.state.questions.length} שאלות בהצלחה. סדר התשובות מעורבב אוטומטית במבחני 000 ללא קובץ תשובות.`
+                            : `נטענו ${this.state.questions.length} שאלות בהצלחה.`;
+                    }
+
+                    const saved = QuizPersistence.loadProgress(QuizPersistence.getStorageKey(this.state.questions));
+                    if (saved && saved.answers && saved.answers.length === this.state.questions.length) {
+                        this.elements.resumeNotice?.classList.remove('hidden');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading questions.json:', err);
+                    const welcomeCard = document.querySelector('.welcome-card');
+                    if (welcomeCard) {
+                        const errDiv = document.createElement('div');
+                        errDiv.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:.75rem;background:var(--error-bg);color:var(--error-color);border:1px solid var(--error-color);font-size:.9rem;';
+                        errDiv.innerHTML = `⚠️ לא נמצא קובץ שאלות. <a href="${this.onlineBuilderUrl}" id="builder-nav-error-link" style="color:inherit;text-decoration:underline;">יוצר מבחן אונליין</a> כדי לטעון שאלות, או השתמש בכפתור "פתור מבחן כעת".`;
+                        welcomeCard.appendChild(errDiv);
+                    }
+                    if (this.elements.startBtn) {
+                        this.elements.startBtn.disabled = true;
+                        this.elements.startBtn.style.opacity = '0.4';
+                    }
+                });
         }
     }
 
-    // ── Cropper Logic ─────────────────────────────────────────────────────────
-    let cropperLibLoaded = false;
-
-    function loadCropperLib() {
-        if (cropperLibLoaded) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css';
-            document.head.appendChild(link);
-
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js';
-            script.onload = () => { cropperLibLoaded = true; resolve(); };
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    }
-
-    openCropperBtn.addEventListener('click', async () => {
-        const fullSrc = questionImage.dataset.fullSrc;
-        if (!fullSrc) return;
-
-        await loadCropperLib();
-
-        cropperModal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-
-        const initCropper = () => {
-            if (cropperInstance) cropperInstance.destroy();
-            cropperInstance = new Cropper(cropperImage, {
-                viewMode: 1,
-                dragMode: 'crop',
-                autoCropArea: 0.5,
-                restore: false,
-                guides: true,
-                center: true,
-                highlight: false,
-                cropBoxMovable: true,
-                cropBoxResizable: true,
-                toggleDragModeOnDblclick: false,
-            });
+    // ── Auto-bootstrap on DOMContentLoaded in browser ──────────────────────────
+    if (typeof document !== 'undefined') {
+        const bootstrap = () => {
+            const app = new QuizUIController();
+            app.init();
+            if (typeof window !== 'undefined') {
+                window._quizAppInstance = app;
+            }
         };
 
-        cropperImage.onload = initCropper;
-        cropperImage.src = fullSrc;
-        if (cropperImage.complete) {
-            initCropper();
-        }
-    });
-
-
-    function closeCropper() {
-        cropperModal.classList.add('hidden');
-        document.body.style.overflow = '';
-        if (cropperInstance) {
-            cropperInstance.destroy();
-            cropperInstance = null;
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootstrap);
+        } else {
+            bootstrap();
         }
     }
 
-    closeCropperBtn.addEventListener('click', closeCropper);
-
-    confirmCropBtn.addEventListener('click', () => {
-        if (!cropperInstance) return;
-        
-        // Get the cropped canvas
-        const canvas = cropperInstance.getCroppedCanvas();
-        if (canvas) {
-            const dataUrl = canvas.toDataURL('image/png');
-            const fullSrc = questionImage.dataset.fullSrc;
-            
-            // Save crop for this image
-            croppedImages[fullSrc] = dataUrl;
-            
-            // Update UI
-            questionImage.src = dataUrl;
-        }
-        
-        closeCropper();
-    });
-
-});
+    return {
+        escapeHtml,
+        QuizSessionState,
+        QuizTimerEngine,
+        QuizPersistence,
+        CropperController,
+        QuizUIController
+    };
+}));
