@@ -143,6 +143,48 @@
             height: auto;
             border-radius: 6px;
             border: 1px solid rgba(0, 0, 0, .08);
+            transition: opacity .2s ease;
+        }
+
+        .thumbnail-img.thumbnail-loaded {
+            animation: fadeInThumb .25s ease-out;
+        }
+
+        @keyframes fadeInThumb {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .thumbnail-placeholder {
+            width: 100%;
+            aspect-ratio: 0.707; /* Standard A4 paper ratio */
+            border-radius: 6px;
+            background: rgba(148, 163, 184, 0.12);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed var(--border-color);
+        }
+
+        .thumbnail-skeleton {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+            animation: shimmerThumb 1.5s infinite;
+        }
+
+        @keyframes shimmerThumb {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .thumbnail-loading-text {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            z-index: 1;
         }
 
         .thumbnail-label {

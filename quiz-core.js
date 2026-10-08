@@ -249,9 +249,42 @@
             if (index >= 0 && index < (questions || []).length) selected.add(index);
         });
         return Array.from(selected).sort((a, b) => a - b);
-    }        return {
-            normalizeWhitespace,
+    }
 
+    function formatDuration(totalSeconds) {
+        const s = Math.max(0, Math.round(Number(totalSeconds) || 0));
+        const hours = Math.floor(s / 3600);
+        const minutes = Math.floor((s % 3600) / 60);
+        const seconds = s % 60;
+        const pad = (n) => String(n).padStart(2, '0');
+        if (hours > 0) {
+            return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
+        return `${pad(minutes)}:${pad(seconds)}`;
+    }
+
+    function calculateTimingStats(questionTimes = []) {
+        const times = (Array.isArray(questionTimes) ? questionTimes : [])
+            .map((t) => Math.max(0, Number(t) || 0));
+        const totalSeconds = Math.round(times.reduce((sum, val) => sum + val, 0));
+        const activeTimes = times.filter((t) => t > 0);
+        const count = activeTimes.length || (times.length > 0 ? times.length : 1);
+        const meanSeconds = times.length > 0
+            ? Math.round((totalSeconds / count) * 10) / 10
+            : 0;
+
+        return {
+            totalSeconds,
+            meanSeconds,
+            formattedTotal: formatDuration(totalSeconds),
+            formattedMean: meanSeconds >= 60 ? formatDuration(meanSeconds) : `${meanSeconds} שנ'`,
+            activeCount: activeTimes.length,
+            totalQuestions: times.length
+        };
+    }
+
+    return {
+        normalizeWhitespace,
         stripExamFooterArtifacts,
         normalizeQuestionsJson,
         parseCsvRows,
@@ -261,6 +294,8 @@
         getCustomSelectedIndices,
         validateQuestions,
         normalizeFormNumber,
-        detectFormNumber
+        detectFormNumber,
+        formatDuration,
+        calculateTimingStats
     };
 }));

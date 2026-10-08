@@ -8,7 +8,9 @@ const {
     mergeAnswers,
     getStorageKey,
     getCustomSelectedIndices,
-    validateQuestions
+    validateQuestions,
+    formatDuration,
+    calculateTimingStats
 } = require('../quiz-core.js');
 
 
@@ -663,6 +665,53 @@ await runTest('Cropper Modal - getPdfBytesForCrop', 'Propagates error when pdfFi
         async () => { await CropperModal.getPdfBytesForCrop(); },
         { message: 'Failed to read PDF file bytes' }
     );
+});
+
+await runTest('Exam Timing & Analytics', 'Formats durations into mm:ss and hh:mm:ss correctly', () => {
+    assert.strictEqual(formatDuration(0), '00:00');
+    assert.strictEqual(formatDuration(45), '00:45');
+    assert.strictEqual(formatDuration(65), '01:05');
+    assert.strictEqual(formatDuration(3600), '01:00:00');
+    assert.strictEqual(formatDuration(3725), '01:02:05');
+});
+
+await runTest('Exam Timing & Analytics', 'Calculates total time, per-question active times, and mean time', () => {
+    const questionTimes = [20, 40, 60, 0]; // 3 answered with times, 1 skipped/zero
+    const stats = calculateTimingStats(questionTimes);
+    assert.strictEqual(stats.totalSeconds, 120);
+    assert.strictEqual(stats.activeCount, 3);
+    assert.strictEqual(stats.meanSeconds, 40); // 120 / 3 = 40
+    assert.strictEqual(stats.formattedTotal, '02:00');
+    assert.strictEqual(stats.formattedMean, '40 שנ\'');
+
+    const emptyStats = calculateTimingStats([]);
+    assert.strictEqual(emptyStats.totalSeconds, 0);
+    assert.strictEqual(emptyStats.meanSeconds, 0);
+});
+
+await runTest('Exam Timing & Analytics DOM & Styles', 'Verifies timer elements in quiz_player.html and styles in style.css', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const quizPlayerHtml = fs.readFileSync(path.join(__dirname, '../quiz_player.html'), 'utf8');
+    const styleCss = fs.readFileSync(path.join(__dirname, '../style.css'), 'utf8');
+    const indexHtml = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+
+    assert.ok(quizPlayerHtml.includes('id="quiz-timer-toggle"'), 'quiz-timer-toggle missing in quiz_player.html');
+    assert.ok(quizPlayerHtml.includes('id="exam-timer-badge"'), 'exam-timer-badge missing in quiz_player.html');
+    assert.ok(quizPlayerHtml.includes('id="question-time-badge"'), 'question-time-badge missing in quiz_player.html');
+    assert.ok(quizPlayerHtml.includes('id="timing-analytics-card"'), 'timing-analytics-card missing in quiz_player.html');
+
+    assert.ok(styleCss.includes('.timer-badge'), '.timer-badge missing in style.css');
+    assert.ok(styleCss.includes('.question-time-badge'), '.question-time-badge missing in style.css');
+    assert.ok(styleCss.includes('.timing-analytics-card'), '.timing-analytics-card missing in style.css');
+    assert.ok(styleCss.includes('.review-time-badge'), '.review-time-badge missing in style.css');
+    assert.ok(styleCss.includes('.thumbnail-placeholder'), '.thumbnail-placeholder missing in style.css');
+    assert.ok(indexHtml.includes('thumbnail-placeholder'), 'thumbnail-placeholder missing in index.html');
+});
+
+await runTest('PDF Service - Lazy Sidebar Thumbnails', 'Verifies renderSingleThumbnail export and lazy loading setup', () => {
+    const pdfService = require('../js/pdf-service.js');
+    assert.strictEqual(typeof pdfService.renderSingleThumbnail, 'function', 'renderSingleThumbnail must be exported');
 });
 
 console.log('\n──────────────────────────────────────────────────────────────');

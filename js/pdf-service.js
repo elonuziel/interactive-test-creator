@@ -359,6 +359,37 @@
         return { imageDatas, pagePreviews };
     }
 
+    async function renderSingleThumbnail(state, pageNum) {
+        if (!state?.pdfDoc) return null;
+        const pageState = (state.pdfPagesState || []).find(p => p.pageNum === pageNum);
+        if (!pageState) return null;
+        if (pageState.thumbnailDataUrl) return pageState.thumbnailDataUrl;
+        if (pageState._renderPromise) return pageState._renderPromise;
+
+        pageState._renderPromise = (async () => {
+            try {
+                const page = await state.pdfDoc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 0.25 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                pageState.thumbnailDataUrl = thumbnailDataUrl;
+                return thumbnailDataUrl;
+            } catch (err) {
+                console.warn(`Failed rendering thumbnail for page ${pageNum}:`, err);
+                return null;
+            } finally {
+                delete pageState._renderPromise;
+            }
+        })();
+
+        return pageState._renderPromise;
+    }
+
     async function loadPdfSidebar(pdfBytesInput, state, elements, progressController) {
         const pdfjs = (typeof window !== 'undefined' ? (window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window.pdfjs) : null);
         if (pdfBytesInput) {
@@ -379,48 +410,27 @@
             const freshCopy = new Uint8Array(state.pdfBytes);
             const loadingTask = pdfjs.getDocument({ data: freshCopy });
             const pdfDoc = await loadingTask.promise;
+            state.pdfDoc = pdfDoc;
             const numPages = pdfDoc.numPages;
 
             if (elements.pdfSidebarCard) elements.pdfSidebarCard.classList.remove('hidden');
             if (elements.builderLayout) elements.builderLayout.classList.remove('no-sidebar');
 
+            // Initialize page states with lazy placeholders immediately
             for (let i = 1; i <= numPages; i++) {
-                if (task && task.isAborted()) {
-                    task.abort('טעינת תצוגות העמודים נעצרה.');
-                    return;
-                }
-
-                const percent = Math.round((i / numPages) * 100);
-                if (task) {
-                    task.update(percent, `יוצר תצוגה מקדימה לעמוד ${i} מתוך ${numPages} (${percent}%)...`);
-                }
-
-                const page = await pdfDoc.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ').trim();
-                const isBlank = pageText.length < 30;
-
-                const viewport = page.getViewport({ scale: 0.25 });
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-
-                await page.render({ canvasContext: context, viewport: viewport }).promise;
-                const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
                 state.pdfPagesState.push({
                     pageNum: i,
                     keep: true,
-                    text: pageText,
-                    isBlank: isBlank,
-                    thumbnailDataUrl: thumbnailDataUrl
+                    text: '',
+                    isBlank: false,
+                    thumbnailDataUrl: null
                 });
             }
 
+            // Immediately display the sidebar structure and thumbnails grid
             renderSidebarThumbnails(state, elements);
             if (elements.downloadCleanPdf) elements.downloadCleanPdf.disabled = false;
-            if (task) task.finish(`נטענו ${numPages} עמודים בהצלחה!`);
+            if (task) task.finish(`נטענו ${numPages} עמודים בהצלחה! התמונות נטענות בהדרגה.`);
         } catch (err) {
             console.error('Error rendering PDF sidebar thumbnails:', err);
             if (task) task.fail(`שגיאה בטעינת עמודי PDF: ${err.message || err}`);
@@ -437,13 +447,72 @@
             elements.pageCountBadge.textContent = `${kept} מתוך ${total} עמודים נבחרו`;
         }
 
+        if (state._thumbnailObserver) {
+            try {
+                state._thumbnailObserver.disconnect();
+            } catch (e) {
+                // ignore observer disconnect errors
+            }
+            state._thumbnailObserver = null;
+        }
+
+        async function loadThumbnailForItem(item, pNum) {
+            const pageState = (state.pdfPagesState || []).find(p => p.pageNum === pNum);
+            if (!pageState) return;
+            if (pageState.thumbnailDataUrl) {
+                let img = item.querySelector('img.thumbnail-img');
+                if (!img) {
+                    const placeholder = item.querySelector('.thumbnail-placeholder');
+                    if (placeholder) placeholder.remove();
+                    img = document.createElement('img');
+                    img.className = 'thumbnail-img thumbnail-loaded';
+                    img.alt = `עמוד ${pNum}`;
+                    const label = item.querySelector('.thumbnail-label');
+                    item.insertBefore(img, label);
+                }
+                img.src = pageState.thumbnailDataUrl;
+                return;
+            }
+
+            const dataUrl = await renderSingleThumbnail(state, pNum);
+            if (dataUrl) {
+                const placeholder = item.querySelector('.thumbnail-placeholder');
+                if (placeholder) placeholder.remove();
+                let img = item.querySelector('img.thumbnail-img');
+                if (!img) {
+                    img = document.createElement('img');
+                    img.className = 'thumbnail-img';
+                    img.alt = `עמוד ${pNum}`;
+                    const label = item.querySelector('.thumbnail-label');
+                    item.insertBefore(img, label);
+                }
+                img.src = dataUrl;
+                img.classList.add('thumbnail-loaded');
+            }
+        }
+
+        let observer = null;
+        if (typeof IntersectionObserver !== 'undefined') {
+            observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const item = entry.target;
+                        const pNum = Number(item.dataset.pageNum);
+                        observer.unobserve(item);
+                        loadThumbnailForItem(item, pNum);
+                    }
+                });
+            }, {
+                root: elements.pageThumbnailsContainer,
+                rootMargin: '250px 0px'
+            });
+            state._thumbnailObserver = observer;
+        }
+
         state.pdfPagesState.forEach((pageState) => {
             const item = document.createElement('div');
             item.className = `thumbnail-item ${pageState.keep ? '' : 'disabled-page'}`;
-
-            const img = document.createElement('img');
-            img.src = pageState.thumbnailDataUrl;
-            img.alt = `עמוד ${pageState.pageNum}`;
+            item.dataset.pageNum = String(pageState.pageNum);
 
             const label = document.createElement('label');
             label.className = 'thumbnail-label';
@@ -460,8 +529,29 @@
             label.appendChild(checkbox);
             label.appendChild(document.createTextNode(`עמוד ${pageState.pageNum}`));
 
-            item.appendChild(img);
+            if (pageState.thumbnailDataUrl) {
+                const img = document.createElement('img');
+                img.className = 'thumbnail-img thumbnail-loaded';
+                img.src = pageState.thumbnailDataUrl;
+                img.alt = `עמוד ${pageState.pageNum}`;
+                item.appendChild(img);
+            } else {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'thumbnail-placeholder';
+                placeholder.innerHTML = `<span class="thumbnail-skeleton"></span><span class="thumbnail-loading-text">עמוד ${pageState.pageNum}</span>`;
+                item.appendChild(placeholder);
+
+                if (observer) {
+                    observer.observe(item);
+                }
+            }
+
             item.appendChild(label);
+
+            // Preload the first 6 pages eagerly so top items are rendered instantly
+            if (!pageState.thumbnailDataUrl && pageState.pageNum <= 6) {
+                loadThumbnailForItem(item, pageState.pageNum);
+            }
 
             item.addEventListener('click', (e) => {
                 if (e.target !== checkbox) {
@@ -648,6 +738,7 @@
         renderPageImageData,
         fileToBase64,
         renderAllPdfPageImages,
+        renderSingleThumbnail,
         loadPdfSidebar,
         renderSidebarThumbnails,
         renderSidebarThumbnailsBadgeOnly,

@@ -13,6 +13,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let isReviewMode = false; // true when reviewing from results screen
     let theme = localStorage.getItem('theme') || 'light';
 
+    // ── Timer & Timing Analytics State ──────────────────────────────────────
+    let isTimerEnabled = localStorage.getItem('quiz_timer_enabled') === 'true';
+    let timerMode = localStorage.getItem('quiz_timer_mode') || 'stopwatch'; // 'stopwatch' | 'countdown'
+    let timerCountdownMinutes = parseInt(localStorage.getItem('quiz_timer_minutes') || '30', 10);
+    let isQuestionTimerEnabled = localStorage.getItem('quiz_question_timer_enabled') !== 'false'; // default true
+
+    let totalElapsedSeconds = 0;
+    let remainingCountdownSeconds = timerCountdownMinutes * 60;
+    let questionTimes = []; // number of active seconds spent per question
+    let currentQuestionStartTimestamp = null;
+    let examTimerInterval = null;
+
     const STORAGE_KEY = 'quiz_answers_v1';
 
     function clearAutoAdvance() {
@@ -83,6 +95,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const builderNavLink = document.getElementById('builder-nav-link');
     const onlineBuilderUrl = 'https://elonuziel.github.io/interactive-test-creator/';
 
+    // Timer Elements
+    const quizTimerToggle           = document.getElementById('quiz-timer-toggle');
+    const timerOptionsContainer     = document.getElementById('timer-options-container');
+    const timerModeStopwatch        = document.getElementById('timer-mode-stopwatch');
+    const timerModeCountdown        = document.getElementById('timer-mode-countdown');
+    const timerCountdownMinutesInput = document.getElementById('timer-countdown-minutes');
+    const questionTimerToggle       = document.getElementById('question-timer-toggle');
+
+    const examTimerBadge            = document.getElementById('exam-timer-badge');
+    const timerDisplay              = document.getElementById('timer-display');
+    const questionTimeBadge         = document.getElementById('question-time-badge');
+    const questionTimeDisplay       = document.getElementById('question-time-display');
+
+    const timingAnalyticsCard       = document.getElementById('timing-analytics-card');
+    const totalTimeStat             = document.getElementById('total-time-stat');
+    const meanTimeStat              = document.getElementById('mean-time-stat');
+    const timedQuestionsStat        = document.getElementById('timed-questions-stat');
+
     if (builderNavLink) {
         builderNavLink.href = onlineBuilderUrl;
         builderNavLink.textContent = 'יוצר מבחן אונליין ←';
@@ -151,6 +181,136 @@ document.addEventListener('DOMContentLoaded', () => {
     feedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
     welcomeFeedbackToggle?.addEventListener('change', e => setImmediateFeedback(e.target.checked));
 
+    // ── Timer Configuration & Handlers ───────────────────────────────────────
+    function initTimerControls() {
+        if (quizTimerToggle) {
+            quizTimerToggle.checked = isTimerEnabled;
+            if (timerOptionsContainer) {
+                timerOptionsContainer.classList.toggle('hidden', !isTimerEnabled);
+            }
+            quizTimerToggle.addEventListener('change', (e) => {
+                isTimerEnabled = e.target.checked;
+                localStorage.setItem('quiz_timer_enabled', isTimerEnabled);
+                if (timerOptionsContainer) {
+                    timerOptionsContainer.classList.toggle('hidden', !isTimerEnabled);
+                }
+            });
+        }
+
+        if (timerModeStopwatch && timerModeCountdown) {
+            if (timerMode === 'countdown') {
+                timerModeCountdown.checked = true;
+            } else {
+                timerModeStopwatch.checked = true;
+            }
+            timerModeStopwatch.addEventListener('change', () => {
+                if (timerModeStopwatch.checked) {
+                    timerMode = 'stopwatch';
+                    localStorage.setItem('quiz_timer_mode', 'stopwatch');
+                }
+            });
+            timerModeCountdown.addEventListener('change', () => {
+                if (timerModeCountdown.checked) {
+                    timerMode = 'countdown';
+                    localStorage.setItem('quiz_timer_mode', 'countdown');
+                }
+            });
+        }
+
+        if (timerCountdownMinutesInput) {
+            timerCountdownMinutesInput.value = timerCountdownMinutes;
+            timerCountdownMinutesInput.addEventListener('input', () => {
+                const val = parseInt(timerCountdownMinutesInput.value, 10);
+                if (val && val >= 1) {
+                    timerCountdownMinutes = val;
+                    localStorage.setItem('quiz_timer_minutes', val);
+                }
+            });
+        }
+
+        if (questionTimerToggle) {
+            questionTimerToggle.checked = isQuestionTimerEnabled;
+            questionTimerToggle.addEventListener('change', (e) => {
+                isQuestionTimerEnabled = e.target.checked;
+                localStorage.setItem('quiz_question_timer_enabled', isQuestionTimerEnabled);
+            });
+        }
+    }
+    initTimerControls();
+
+    function startExamTimer(resume = false) {
+        stopExamTimer();
+
+        if (!resume) {
+            totalElapsedSeconds = 0;
+            remainingCountdownSeconds = timerCountdownMinutes * 60;
+        }
+
+        if (examTimerBadge) {
+            examTimerBadge.classList.toggle('hidden', !isTimerEnabled);
+            examTimerBadge.classList.remove('warning');
+        }
+        if (questionTimeBadge) {
+            questionTimeBadge.classList.toggle('hidden', !isQuestionTimerEnabled);
+        }
+
+        currentQuestionStartTimestamp = Date.now();
+        updateTimerDisplays();
+
+        examTimerInterval = setInterval(() => {
+            totalElapsedSeconds++;
+            if (timerMode === 'countdown') {
+                remainingCountdownSeconds--;
+                if (remainingCountdownSeconds <= 0) {
+                    remainingCountdownSeconds = 0;
+                    stopExamTimer();
+                    if (examTimerBadge) examTimerBadge.classList.add('warning');
+                    updateTimerDisplays();
+                    // Auto submit when time has elapsed
+                    setTimeout(() => {
+                        if (submitBtn) submitBtn.click();
+                    }, 800);
+                    return;
+                } else if (remainingCountdownSeconds <= 60 && examTimerBadge) {
+                    examTimerBadge.classList.add('warning');
+                }
+            }
+
+            updateTimerDisplays();
+        }, 1000);
+    }
+
+    function stopExamTimer() {
+        if (examTimerInterval) {
+            clearInterval(examTimerInterval);
+            examTimerInterval = null;
+        }
+        commitCurrentQuestionTime();
+    }
+
+    function commitCurrentQuestionTime() {
+        if (currentQuestionStartTimestamp && currentQuestionIndex >= 0 && currentQuestionIndex < questions.length) {
+            const now = Date.now();
+            const diffSecs = Math.max(0, Math.round((now - currentQuestionStartTimestamp) / 1000));
+            questionTimes[currentQuestionIndex] = (questionTimes[currentQuestionIndex] || 0) + diffSecs;
+            currentQuestionStartTimestamp = null;
+        }
+    }
+
+    function updateTimerDisplays() {
+        if (timerDisplay && isTimerEnabled) {
+            const secs = (timerMode === 'countdown') ? remainingCountdownSeconds : totalElapsedSeconds;
+            timerDisplay.textContent = window.QuizCore ? window.QuizCore.formatDuration(secs) : `${secs}s`;
+        }
+
+        if (questionTimeDisplay && isQuestionTimerEnabled) {
+            const alreadySpent = questionTimes[currentQuestionIndex] || 0;
+            const currentActive = (!isReviewMode && currentQuestionStartTimestamp) ? Math.max(0, Math.round((Date.now() - currentQuestionStartTimestamp) / 1000)) : 0;
+            const totalForThisQ = alreadySpent + currentActive;
+            questionTimeDisplay.textContent = window.QuizCore ? window.QuizCore.formatDuration(totalForThisQ) : `${totalForThisQ}s`;
+        }
+    }
+
     function escapeHtml(str) {
         if (!str) return '';
         return String(str)
@@ -165,10 +325,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const getStorageKey = () => window.QuizCore.getStorageKey(questions);
 
     function saveProgress() {
+        commitCurrentQuestionTime();
+        if (!isReviewMode) {
+            currentQuestionStartTimestamp = Date.now();
+        }
         localStorage.setItem(getStorageKey(), JSON.stringify({
             answers: userAnswers,
             flags: userFlags,
-            index: currentQuestionIndex
+            index: currentQuestionIndex,
+            questionTimes,
+            totalElapsedSeconds,
+            remainingCountdownSeconds
         }));
     }
 
@@ -306,9 +473,11 @@ document.addEventListener('DOMContentLoaded', () => {
         clearProgress();
         userAnswers = new Array(questions.length).fill(null);
         userFlags = new Array(questions.length).fill(false);
+        questionTimes = new Array(questions.length).fill(0);
         currentQuestionIndex = 0;
         isReviewMode = false;
         switchScreen(setupScreen, quizScreen);
+        startExamTimer(false);
         renderQuestion();
     });
 
@@ -317,17 +486,33 @@ document.addEventListener('DOMContentLoaded', () => {
         userAnswers = (saved && saved.answers) ? saved.answers : new Array(questions.length).fill(null);
         userFlags = (saved && saved.flags) ? saved.flags : new Array(questions.length).fill(false);
         currentQuestionIndex = saved ? saved.index : 0;
+        if (saved && Array.isArray(saved.questionTimes)) {
+            questionTimes = saved.questionTimes;
+        } else {
+            questionTimes = new Array(questions.length).fill(0);
+        }
+        if (saved && typeof saved.totalElapsedSeconds === 'number') {
+            totalElapsedSeconds = saved.totalElapsedSeconds;
+        }
+        if (saved && typeof saved.remainingCountdownSeconds === 'number') {
+            remainingCountdownSeconds = saved.remainingCountdownSeconds;
+        }
         switchScreen(setupScreen, quizScreen);
+        startExamTimer(true);
         renderQuestion();
     });
 
     restartBtn.addEventListener('click', () => {
+        stopExamTimer();
         clearProgress();
         if (allMasterQuestions && allMasterQuestions.length > 0) {
             questions = [...allMasterQuestions];
         }
         userAnswers = new Array(questions.length).fill(null);
         userFlags = new Array(questions.length).fill(false);
+        questionTimes = new Array(questions.length).fill(0);
+        totalElapsedSeconds = 0;
+        remainingCountdownSeconds = timerCountdownMinutes * 60;
         currentQuestionIndex = 0;
         isReviewMode = false;
         reviewFilter = 'all';
@@ -345,6 +530,9 @@ document.addEventListener('DOMContentLoaded', () => {
             questions = wrongOrUnanswered;
             userAnswers = new Array(questions.length).fill(null);
             userFlags = new Array(questions.length).fill(false);
+            questionTimes = new Array(questions.length).fill(0);
+            totalElapsedSeconds = 0;
+            remainingCountdownSeconds = timerCountdownMinutes * 60;
             currentQuestionIndex = 0;
             isReviewMode = false;
             reviewFilter = 'all';
@@ -353,6 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             clearProgress();
             switchScreen(resultsScreen, quizScreen);
+            startExamTimer(false);
             renderQuestion();
         });
     }
@@ -365,6 +554,9 @@ document.addEventListener('DOMContentLoaded', () => {
             questions = flaggedList;
             userAnswers = new Array(questions.length).fill(null);
             userFlags = new Array(questions.length).fill(true);
+            questionTimes = new Array(questions.length).fill(0);
+            totalElapsedSeconds = 0;
+            remainingCountdownSeconds = timerCountdownMinutes * 60;
             currentQuestionIndex = 0;
             isReviewMode = false;
             reviewFilter = 'all';
@@ -373,6 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             clearProgress();
             switchScreen(resultsScreen, quizScreen);
+            startExamTimer(false);
             renderQuestion();
         });
     }
@@ -413,6 +606,9 @@ document.addEventListener('DOMContentLoaded', () => {
             questions = customSubList;
             userAnswers = new Array(questions.length).fill(null);
             userFlags = newFlags;
+            questionTimes = new Array(questions.length).fill(0);
+            totalElapsedSeconds = 0;
+            remainingCountdownSeconds = timerCountdownMinutes * 60;
             manualSelectedIndices.clear();
             currentQuestionIndex = 0;
             isReviewMode = false;
@@ -422,6 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             clearProgress();
             switchScreen(resultsScreen, quizScreen);
+            startExamTimer(false);
             renderQuestion();
         });
     }
@@ -438,14 +635,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Navigation Buttons ────────────────────────────────────────────────────
     nextBtn.addEventListener('click', () => {
         if (currentQuestionIndex < questions.length - 1) {
+            commitCurrentQuestionTime();
             currentQuestionIndex++;
+            currentQuestionStartTimestamp = Date.now();
             renderQuestion();
         }
     });
 
     prevBtn.addEventListener('click', () => {
         if (currentQuestionIndex > 0) {
+            commitCurrentQuestionTime();
             currentQuestionIndex--;
+            currentQuestionStartTimestamp = Date.now();
             renderQuestion();
         }
     });
@@ -457,6 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderResults();
             return;
         }
+        stopExamTimer();
         clearProgress();
         switchScreen(quizScreen, resultsScreen);
         renderResults();
@@ -488,7 +690,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             btn.addEventListener('click', () => {
+                commitCurrentQuestionTime();
                 currentQuestionIndex = i;
+                currentQuestionStartTimestamp = Date.now();
                 renderQuestion();
             });
             jumpBar.appendChild(btn);
@@ -500,6 +704,16 @@ document.addEventListener('DOMContentLoaded', () => {
         clearAutoAdvance();
         const q = questions[currentQuestionIndex];
         const answered = userAnswers[currentQuestionIndex];
+
+        // Update timer displays & visibility
+        if (isReviewMode) {
+            if (examTimerBadge) examTimerBadge.classList.add('hidden');
+            if (questionTimeBadge) questionTimeBadge.classList.add('hidden');
+        } else {
+            if (examTimerBadge) examTimerBadge.classList.toggle('hidden', !isTimerEnabled);
+            if (questionTimeBadge) questionTimeBadge.classList.toggle('hidden', !isQuestionTimerEnabled);
+            updateTimerDisplays();
+        }
 
         questionCounter.textContent = `שאלה ${currentQuestionIndex + 1} מתוך ${questions.length}`;
         questionText.textContent = q.question;
@@ -638,7 +852,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (isLast) {
                         submitBtn.click();
                     } else {
+                        commitCurrentQuestionTime();
                         currentQuestionIndex++;
+                        currentQuestionStartTimestamp = Date.now();
                         renderQuestion();
                     }
                 }, totalDurationMs);
@@ -735,6 +951,28 @@ document.addEventListener('DOMContentLoaded', () => {
             scoreText.textContent = `ענית נכונה על ${correctCount} מתוך ${total} שאלות.`;
         }
 
+        // Timing Analytics
+        if (timingAnalyticsCard) {
+            if (isTimerEnabled || isQuestionTimerEnabled) {
+                const stats = window.QuizCore ? window.QuizCore.calculateTimingStats(questionTimes) : null;
+                if (stats) {
+                    const totalSec = isTimerEnabled ? totalElapsedSeconds : stats.totalSeconds;
+                    if (totalTimeStat) {
+                        totalTimeStat.textContent = window.QuizCore ? window.QuizCore.formatDuration(totalSec) : `${totalSec}s`;
+                    }
+                    if (meanTimeStat) {
+                        meanTimeStat.textContent = stats.formattedMean;
+                    }
+                    if (timedQuestionsStat) {
+                        timedQuestionsStat.textContent = String(stats.activeCount);
+                    }
+                    timingAnalyticsCard.classList.remove('hidden');
+                }
+            } else {
+                timingAnalyticsCard.classList.add('hidden');
+            }
+        }
+
         const circle = document.querySelector('.score-circle');
         const scoreEl = document.getElementById('final-score');
 
@@ -779,10 +1017,15 @@ document.addEventListener('DOMContentLoaded', () => {
             div.className = 'review-item';
 
             const isManuallySelected = manualSelectedIndices.has(i);
+            const timeSpent = questionTimes[i] || 0;
+            const timeBadgeHtml = (isQuestionTimerEnabled && timeSpent > 0)
+                ? `<span class="review-time-badge" title="זמן מענה לשאלה">⏱️ ${window.QuizCore ? window.QuizCore.formatDuration(timeSpent) : timeSpent + 's'}</span>`
+                : '';
 
             let html = `
                 <div class="review-item-header">
                     <div class="review-question" style="margin:0;">${i + 1}. ${escapeHtml(q.question)}</div>
+                    ${timeBadgeHtml}
                     <label class="review-card-select-label" onclick="event.stopPropagation();">
                         <input type="checkbox" class="review-card-checkbox" data-index="${i}" ${isManuallySelected ? 'checked' : ''} style="accent-color:var(--primary-color);">
                         <span>בחירה לתרגול</span>

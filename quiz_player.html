@@ -59,6 +59,45 @@
                     </div>
                     <span class="toggle-subtitle">צפייה בתשובה הנכונה מיד עם בחירתה</span>
                 </label>
+
+                <!-- Timer Settings Card -->
+                <div class="timer-settings-card">
+                    <label class="timer-setting-row" for="quiz-timer-toggle">
+                        <div class="timer-setting-label">
+                            <span class="timer-setting-title">⏱️ הפעל טיימר למבחן</span>
+                            <span class="timer-setting-subtitle">מדידת זמן כוללת וספירה קדימה או לאחור</span>
+                        </div>
+                        <div class="toggle-wrapper">
+                            <input type="checkbox" id="quiz-timer-toggle">
+                            <span class="slider"></span>
+                        </div>
+                    </label>
+
+                    <div id="timer-options-container" class="timer-options-grid hidden">
+                        <label class="timer-mode-pill">
+                            <input type="radio" name="timer-mode" id="timer-mode-stopwatch" value="stopwatch" checked>
+                            <span>סטופר (ספירה קדימה)</span>
+                        </label>
+                        <label class="timer-mode-pill">
+                            <input type="radio" name="timer-mode" id="timer-mode-countdown" value="countdown">
+                            <span>ספירה לאחור:</span>
+                            <input type="number" id="timer-countdown-minutes" min="1" max="300" value="30" style="width: 55px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font: inherit; text-align: center;">
+                            <span>דק'</span>
+                        </label>
+                    </div>
+
+                    <label class="timer-setting-row" for="question-timer-toggle" style="margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+                        <div class="timer-setting-label">
+                            <span class="timer-setting-title">⏳ מדידת זמן לכל שאלה</span>
+                            <span class="timer-setting-subtitle">מעקב זמן נפרד לשאלה וחישוב זמן ממוצע (Mean) בסיום</span>
+                        </div>
+                        <div class="toggle-wrapper">
+                            <input type="checkbox" id="question-timer-toggle" checked>
+                            <span class="slider"></span>
+                        </div>
+                    </label>
+                </div>
+
                 <p class="keyboard-hint">ניווט מקלדת: מקשים 1–4 לבחירת תשובה · ← → לניווט בין שאלות · Esc לסגירת זום</p>
             </div>
         </div>
@@ -73,8 +112,12 @@
             </div>
 
             <div class="quiz-card">
-                <div class="question-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span id="question-counter" class="badge" aria-live="polite">שאלה 1 מתוך X</span>
+                <div class="question-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span id="question-counter" class="badge" aria-live="polite">שאלה 1 מתוך X</span>
+                        <span id="exam-timer-badge" class="timer-badge hidden" title="זמן כולל של המבחן">⏱️ <span id="timer-display">00:00</span></span>
+                        <span id="question-time-badge" class="question-time-badge hidden" title="זמן מענה לשאלה הנוכחית">⏳ <span id="question-time-display">00:00</span></span>
+                    </div>
                     <button id="flag-btn" class="flag-btn" type="button" title="סמן שאלה זו (Flag/Star)">
                         <span class="flag-star">☆</span>
                         <span class="flag-text">סמן שאלה</span>
@@ -111,6 +154,27 @@
                         <span id="final-score">0%</span>
                     </div>
                     <p id="score-text">ענית נכונה על 0 מתוך 0 שאלות.</p>
+                </div>
+
+                <!-- Timing Analytics Card -->
+                <div id="timing-analytics-card" class="timing-analytics-card hidden">
+                    <div class="timing-analytics-header">
+                        <h3 class="timing-analytics-title">⏱️ ניתוח זמנים וממוצע לשאלה</h3>
+                    </div>
+                    <div class="timing-stats-grid">
+                        <div class="stat-box">
+                            <span class="stat-box-label">זמן כולל במבחן</span>
+                            <span id="total-time-stat" class="stat-box-value">00:00</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-box-label">זמן ממוצע לשאלה (Mean)</span>
+                            <span id="mean-time-stat" class="stat-box-value">0 שנ'</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-box-label">שאלות שנמדדו</span>
+                            <span id="timed-questions-stat" class="stat-box-value">0</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="results-actions" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px;">
                     <button id="restart-btn" class="primary-btn">התחל מחדש</button>

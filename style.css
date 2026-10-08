@@ -1406,3 +1406,225 @@ select:focus-visible {
     100% { transform: rotate(360deg); }
 }
 
+/* ── Lazy Thumbnail Styles ──────────────────────────────────────────────── */
+.thumbnail-item img.thumbnail-loaded {
+    animation: fadeInThumb .25s ease-out;
+}
+
+@keyframes fadeInThumb {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.thumbnail-placeholder {
+    width: 100%;
+    aspect-ratio: 0.707;
+    border-radius: 6px;
+    background: rgba(148, 163, 184, 0.12);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--border-color);
+}
+
+.thumbnail-skeleton {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%);
+    animation: shimmerThumb 1.5s infinite;
+}
+
+@keyframes shimmerThumb {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.thumbnail-loading-text {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    z-index: 1;
+}
+
+/* ── Exam Timer & Question Timing Styles ───────────────────────────────── */
+.timer-settings-card {
+    margin-top: 14px;
+    padding: 14px 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.timer-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.timer-setting-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: right;
+}
+
+.timer-setting-title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.timer-setting-subtitle {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.timer-options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.timer-mode-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    font-size: 0.84rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.timer-mode-pill:hover {
+    border-color: var(--primary-color);
+}
+
+.timer-mode-pill input[type="radio"] {
+    accent-color: var(--primary-color);
+}
+
+.timer-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--primary-color);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    font-variant-numeric: tabular-nums;
+}
+
+.timer-badge.warning {
+    background: rgba(239, 68, 68, 0.14);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.35);
+    animation: timerPulse 1s infinite alternate;
+}
+
+@keyframes timerPulse {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0.85; transform: scale(1.03); }
+}
+
+.question-time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: rgba(148, 163, 184, 0.14);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Results Timing Analytics ──────────────────────────────────────────── */
+.timing-analytics-card {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    text-align: right;
+}
+
+.timing-analytics-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.timing-analytics-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.timing-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+}
+
+.stat-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-box-label {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.stat-box-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.review-time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary-color);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    font-variant-numeric: tabular-nums;
+    margin-right: auto;
+}
+
