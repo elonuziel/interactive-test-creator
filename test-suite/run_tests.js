@@ -804,6 +804,69 @@ await runTest('Quiz Player Refactor - QuizTimerEngine', 'Controls intervals and 
     timer.cleanup(state);
 });
 
+await runTest('Quiz Player Refactor - QuizUIController DOM Integrity & Settings Sync', 'Resolves player element IDs and synchronizes immediate feedback toggles', () => {
+    const { QuizUIController } = require('../app.js');
+    const fs = require('fs');
+    const path = require('path');
+
+    // 1. Verify quiz_player.html contains correct IDs
+    const html = fs.readFileSync(path.join(__dirname, '../quiz_player.html'), 'utf8');
+    assert.ok(html.includes('id="immediate-feedback-toggle"'), 'immediate-feedback-toggle missing in quiz_player.html');
+    assert.ok(html.includes('id="welcome-immediate-feedback-toggle"'), 'welcome-immediate-feedback-toggle missing in quiz_player.html');
+    assert.ok(html.includes('id="question-jump-bar"'), 'question-jump-bar missing in quiz_player.html');
+    assert.ok(html.includes('id="progress-bar"'), 'progress-bar missing in quiz_player.html');
+
+    // 2. Test cacheElements and initSettings behavior with mock DOM
+    const mockStorage = {};
+    const mockElements = {
+        'immediate-feedback-toggle': { checked: false, listeners: {}, addEventListener(ev, cb) { this.listeners[ev] = cb; } },
+        'welcome-immediate-feedback-toggle': { checked: false, listeners: {}, addEventListener(ev, cb) { this.listeners[ev] = cb; } },
+        'question-jump-bar': { innerHTML: '', appendChild() {} },
+        'progress-bar': { style: {} },
+        'theme-toggle': { listeners: {}, addEventListener(ev, cb) { this.listeners[ev] = cb; } },
+        'theme-icon': { innerHTML: '' },
+        'builder-nav-link': { href: '', textContent: '' }
+    };
+
+    global.document = {
+        getElementById: (id) => mockElements[id] || null,
+        querySelector: (sel) => sel === '.progress-bar' ? mockElements['progress-bar'] : null,
+        querySelectorAll: () => [],
+        documentElement: { setAttribute: () => {}, getAttribute: () => 'light' }
+    };
+    global.localStorage = {
+        getItem: (k) => mockStorage[k] || null,
+        setItem: (k, v) => { mockStorage[k] = String(v); }
+    };
+
+    try {
+        const app = new QuizUIController();
+        app.cacheElements();
+        assert.ok(app.elements.feedbackToggle, 'feedbackToggle must be resolved');
+        assert.ok(app.elements.welcomeFeedbackToggle, 'welcomeFeedbackToggle must be resolved');
+        assert.ok(app.elements.jumpBar, 'jumpBar must be resolved');
+        assert.ok(app.elements.progressBar, 'progressBar must be resolved');
+
+        app.initSettings();
+        assert.strictEqual(app.state.isImmediateFeedback, false);
+
+        // Simulate user clicking welcome feedback toggle
+        mockElements['welcome-immediate-feedback-toggle'].listeners['change']({ target: { checked: true } });
+        assert.strictEqual(app.state.isImmediateFeedback, true);
+        assert.strictEqual(mockElements['immediate-feedback-toggle'].checked, true);
+        assert.strictEqual(mockElements['welcome-immediate-feedback-toggle'].checked, true);
+
+        // Simulate user clicking top nav toggle
+        mockElements['immediate-feedback-toggle'].listeners['change']({ target: { checked: false } });
+        assert.strictEqual(app.state.isImmediateFeedback, false);
+        assert.strictEqual(mockElements['immediate-feedback-toggle'].checked, false);
+        assert.strictEqual(mockElements['welcome-immediate-feedback-toggle'].checked, false);
+    } finally {
+        delete global.document;
+        delete global.localStorage;
+    }
+});
+
 console.log('\n──────────────────────────────────────────────────────────────');
 console.log(`📊 Final Execution Summary: ${testsPassed} Passed, ${testsFailed} Failed.`);
 console.log('──────────────────────────────────────────────────────────────\n');

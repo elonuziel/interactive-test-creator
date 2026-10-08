@@ -371,7 +371,7 @@
                 flaggedCountBadgeFilter: get('flagged-count-badge-filter'),
                 incorrectCountBadge: get('incorrect-count-badge'),
                 questionCounter: get('question-counter'),
-                progressBar: document.querySelector('.progress-bar'),
+                progressBar: get('progress-bar') || document.querySelector('.progress-bar'),
 
                 // Custom practice mix
                 chkMixWrong: get('chk-mix-wrong'),
@@ -389,7 +389,7 @@
                 openCropperBtn: get('open-cropper-btn'),
                 optionsContainer: get('options-container'),
                 feedbackMessage: get('feedback-message'),
-                jumpBar: get('jump-bar'),
+                jumpBar: get('question-jump-bar') || get('jump-bar'),
 
                 // Zoom modal
                 zoomOverlay: get('zoom-overlay'),
@@ -398,8 +398,8 @@
                 // Header toggles & navigation
                 themeToggle: get('theme-toggle'),
                 themeIcon: get('theme-icon'),
-                feedbackToggle: get('feedback-toggle'),
-                welcomeFeedbackToggle: get('welcome-feedback-toggle'),
+                feedbackToggle: get('immediate-feedback-toggle') || get('feedback-toggle'),
+                welcomeFeedbackToggle: get('welcome-immediate-feedback-toggle') || get('welcome-feedback-toggle'),
                 builderNavLink: get('builder-nav-link'),
 
                 // Timer Controls & Badges
